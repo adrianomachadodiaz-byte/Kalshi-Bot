@@ -169,8 +169,9 @@ class EjecutorReal:
         else:
             libro, precio_yes = "bid", ajustar_tick(1 - op.objetivo, m.get("rangos"), "cerca")
         try:
-            r = self.k.crear_orden(op.ticker, libro, precio_yes, op.abiertos(), "good_till_canceled", op.shard,
-                                   reduce_only=True)
+            # Kalshi solo acepta reduce_only en órdenes IOC: el TP (que queda puesto) va sin él.
+            # Por eso el stop no vende hasta confirmar que el TP quedó cancelado (ver stop()).
+            r = self.k.crear_orden(op.ticker, libro, precio_yes, op.abiertos(), "good_till_canceled", op.shard)
             op.tp_orden, op.tp_llenos, op.tp_comision = r["order_id"], 0.0, 0.0
             self.revisar(op)
         except Exception as e:  # noqa: BLE001
@@ -214,8 +215,11 @@ class EjecutorReal:
                 self.k.cancelar(op.tp_orden, op.shard)
             except Exception as e:  # noqa: BLE001
                 log(f"{op.activo} no pude cancelar el TP: {e}")
-            self.revisar(op)                   # registra lo que el TP haya llenado antes de cancelarse
-            op.tp_orden = None
+            self.revisar(op)                   # registra lo que el TP haya llenado y ve si ya no está puesta
+            if op.tp_orden:
+                # el TP sigue puesto: vender ahora podría dejar una posición al revés si después se llena
+                log(f"{op.activo} el TP todavía figura puesto; reintento cancelarlo en el segundo siguiente")
+                return
         if op.abiertos() > 0:
             self._vender(op, 0.01, "Exit", f.ts)
 
