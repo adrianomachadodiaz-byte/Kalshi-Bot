@@ -1,0 +1,7 @@
+datos/
+data/
+*.pem
+.env
+*.jsonl
+*.jsonl.gz
+__pycache__/

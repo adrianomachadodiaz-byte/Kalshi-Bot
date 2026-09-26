@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kalshi Bot</title>
+<style>
+:root{--bg:#0f1115;--card:#171a21;--line:#262b36;--text:#e8e8ea;--muted:#9097a3;--blue:#3b82f6;--green:#22c55e;--red:#f87171;--amber:#f59e0b;
+--greenbg:#0f2e1c;--redbg:#351717;--amberbg:#33260b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:16px}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:16px}
+h1{font-size:22px;margin:0;font-weight:650}
+h2{font-size:16px;margin:0 0 12px;font-weight:600}
+.pill{padding:4px 12px;border-radius:999px;font-size:13px;font-weight:600}
+.on{background:var(--greenbg);color:var(--green)}.off{background:#23262e;color:var(--muted)}.warn{background:var(--amberbg);color:var(--amber)}
+.sp{flex:1}
+button{font:inherit;border:0;border-radius:8px;padding:9px 18px;cursor:pointer;font-weight:600}
+.b-on{background:var(--green);color:#052e16}.b-off{background:var(--red);color:#3b0a0a}.b-main{background:var(--blue);color:#fff}
+.b-ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
+button:disabled{opacity:.5;cursor:default}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.stat .k{color:var(--muted);font-size:13px}.stat .v{font-size:22px;font-weight:650;margin-top:2px}.stat .s{color:var(--muted);font-size:12px}
+.pos{color:var(--green)}.neg{color:var(--red)}
+.wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}th{color:var(--muted);font-weight:500}
+#logs{background:#0b0d11;border:1px solid var(--line);border-radius:8px;height:320px;overflow:auto;padding:10px;
+font:12.5px/1.55 ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-word}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+label{display:block;font-size:13px;color:var(--muted)}
+input,textarea{width:100%;margin-top:4px;padding:9px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:inherit}
+textarea{font:12px ui-monospace,Consolas,monospace;height:140px;resize:vertical}
+.ayuda{font-size:12px;color:var(--muted)}.err{font-size:12px;color:var(--red)}
+.msg{margin-left:12px;font-size:14px}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}
+.aviso{padding:10px 14px;border-radius:8px;margin-bottom:12px;font-size:14px}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}.grid2>*{min-width:0}
+@media(min-width:900px){.grid2{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+.stats{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>Kalshi Bot</h1>
+  <span id="pill" class="pill off">cargando…</span>
+  <span id="uptime" class="ayuda"></span>
+  <span class="sp"></span>
+  <span id="msgPower" class="msg"></span>
+  <button id="power" class="b-on" disabled>Encender</button>
+  <form method="post" action="/logout" style="margin:0"><button class="b-ghost">Salir</button></form>
+</header>
+
+<div id="avisos"></div>
+
+<div class="stats">
+  <div class="stat"><div class="k">Profit total</div><div class="v" id="sProfit">–</div><div class="s" id="sProfitHoy"></div></div>
+  <div class="stat"><div class="k">Operaciones</div><div class="v" id="sOps">–</div><div class="s" id="sOpsHoy"></div></div>
+  <div class="stat"><div class="k">Ganadas</div><div class="v pos" id="sWin">–</div><div class="s" id="sWinMedia"></div></div>
+  <div class="stat"><div class="k">Perdidas</div><div class="v neg" id="sLoss">–</div><div class="s" id="sLossMedia"></div></div>
+  <div class="stat"><div class="k">% de acierto</div><div class="v" id="sWr">–</div><div class="s">para no perder hace falta ~78%</div></div>
+  <div class="stat"><div class="k">Tiempo encendido</div><div class="v" id="sOn">–</div><div class="s" id="sServer"></div></div>
+  <div class="stat"><div class="k">Saldo Kalshi</div><div class="v" id="sSaldo">–</div><div class="s" id="sKey"></div></div>
+</div>
+
+<div class="card">
+  <h2>En vivo</h2>
+  <div class="wrap"><table>
+    <thead><tr><th>Activo</th><th>Mercado</th><th>Queda</th><th>Referencia</th><th>Precio</th><th>Delta</th><th>YES ask/bid</th><th>NO ask/bid</th><th>Estado</th></tr></thead>
+    <tbody id="vivo"></tbody>
+  </table></div>
+</div>
+
+<div class="card">
+  <div class="row" style="margin:0 0 10px"><h2 style="margin:0">Logs</h2><span class="sp"></span>
+    <label style="display:flex;align-items:center;gap:6px;margin:0"><input type="checkbox" id="auto" checked style="width:auto;margin:0">seguir los nuevos</label></div>
+  <div id="logs"></div>
+</div>
+
+<div class="card">
+  <div class="row" style="margin:0 0 10px"><h2 style="margin:0">Operaciones</h2><span class="sp"></span><a href="/operaciones.csv" style="color:var(--blue)">bajar todas (CSV)</a></div>
+  <div class="wrap"><table>
+    <thead><tr><th>Fecha (CDT)</th><th>Activo</th><th>Lado</th><th>Entrada</th><th>Salida</th><th>Precio salida</th><th>Contratos</th><th>Resultado</th><th>$</th></tr></thead>
+    <tbody id="ops"></tbody>
+  </table></div>
+</div>
+
+<div class="grid2">
+  <div class="card">
+    <h2>Ajustes</h2>
+    <p class="ayuda" style="margin-top:-6px">Se aplican al instante al guardar. Una operación ya abierta mantiene su TP.</p>
+    <div class="form" id="form"></div>
+    <div class="row"><button class="b-main" id="guardar">Guardar ajustes</button><button class="b-ghost" id="deshacer">Deshacer cambios</button><span id="msgAjustes" class="msg"></span></div>
+  </div>
+  <div class="card">
+    <h2>API de Kalshi</h2>
+    <p class="ayuda" style="margin-top:-6px">Se crean en kalshi.com → Account → API Keys. La private key no se vuelve a mostrar después de guardarla.</p>
+    <div id="keyEstado" class="aviso off">cargando…</div>
+    <label>API key ID<input id="keyId" autocomplete="off" spellcheck="false" placeholder="ej. a1b2c3d4-…"></label>
+    <label style="margin-top:12px">Private key (.pem completo)<textarea id="pem" spellcheck="false" placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;…&#10;-----END RSA PRIVATE KEY-----"></textarea></label>
+    <div class="row"><button class="b-main" id="guardarKey">Guardar y probar</button><span id="msgKey" class="msg"></span></div>
+  </div>
+</div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+let ultimo = null, campos = [], ajustesGuardados = null;
+
+async function api(path, body) {
+  const r = await fetch(path, body === undefined ? {} : {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+  if (r.status === 401) { location.href = '/'; return null; }
+  return r.json();
+}
+const usd = x => x == null ? '–' : (x >= 0 ? '+' : '−') + '$' + Math.abs(x).toFixed(2);
+const clase = x => x == null ? '' : x > 0 ? 'pos' : x < 0 ? 'neg' : '';
+const n = (x, d = 3) => x == null ? '–' : Number(x).toFixed(d);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+function dur(s) {
+  if (s == null) return '–';
+  s = Math.floor(s); const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
+  return d ? `${d} d ${h} h` : h ? `${h} h ${m} min` : `${m} min ${s % 60} s`;
+}
+function msg(el, texto, ok) { el.textContent = texto; el.className = 'msg ' + (ok ? 'pos' : 'neg'); }
+
+function render(d) {
+  ultimo = d;
+  const pill = $('pill'), btn = $('power');
+  if (!d.conectado) { pill.textContent = 'sin API key'; pill.className = 'pill warn'; }
+  else if (d.encendido) { pill.textContent = 'encendido'; pill.className = 'pill on'; }
+  else { pill.textContent = 'apagado'; pill.className = 'pill off'; }
+  btn.disabled = false;
+  btn.textContent = d.encendido ? 'Apagar' : 'Encender';
+  btn.className = d.encendido ? 'b-off' : 'b-on';
+  $('uptime').textContent = 'servidor activo hace ' + dur(d.servidor_s);
+
+  const av = [];
+  if (!d.conectado) av.push(['warn', 'Falta conectar tu API key de Kalshi (abajo, en "API de Kalshi"). Sin ella el bot solo mira precios.']);
+  if (d.limite_diario) av.push(['warn', 'Se alcanzó el límite del día: no abre operaciones nuevas hasta mañana (CDT).']);
+  if (d.abiertas.length) av.push(['on', 'Operación abierta: ' + d.abiertas.map(o => `${o.activo} ${o.lado} ${o.contratos} a ${n(o.entrada)} → TP ${n(o.objetivo)}`).join(' · ')]);
+  if (d.pendientes) av.push(['off', `${d.pendientes} operación(es) cerrando: esperando el resultado oficial de Kalshi.`]);
+  $('avisos').innerHTML = av.map(([c, t]) => `<div class="aviso ${c}">${esc(t)}</div>`).join('');
+
+  const t = d.total, h = d.hoy;
+  $('sProfit').textContent = usd(t.usd); $('sProfit').className = 'v ' + clase(t.usd);
+  $('sProfitHoy').innerHTML = `hoy <span class="${clase(h.usd)}">${usd(h.usd)}</span>`;
+  $('sOps').textContent = t.ops; $('sOpsHoy').textContent = `hoy ${h.ops}`;
+  $('sWin').textContent = t.ganadas; $('sWinMedia').textContent = t.media_ganada != null ? `media ${usd(t.media_ganada)} · hoy ${h.ganadas}` : `hoy ${h.ganadas}`;
+  $('sLoss').textContent = t.perdidas; $('sLossMedia').textContent = t.media_perdida != null ? `media ${usd(t.media_perdida)} · hoy ${h.perdidas}` : `hoy ${h.perdidas}`;
+  $('sWr').textContent = t.wr == null ? '–' : t.wr + '%';
+  $('sOn').textContent = d.encendido ? dur(d.encendido_s) : 'apagado';
+  $('sServer').textContent = 'servidor: ' + dur(d.servidor_s);
+  $('sSaldo').textContent = d.saldo == null ? '–' : '$' + d.saldo.toFixed(2);
+  $('sKey').textContent = d.conectado ? 'key ' + d.key_id : 'sin API key';
+
+  $('vivo').innerHTML = d.vivo.map(v => v.mercado ? `<tr><td>${v.activo}</td><td>${esc(v.mercado)}</td>
+    <td>${Math.floor(v.quedan / 60)}:${String(Math.floor(v.quedan % 60)).padStart(2, '0')}</td><td>${n(v.referencia, 2)}</td><td>${n(v.precio, 2)}</td>
+    <td class="${v.delta_ok ? 'pos' : ''}">${n(v.delta, 1)}</td><td>${n(v.yes_ask)} / ${n(v.yes_bid)}</td><td>${n(v.no_ask)} / ${n(v.no_bid)}</td>
+    <td>${esc(v.estado)}</td></tr>` : `<tr><td>${v.activo}</td><td colspan="8" class="ayuda">esperando datos…</td></tr>`).join('');
+
+  const box = $('logs'), abajo = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+  box.textContent = d.logs.join('\n') || 'sin mensajes todavía';
+  if ($('auto').checked && abajo) box.scrollTop = box.scrollHeight;
+
+  $('ops').innerHTML = d.operaciones.length ? d.operaciones.map(r => `<tr><td>${r.fecha} ${r.hora_entrada}</td><td>${r.activo}</td><td>${r.lado}</td>
+    <td>${r.entrada}</td><td>${r.salida}</td><td>${r.precio_salida}</td><td>${r.contratos}</td>
+    <td class="${r.resultado === 'GANA' ? 'pos' : 'neg'}">${r.resultado === 'GANA' ? 'ganada' : 'perdida'}</td>
+    <td class="${clase(+r.pnl_usd)}">${usd(+r.pnl_usd)}</td></tr>`).join('') : '<tr><td colspan="9" class="ayuda">todavía no hay operaciones</td></tr>';
+
+  const ke = $('keyEstado');
+  ke.className = 'aviso ' + (d.conectado ? 'on' : 'warn');
+  ke.textContent = d.conectado ? `Conectada · key ${d.key_id} · saldo ${d.saldo == null ? '–' : '$' + d.saldo.toFixed(2)}` : 'No conectada';
+
+  if (!campos.length) { campos = d.campos; ajustesGuardados = d.ajustes; armarForm(); }
+}
+
+function armarForm() {
+  $('form').innerHTML = campos.map(c => `<div><label>${esc(c.etiqueta)}<input id="f_${c.clave}" inputmode="${c.tipo === 'activos' ? 'text' : 'decimal'}"></label>
+    <div class="ayuda">${esc(c.ayuda)}</div><div class="err" id="e_${c.clave}"></div></div>`).join('');
+  llenarForm(ajustesGuardados);
+}
+function llenarForm(v) {
+  for (const c of campos) { $('f_' + c.clave).value = v[c.clave] == null ? '' : v[c.clave]; $('e_' + c.clave).textContent = ''; }
+}
+
+async function refrescar() { try { const d = await api('/api/estado'); if (d) render(d); } catch (e) { $('pill').textContent = 'sin conexión'; $('pill').className = 'pill warn'; } }
+
+$('power').onclick = async () => {
+  const encender = !ultimo.encendido;
+  if (encender && !confirm('El bot va a operar con DINERO REAL. ¿Encender?')) return;
+  $('power').disabled = true;
+  const r = await api(encender ? '/api/encender' : '/api/apagar', {});
+  if (r) msg($('msgPower'), r.msg, r.ok);
+  refrescar();
+};
+
+$('guardar').onclick = async () => {
+  const datos = {};
+  for (const c of campos) { datos[c.clave] = $('f_' + c.clave).value; $('e_' + c.clave).textContent = ''; }
+  const r = await api('/api/ajustes', datos);
+  if (!r) return;
+  msg($('msgAjustes'), r.msg, r.ok);
+  if (r.ok) { ajustesGuardados = r.ajustes; llenarForm(r.ajustes); }
+  else for (const [k, t] of Object.entries(r.errores || {})) $('e_' + k).textContent = t;
+};
+$('deshacer').onclick = () => { llenarForm(ajustesGuardados); $('msgAjustes').textContent = ''; };
+
+$('guardarKey').onclick = async () => {
+  $('guardarKey').disabled = true; msg($('msgKey'), 'probando…', true);
+  const r = await api('/api/claves', {key_id: $('keyId').value, private_key: $('pem').value});
+  $('guardarKey').disabled = false;
+  if (!r) return;
+  msg($('msgKey'), r.msg, r.ok);
+  if (r.ok) { $('pem').value = ''; $('keyId').value = ''; }
+  refrescar();
+};
+
+refrescar();
+setInterval(refrescar, 2000);
+</script>
+</body>
+</html>
