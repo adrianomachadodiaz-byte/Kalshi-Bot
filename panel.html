@@ -69,7 +69,8 @@ textarea{font:12px ui-monospace,Consolas,monospace;height:140px;resize:vertical}
 
 <div class="card" id="cardGrafico" style="display:none">
   <div class="row" style="margin:0 0 10px"><h2 style="margin:0">Bloque en vivo</h2><span id="gTicker" class="ayuda"></span>
-    <span class="sp"></span><span class="ayuda">quedan</span><span id="gQueda" style="font-weight:600"></span></div>
+    <span class="sp"></span><span class="ayuda">ask/bid</span><span id="gLados" style="display:flex;gap:8px"></span>
+    <span class="ayuda" style="margin-left:6px">quedan</span><span id="gQueda" style="font-weight:600"></span></div>
   <div id="grafico"></div>
   <div class="row" id="gPie" style="gap:24px;margin-top:10px;padding-top:8px;border-top:1px solid var(--line)"></div>
 </div>
@@ -397,6 +398,16 @@ function render(d) {
   if (v0) {
     $('gTicker').textContent = v0.mercado;
     $('gQueda').textContent = Math.floor(v0.quedan / 60) + ':' + String(Math.floor(v0.quedan % 60)).padStart(2, '0');
+    // precios de YES y NO en el encabezado; se resalta el lado cuyo ask cae en el rango de entrada
+    const emin = +d.ajustes.entrada_min, emax = +d.ajustes.entrada_max;
+    $('gLados').innerHTML = [['YES', v0.yes_ask, v0.yes_bid, 'var(--green)'], ['NO', v0.no_ask, v0.no_bid, 'var(--red)']]
+      .map(([k, ask, bid, col]) => {
+        const dentro = ask != null && ask >= emin - 1e-9 && ask <= emax + 1e-9;
+        return `<span style="display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;font-size:13px;`
+          + `background:${dentro ? 'rgba(34,197,94,.12)' : '#0b0d11'};border:1px solid ${dentro ? 'var(--green)' : 'var(--line)'}">`
+          + `<b style="color:${col}">${k}</b><span style="font-weight:600">${n(ask, 3)}</span>`
+          + `<span class="ayuda">/ ${n(bid, 3)}</span></span>`;
+      }).join('');
     $('grafico').innerHTML = grafico(v0);
     armarHover();
     dibujarCruz();
