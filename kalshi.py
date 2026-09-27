@@ -18,6 +18,11 @@ import requests
 SERIES = {"BTC": "KXBTC15M", "ETH": "KXETH15M", "SOL": "KXSOL15M", "XRP": "KXXRP15M",
           "DOGE": "KXDOGE15M", "HYPE": "KXHYPE15M", "BNB": "KXBNB15M"}
 
+# Índices de CF Benchmarks con los que Kalshi liquida (y los que muestra la app).
+INDICES = {"BTC": "BRTI", "ETH": "ETHUSD_RTI", "SOL": "SOLUSD_RTI", "XRP": "XRPUSD_RTI",
+           "DOGE": "DOGEUSD_RTI", "HYPE": "HYPEUSD_RTI", "BNB": "BNBUSD_RTI"}
+INDICE_URL = "https://external-api.kalshi.com/trade-api/v2"      # el passthrough /cfbenchmarks vive aquí
+
 
 class ErrorKalshi(Exception):
     def __init__(self, status, texto):
@@ -77,9 +82,34 @@ def ajustar_tick(p, rangos, hacia="cerca"):
     return round(min(max(p, minimo), 1 - rangos[-1][2]), 4)
 
 
+def valor_indice(d):
+    """Saca el número de la respuesta de CF Benchmarks sin depender del formato exacto del payload."""
+    encontrado = []
+
+    def mirar(o):
+        if encontrado:
+            return
+        if isinstance(o, dict):
+            for k, v in o.items():
+                if k.lower() in ("value", "price", "rate", "level", "indexvalue", "index_value"):
+                    n = num(v)
+                    if n and n > 0:
+                        encontrado.append(n)
+                        return
+            for v in o.values():
+                mirar(v)
+        elif isinstance(o, list):
+            for v in o:
+                mirar(v)
+
+    mirar(d)
+    return encontrado[0] if encontrado else None
+
+
 class Kalshi:
-    def __init__(self, rest_url, key_id="", clave=None, min_intervalo=0.06):
+    def __init__(self, rest_url, key_id="", clave=None, min_intervalo=0.06, indice_url=INDICE_URL):
         self.base = rest_url.rstrip("/")
+        self.base_indice = indice_url.rstrip("/")
         self.key_id = key_id
         self.clave = clave
         self.s = requests.Session()
@@ -103,8 +133,8 @@ class Kalshi:
         return {"KALSHI-ACCESS-KEY": self.key_id, "KALSHI-ACCESS-SIGNATURE": base64.b64encode(sig).decode(),
                 "KALSHI-ACCESS-TIMESTAMP": ts}
 
-    def _pedir(self, metodo, ruta, params=None, cuerpo=None, firmar=None, reintentos=3):
-        url = self.base + ruta + ("?" + urlencode(params) if params else "")
+    def _pedir(self, metodo, ruta, params=None, cuerpo=None, firmar=None, reintentos=3, base=None):
+        url = (base or self.base) + ruta + ("?" + urlencode(params) if params else "")
         firmar = self.autenticado if firmar is None else firmar
         for intento in range(reintentos):
             with self.lock:                                  # espacia los pedidos (límite de Kalshi)
@@ -157,6 +187,19 @@ class Kalshi:
         return dict(yes_bid=yb if yb is not None else 0.0, no_bid=nb if nb is not None else 0.0,
                     yes_ask=round(1 - nb, 4) if nb is not None else 1.0,
                     no_ask=round(1 - yb, 4) if yb is not None else 1.0)
+
+    # ------------------------------------------------------------------ índice del activo (el de la app)
+    def indice(self, activo):
+        """Precio del índice de CF Benchmarks con el que Kalshi liquida (BRTI en BTC).
+
+        Va por el passthrough /cfbenchmarks: hace falta API key y que la cuenta tenga ese permiso
+        (si no la tiene, Kalshi responde 401/403 y el bot se queda sin Delta: no opera).
+        """
+        idx = INDICES.get(activo)
+        if not idx:
+            return None
+        d = self._pedir("GET", "/cfbenchmarks/values", {"id": idx}, reintentos=1, base=self.base_indice)
+        return valor_indice(d)
 
     # ------------------------------------------------------------------ cuenta
     def saldo(self, exchange_index=None):
@@ -246,10 +289,3 @@ class Kalshi:
             if not cursor:
                 break
         return n, (nocional / n if n else None), fee
-
-
-def precio_coinbase(sesion, activo):
-    """Precio spot de Coinbase (igual que el grabador)."""
-    r = sesion.get(f"https://api.exchange.coinbase.com/products/{activo}-USD/ticker", timeout=3)
-    r.raise_for_status()
-    return float(r.json()["price"])

@@ -141,6 +141,7 @@ function render(d) {
   const av = [];
   if (!d.conectado) av.push(['warn', 'Falta conectar tu API key de Kalshi (abajo, en "API de Kalshi"). Sin ella el bot solo mira precios.']);
   if (d.limite_diario) av.push(['warn', 'Se alcanzó el límite del día: no abre operaciones nuevas hasta mañana (CDT).']);
+  if (d.aviso_precio) av.push(['warn', 'Precio de BTC: ' + d.aviso_precio + '.']);
   if (d.abiertas.length) av.push(['on', 'Operación abierta: ' + d.abiertas.map(o => `${o.activo} ${o.lado} ${o.contratos} a ${n(o.entrada)} → TP ${n(o.objetivo)}`).join(' · ')]);
   if (d.pendientes) av.push(['off', `${d.pendientes} operación(es) cerrando: esperando el resultado oficial de Kalshi.`]);
   $('avisos').innerHTML = av.map(([c, t]) => `<div class="aviso ${c}">${esc(t)}</div>`).join('');
@@ -179,7 +180,7 @@ function render(d) {
 }
 
 function armarForm() {
-  $('form').innerHTML = campos.map(c => `<div><label>${esc(c.etiqueta)}<input id="f_${c.clave}" inputmode="${c.tipo === 'activos' ? 'text' : 'decimal'}"></label>
+  $('form').innerHTML = campos.map(c => `<div><label>${esc(c.etiqueta)}<input id="f_${c.clave}" inputmode="${c.tipo === 'num' || c.tipo === 'ent' || c.tipo === 'opc' ? 'decimal' : 'text'}"></label>
     <div class="ayuda">${esc(c.ayuda)}</div><div class="err" id="e_${c.clave}"></div></div>`).join('');
   llenarForm(ajustesGuardados);
 }

@@ -11,7 +11,7 @@ Probado contra los datos del 25-ago al 25-sep: el código del bot repite **las m
 
 ## Qué hace
 
-Cada segundo mira el bloque abierto de BTC (libro de Kalshi + precio de Coinbase) y:
+Cada segundo mira el bloque abierto de BTC (libro de Kalshi + índice de BTC de Kalshi) y:
 
 1. **Entra** en los últimos 7 minutos si el ask de YES o de NO está entre 0.81 y 0.86 y
    |precio BTC − precio de referencia del bloque| ≥ 100 $. Si los dos lados están en rango, compra el de ask más alto.
@@ -64,6 +64,7 @@ El panel manda: lo que guardes ahí gana sobre estas variables. Sirven solo como
 |---|---|
 | `ACCESS_TOKEN` | **Obligatoria.** Clave del panel. Sin ella el panel no abre. |
 | `KALSHI_API_KEY_ID`, `KALSHI_PRIVATE_KEY` | API key si prefieres ponerla aquí en vez de en el panel |
+| `KALSHI_INDICE_URL` | URL del passthrough del índice (por defecto `https://external-api.kalshi.com/trade-api/v2`) |
 | `CONTRATOS`, `ACTIVOS`, `DELTA_BTC`, `DELTA_ETH`, `DELAY`, `ENTRADA_MIN`, `ENTRADA_MAX`, `TP`, `EXIT`, `BREAKEVEN`, `MAX_PERDIDA_DIA`, `META_GANANCIA_DIA`, `DESLIZ_ENTRADA` | Ajustes iniciales (los mismos del panel) |
 | `DATA_DIR` | Carpeta del Volume (por defecto `/data`) |
 
@@ -78,8 +79,19 @@ El panel manda: lo que guardes ahí gana sobre estas variables. Sirven solo como
   durante los segundos en que el bot está caído. Los ajustes del panel no reinician nada.
 - **La private key queda guardada en el Volume** (`/data/claves.json`). Cualquiera con tu `ACCESS_TOKEN` puede usar el
   panel: pon una clave larga y no la compartas.
-- **Precio de BTC.** El Delta se calcula con Coinbase. Kalshi liquida con el índice BRTI de CF Benchmarks, y el backtest
-  usó el precio de Kalshi BackTest. La diferencia suele ser de pocos dólares, pero cuenta cerca de Delta = 100.
+- **Precio de BTC: el índice de Kalshi.** El Delta se calcula con el índice de CF Benchmarks con el que Kalshi
+  liquida (BRTI en BTC), que es **el mismo que ves en la app**. El bot lo pide al endpoint `/cfbenchmarks` de la API
+  de Kalshi, firmado con tu API key, y necesita que tu cuenta tenga ese permiso.
+  - Si Kalshi responde que no tienes acceso (401/403/404), el bot **no usa ninguna otra fuente**: se queda sin Delta,
+    no abre operaciones, y lo avisa arriba del panel, en la columna Estado y en los logs. En ese caso pide en Kalshi
+    el acceso al endpoint `/cfbenchmarks`.
+  - Un fallo suelto de la API no corta nada: vale el último índice leído hasta 3 segundos.
+  - Ojo: el backtest de las 466 operaciones se hizo con el precio de Coinbase, que se lleva unos pocos dólares con el
+    índice. Cerca del corte de Delta = 100 algunas entradas pueden salir distintas a las del backtest.
+- **La referencia NO es el precio al abrir el bloque.** El `floor_strike` de Kalshi es el promedio de 60 segundos del
+  índice durante el último minuto del bloque anterior (el mismo valor con el que Kalshi liquidó ese bloque). Por eso
+  el Delta **nunca arranca en 0**: al abrir el bloque ya vale unos 9 $ de media (en 73 bloques medidos del 26-27 de
+  septiembre: mediana 8.8 $, p90 21 $, máximo 42 $). No es un error del bot ni de la fuente del precio.
 - **Liquidez.** El backtest no pudo comprobar el tamaño del libro. Con muchos contratos, la entrada y el stop pueden
   llenarse a peor precio que el ask/bid de arriba.
 - **Comisiones.** Se anotan las que devuelve Kalshi en cada orden.
