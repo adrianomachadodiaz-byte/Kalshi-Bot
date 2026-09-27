@@ -439,6 +439,7 @@ class Bot:
                     activo=h.get("activo", []) if h.get("ticker") == f.ticker else [],
                     contrato=h.get("contrato", []) if h.get("ticker") == f.ticker else [],
                     referencia=f.referencia, ventana=(cfg.delay * 60) if cfg else None,
+                    delta_min=cfg.delta if cfg else None,
                     entrada=op.entrada if op else None, tp=op.objetivo if op else None,
                     exit=cfg.exit if (op and cfg) else None, lado=op.lado if op else None,
                     bid=(f.bid(op.lado) if op else None))
