@@ -70,7 +70,7 @@ textarea{font:12px ui-monospace,Consolas,monospace;height:140px;resize:vertical}
 <div class="card">
   <h2>En vivo</h2>
   <div class="wrap"><table>
-    <thead><tr><th>Activo</th><th>Mercado</th><th>Queda</th><th>Referencia</th><th>Precio</th><th>Delta</th><th>YES ask/bid</th><th>NO ask/bid</th><th>Estado</th></tr></thead>
+    <thead><tr><th>Activo</th><th>Mercado</th><th>Queda</th><th>Referencia</th><th>Precio</th><th>Índice</th><th>Delta</th><th>YES ask/bid</th><th>NO ask/bid</th><th>Estado</th></tr></thead>
     <tbody id="vivo"></tbody>
   </table></div>
 </div>
@@ -159,9 +159,9 @@ function render(d) {
   $('sKey').textContent = d.conectado ? 'key ' + d.key_id : 'sin API key';
 
   $('vivo').innerHTML = d.vivo.map(v => v.mercado ? `<tr><td>${v.activo}</td><td>${esc(v.mercado)}</td>
-    <td>${Math.floor(v.quedan / 60)}:${String(Math.floor(v.quedan % 60)).padStart(2, '0')}</td><td>${n(v.referencia, 2)}</td><td>${n(v.precio, 2)}</td>
+    <td>${Math.floor(v.quedan / 60)}:${String(Math.floor(v.quedan % 60)).padStart(2, '0')}</td><td>${n(v.referencia, 2)}</td><td>${n(v.precio, 2)}</td><td class="ayuda">${v.indice_s == null ? '–' : 'hace ' + v.indice_s.toFixed(0) + ' s'}</td>
     <td class="${v.delta_ok ? 'pos' : ''}">${n(v.delta, 1)}</td><td>${n(v.yes_ask)} / ${n(v.yes_bid)}</td><td>${n(v.no_ask)} / ${n(v.no_bid)}</td>
-    <td>${esc(v.estado)}</td></tr>` : `<tr><td>${v.activo}</td><td colspan="8" class="ayuda">esperando datos…</td></tr>`).join('');
+    <td>${esc(v.estado)}</td></tr>` : `<tr><td>${v.activo}</td><td colspan="9" class="ayuda">esperando datos…</td></tr>`).join('');
 
   const box = $('logs'), abajo = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
   box.textContent = d.logs.join('\n') || 'sin mensajes todavía';

@@ -16,11 +16,13 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+import requests
+
 import operador
 from ejecutores import EjecutorReal, log_cada
 from estrategia import Config, Estrategia, Foto
 from kalshi import INDICE_URL as INDICE_URL_DEF
-from kalshi import ErrorKalshi, Kalshi, cargar_clave
+from kalshi import ErrorKalshi, Kalshi, cargar_clave, precio_indice
 from operador import CDT, Estado, Operador, Registro, log
 
 
@@ -33,8 +35,9 @@ ACCESS_TOKEN = env("ACCESS_TOKEN")
 PORT = int(env("PORT", "8080"))
 DATA_DIR = Path(env("DATA_DIR", "/data" if os.environ.get("RAILWAY_ENVIRONMENT") else "datos"))
 REST_URL = env("KALSHI_REST_URL", "https://api.elections.kalshi.com/trade-api/v2")
-INDICE_URL = env("KALSHI_INDICE_URL", INDICE_URL_DEF)    # passthrough /cfbenchmarks (índice del activo)
+INDICE_URL = env("KALSHI_INDICE_URL", INDICE_URL_DEF)    # feed público del índice ({activo} = btc/eth)
 ACTIVOS_VALIDOS = ("BTC", "ETH")
+CICLO = float(env("CICLO_S", "0.5"))     # segundos entre fotos: con qué rapidez reacciona el stop y la entrada
 
 # ---------------------------------------------------------------- ajustes (panel > variables de Railway > defecto)
 # clave, tipo, defecto, etiqueta, ayuda
@@ -187,58 +190,54 @@ class Mercados:
 
 
 class Precios:
-    """Precio del activo con el que se calcula el Delta.
+    """Precio del activo con el que se calcula el Delta: el índice de CF Benchmarks que usa Kalshi.
 
-    Sale SIEMPRE del índice de CF Benchmarks con el que Kalshi liquida (BRTI en BTC): es el mismo que muestra la
-    app de Kalshi, así que el Delta del panel coincide con lo que ves ahí. Va por el endpoint /cfbenchmarks de la
-    API, firmado con tu API key, y hace falta que tu cuenta tenga ese permiso.
+    Sale del feed público de Kalshi (kalshi-public-docs, `{activo}_current.json`), el mismo número que la app
+    pone como "NOW". No necesita API key. El archivo se actualiza cada segundo y viene ~3-4 s por detrás.
 
-    Si el índice no se puede leer, el bot se queda SIN precio y no abre operaciones (no usa ninguna otra fuente).
+    Si el feed no responde o se queda congelado (más de MAX_ATRASO s), el bot se queda SIN precio y no abre
+    operaciones: no usa ninguna otra fuente.
     """
+
+    MAX_ATRASO = 15        # segundos: más viejo que esto, el precio no sirve para operar
 
     def __init__(self, bot):
         self.bot = bot
-        self.cache = {}         # activo -> (ts, precio)
-        self.indice_ok = None   # None = sin probar · True = funciona · False = la cuenta no tiene el permiso
-        self.nota = ""          # por qué no hay precio (se ve arriba del panel)
+        self.s = requests.Session()
+        self.cache = {}     # activo -> (ts local, precio, atraso del feed)
+        self.nota = ""      # por qué no hay precio (se ve arriba del panel)
 
     def reset(self):
-        """Al cambiar la API key se vuelve a probar el índice."""
-        self.indice_ok, self.nota = None, ""
+        self.nota = ""
+
+    def atraso(self, activo):
+        return self.cache.get(activo, (0, None, None))[2]
 
     def get(self, activo):
-        """Precio del índice, o None si no se pudo leer (entonces el bot no opera)."""
+        """Precio del índice, o None si no hay uno fresco (entonces el bot no opera)."""
         ahora = time.time()
-        ts, p = self.cache.get(activo, (0.0, None))
-        if ahora - ts < 0.8:
+        ts, p, atraso = self.cache.get(activo, (0.0, None, None))
+        if ahora - ts < 0.5:                       # el feed cambia una vez por segundo
             return p
-        if not self.bot.ej:                                   # sin API key no se puede pedir el índice
-            self.nota = "el índice de Kalshi necesita tu API key"
-            return None
-        if self.indice_ok is False:
-            return None
-        v = None
         try:
-            v = self.bot.k.indice(activo)
-        except ErrorKalshi as e:
-            if e.status in (401, 403, 404):                   # la cuenta no tiene el permiso: no insistir
-                self.indice_ok = False
-                self.nota = (f"tu cuenta de Kalshi no tiene acceso al índice (HTTP {e.status}): el bot no puede "
-                             f"calcular el Delta y no va a operar")
-                log(f"NO PUEDO LEER EL ÍNDICE DE KALSHI ({e}). Sin él no hay Delta y el bot no abre operaciones. "
-                    f"Pide en Kalshi el acceso al endpoint /cfbenchmarks.")
-                return None
-            log_cada(f"indice{activo}", f"{activo} el índice de Kalshi no responde: {e}")
+            precio, edad = precio_indice(self.s, activo, INDICE_URL)
         except Exception as e:  # noqa: BLE001
             log_cada(f"indice{activo}", f"{activo} el índice de Kalshi no responde: {e}")
-        if v is not None and v > 0:
-            self.indice_ok, self.nota = True, ""
-            self.cache[activo] = (ahora, v)
-            return v
-        if p is not None and ahora - ts < 3:                  # fallo suelto: vale el último índice, hasta 3 s
-            return p
-        self.nota = "el índice de Kalshi no responde; sin precio no se abren operaciones"
-        return None
+            if p is not None and ahora - ts < 5:   # fallo suelto: vale el último, hasta 5 s
+                return p
+            self.nota = "el índice de Kalshi no responde; sin precio no se abren operaciones"
+            return None
+        if precio is None or precio <= 0:
+            self.nota = "el índice de Kalshi llegó vacío; sin precio no se abren operaciones"
+            return None
+        if edad is not None and edad > self.MAX_ATRASO:
+            self.nota = f"el índice de Kalshi está atrasado {edad:.0f} s; no opero con un precio viejo"
+            log_cada(f"atraso{activo}", f"{activo} el índice viene atrasado {edad:.0f} s: no opero")
+            self.cache[activo] = (ahora, None, edad)
+            return None
+        self.nota = ""
+        self.cache[activo] = (ahora, precio, edad)
+        return precio
 
 # ---------------------------------------------------------------- bot
 class Bot:
@@ -249,7 +248,7 @@ class Bot:
         self.registro = Registro(DATA_DIR, "real")
         self.ajustes = Ajustes(DATA_DIR)
         self.claves = Claves(DATA_DIR)
-        self.k = Kalshi(REST_URL, indice_url=INDICE_URL)   # sin clave: solo datos públicos (precios)
+        self.k = Kalshi(REST_URL)            # sin clave: solo datos públicos (precios)
         self.ej = None                       # EjecutorReal cuando hay API key
         self.key_id = ""
         self.mercados = Mercados(self.k)
@@ -294,7 +293,7 @@ class Bot:
             clave = cargar_clave(pem)
         except Exception as e:  # noqa: BLE001
             return False, f"la private key no es válida ({e.__class__.__name__}). Pega el .pem completo, con BEGIN y END."
-        k = Kalshi(REST_URL, key_id, clave, indice_url=INDICE_URL)
+        k = Kalshi(REST_URL, key_id, clave)
         try:
             saldo = k.saldo()
         except ErrorKalshi as e:
@@ -365,8 +364,10 @@ class Bot:
                 log_cada(f"liq{op.ticker}", f"{op.ticker} lleva 30 min cerrado sin resultado oficial; sigo esperando", 600)
 
     def correr(self):
-        log(f"BOT INICIADO | {'APAGADO' if self.estado.pausado else 'ENCENDIDO'} | datos en {DATA_DIR}")
+        log(f"BOT INICIADO | {'APAGADO' if self.estado.pausado else 'ENCENDIDO'} | datos en {DATA_DIR} | "
+            f"una foto cada {CICLO:g} s")
         while True:
+            t0 = time.time()
             for a in list(dict.fromkeys(self.activos + list(self.estado.abiertas))):
                 try:
                     self.paso(a)
@@ -376,7 +377,7 @@ class Bot:
                 self.liquidar()
             except Exception as e:  # noqa: BLE001
                 log_cada("liquidar", f"error al liquidar: {e}")
-            time.sleep(max(0.05, int(time.time()) + 1.2 - time.time()))     # una foto por segundo
+            time.sleep(max(0.05, CICLO - (time.time() - t0)))
 
     # ------------------------------------------------------------------ para el panel
     def resumen_json(self):
@@ -409,7 +410,8 @@ class Bot:
                 else:
                     est = "buscando entrada"
                 d = f.delta()
-                fila.update(mercado=f.ticker, quedan=quedan, referencia=f.referencia, precio=f.precio, delta=d,
+                fila.update(mercado=f.ticker, quedan=quedan, referencia=f.referencia, precio=f.precio,
+                            indice_s=self.precios.atraso(a), delta=d,
                             delta_ok=bool(cfg and d is not None and d >= cfg.delta), yes_ask=f.yes_ask,
                             yes_bid=f.yes_bid, no_ask=f.no_ask, no_bid=f.no_bid, estado=est)
             vivo.append(fila)

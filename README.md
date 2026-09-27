@@ -11,7 +11,7 @@ Probado contra los datos del 25-ago al 25-sep: el código del bot repite **las m
 
 ## Qué hace
 
-Cada segundo mira el bloque abierto de BTC (libro de Kalshi + índice de BTC de Kalshi) y:
+Dos veces por segundo mira el bloque abierto de BTC (libro de Kalshi + índice de BTC de Kalshi) y:
 
 1. **Entra** en los últimos 7 minutos si el ask de YES o de NO está entre 0.81 y 0.86 y
    |precio BTC − precio de referencia del bloque| ≥ 100 $. Si los dos lados están en rango, compra el de ask más alto.
@@ -28,7 +28,8 @@ Todo se maneja desde el panel (el dominio de Railway, con tu clave `ACCESS_TOKEN
   la sigue cuidando hasta el TP, el stop o el cierre. Queda guardado aunque Railway reinicie.
 - **Estadísticas**: profit total y de hoy, operaciones, ganadas, perdidas (con la media de cada una), % de acierto,
   tiempo encendido y saldo de Kalshi.
-- **En vivo**: bloque, tiempo que queda, referencia, precio, Delta, asks/bids y qué está haciendo.
+- **En vivo**: bloque, tiempo que queda, referencia, precio, antigüedad del índice, Delta, asks/bids y qué
+  está haciendo.
 - **Logs**: los últimos mensajes del bot (entradas, TP, stops, errores), se actualizan cada 2 segundos.
 - **Operaciones**: las últimas 50 y un botón para bajarlas todas en CSV.
 - **Ajustes**: contratos, Delta, Delay, rango de entrada, TP, Exit, BreakEven, límites del día y deslizamiento.
@@ -64,7 +65,8 @@ El panel manda: lo que guardes ahí gana sobre estas variables. Sirven solo como
 |---|---|
 | `ACCESS_TOKEN` | **Obligatoria.** Clave del panel. Sin ella el panel no abre. |
 | `KALSHI_API_KEY_ID`, `KALSHI_PRIVATE_KEY` | API key si prefieres ponerla aquí en vez de en el panel |
-| `KALSHI_INDICE_URL` | URL del passthrough del índice (por defecto `https://external-api.kalshi.com/trade-api/v2`) |
+| `CICLO_S` | Segundos entre fotos (por defecto `0.5`): con qué rapidez reaccionan la entrada y el stop |
+| `KALSHI_INDICE_URL` | URL del feed del índice (por defecto el público de Kalshi; `{activo}` se cambia por btc/eth) |
 | `CONTRATOS`, `ACTIVOS`, `DELTA_BTC`, `DELTA_ETH`, `DELAY`, `ENTRADA_MIN`, `ENTRADA_MAX`, `TP`, `EXIT`, `BREAKEVEN`, `MAX_PERDIDA_DIA`, `META_GANANCIA_DIA`, `DESLIZ_ENTRADA` | Ajustes iniciales (los mismos del panel) |
 | `DATA_DIR` | Carpeta del Volume (por defecto `/data`) |
 
@@ -75,18 +77,20 @@ El panel manda: lo que guardes ahí gana sobre estas variables. Sirven solo como
 - **Saldo en el shard.** Los mercados 15m están en el shard 2 de Kalshi. Al empezar cada bloque (si está encendido)
   el bot deja `CONTRATOS × 1 $` en ese shard, pasándolo del shard 0 si falta (igual que NightShark).
 - **Entrada.** Acepta pagar hasta `DESLIZ_ENTRADA` (0.02) más que el ask, pero nunca más que la entrada máxima (0.86).
+- **Velocidad.** El bot toma una foto cada 0.5 s (variable `CICLO_S`), así que la entrada y el stop reaccionan el
+  doble de rápido que antes. El precio del índice se pide una vez por segundo, que es cada cuánto se actualiza.
 - **Reinicios.** Si Railway reinicia con una operación abierta, el TP sigue puesto en Kalshi, pero el stop no se vigila
   durante los segundos en que el bot está caído. Los ajustes del panel no reinician nada.
 - **La private key queda guardada en el Volume** (`/data/claves.json`). Cualquiera con tu `ACCESS_TOKEN` puede usar el
   panel: pon una clave larga y no la compartas.
-- **Precio de BTC: el índice de Kalshi.** El Delta se calcula con el índice de CF Benchmarks con el que Kalshi
-  liquida (BRTI en BTC), que es **el mismo que ves en la app**. El bot lo pide al endpoint `/cfbenchmarks` de la API
-  de Kalshi, firmado con tu API key, y necesita que tu cuenta tenga ese permiso.
-  - Si Kalshi responde que no tienes acceso (401/403/404), el bot **no usa ninguna otra fuente**: se queda sin Delta,
-    no abre operaciones, y lo avisa arriba del panel, en la columna Estado y en los logs. En ese caso pide en Kalshi
-    el acceso al endpoint `/cfbenchmarks`.
-  - Un fallo suelto de la API no corta nada: vale el último índice leído hasta 3 segundos.
-  - Ojo: el backtest de las 466 operaciones se hizo con el precio de Coinbase, que se lleva unos pocos dólares con el
+- **Precio de BTC: el índice de Kalshi.** El Delta se calcula con el índice de CF Benchmarks (BRTI), el mismo
+  número que la app de Kalshi muestra como **NOW**. Sale del feed público de Kalshi
+  (`kalshi-public-docs.s3.amazonaws.com/external/crypto/btc_current.json`): **no necesita API key**, trae los
+  últimos 60 valores del índice (uno por segundo) y viene unos 3-4 segundos por detrás del tiempo real.
+  - El bot avisa y **no abre operaciones** si el feed no responde o si se queda congelado más de 15 segundos.
+    Nunca cambia a otra fuente de precio.
+  - La columna **Índice** de la tabla "En vivo" dice hace cuántos segundos es el precio.
+  - Ojo: el backtest de las 466 operaciones se hizo con el precio de Coinbase, que se lleva unos dólares con el
     índice. Cerca del corte de Delta = 100 algunas entradas pueden salir distintas a las del backtest.
 - **La referencia NO es el precio al abrir el bloque.** El `floor_strike` de Kalshi es el promedio de 60 segundos del
   índice durante el último minuto del bloque anterior (el mismo valor con el que Kalshi liquidó ese bloque). Por eso
