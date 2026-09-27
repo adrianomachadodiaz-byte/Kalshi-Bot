@@ -134,19 +134,48 @@ function dur(s) {
 }
 function msg(el, texto, ok) { el.textContent = texto; el.className = 'msg ' + (ok ? 'pos' : 'neg'); }
 
+let G = null, hoverX = null;   // estado del gráfico para la cruz
+
+// curva monótona: suaviza sin inventar subidas ni bajadas que no están en los datos
+function curva(p) {
+  const n = p.length;
+  if (n < 2) return '';
+  if (n === 2) return `M ${p[0][0]} ${p[0][1]} L ${p[1][0]} ${p[1][1]}`;
+  const dx = [], m = [], t = [];
+  for (let i = 0; i < n - 1; i++) { dx[i] = p[i + 1][0] - p[i][0] || 1e-6; m[i] = (p[i + 1][1] - p[i][1]) / dx[i]; }
+  t[0] = m[0];
+  for (let i = 1; i < n - 1; i++) {
+    if (m[i - 1] * m[i] <= 0) { t[i] = 0; continue; }
+    const w1 = 2 * dx[i] + dx[i - 1], w2 = dx[i] + 2 * dx[i - 1];
+    t[i] = (w1 + w2) / (w1 / m[i - 1] + w2 / m[i]);
+  }
+  t[n - 1] = m[n - 2];
+  let d = `M ${p[0][0].toFixed(1)} ${p[0][1].toFixed(1)}`;
+  for (let i = 0; i < n - 1; i++) {
+    const h = dx[i] / 3;
+    d += ` C ${(p[i][0] + h).toFixed(1)} ${(p[i][1] + t[i] * h).toFixed(1)} ${(p[i + 1][0] - h).toFixed(1)} ${(p[i + 1][1] - t[i + 1] * h).toFixed(1)} ${p[i + 1][0].toFixed(1)} ${p[i + 1][1].toFixed(1)}`;
+  }
+  return d;
+}
+
+// etiqueta de precio pegada al eje, como las de TradingView
+function capsula(y, texto, fondo, tinta) {
+  const w = texto.length * 6.1 + 12;
+  return `<rect x="${(X_1 + 6).toFixed(1)}" y="${(y - 8).toFixed(1)}" width="${w.toFixed(1)}" height="16" rx="3" fill="${fondo}"></rect>`
+    + `<text x="${(X_1 + 6 + w / 2).toFixed(1)}" y="${(y + 3.6).toFixed(1)}" text-anchor="middle" fill="${tinta}" font-size="10.5" font-weight="700">${texto}</text>`;
+}
+
+const X_0 = 76, X_1 = 796, ALTO_G = 240, Y_0 = 26, Y_1 = ALTO_G - 34, W_G = 880, BLOQUE_S = 900;
+
 function grafico(v) {
   const g = v.grafico;
-  if (!g || !g.activo || g.activo.length < 2) return '';
-  // ALTO: sube o baja este número para agrandar o achicar el gráfico (240 ≈ 280 px en pantalla)
-  const ALTO = 240;
-  const X0 = 76, X1 = 796, Y0 = 26, Y1 = ALTO - 34, W = 880, H = ALTO, BLOQUE = 900;
-  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+  if (!g || !g.activo || g.activo.length < 2) { G = null; return ''; }
+  const X0 = X_0, X1 = X_1, Y0 = Y_0, Y1 = Y_1, W = W_G, H = ALTO_G, BLOQUE = BLOQUE_S;
   const x = s => X0 + (Math.max(0, Math.min(BLOQUE, s)) / BLOQUE) * (X1 - X0);
 
-  // escala del activo: la serie mas la referencia, con un respiro arriba y abajo
   const ps = g.activo.map(p => p[1]).concat(g.referencia != null ? [g.referencia] : []);
   let lo = Math.min(...ps), hi = Math.max(...ps);
-  // los umbrales del Delta entran en la escala, pero sin aplastar la linea: como mucho 3x el recorrido del bloque
+  // los umbrales del Delta entran en la escala, pero sin aplastar la línea: como mucho 3x el recorrido del bloque
   const ref = g.referencia, dm = g.delta_min;
   if (dm > 0 && ref != null) {
     const tope = Math.max(hi - ref, ref - lo, 1) * 3;
@@ -158,7 +187,6 @@ function grafico(v) {
   const ya = p => Y1 - (p - lo) / (hi - lo) * (Y1 - Y0);
   const corta = y => Math.max(Y0, Math.min(Y1, y));
 
-  // escala del contrato: solo cuando hay operacion abierta
   const hayOp = g.tp != null;
   const bids = (g.contrato || []).map(p => p[1]);
   let clo = 0.4, chi = 1;
@@ -168,56 +196,128 @@ function grafico(v) {
   }
   const yc = p => Y1 - (p - clo) / (chi - clo) * (Y1 - Y0);
 
-  const linea = (pts, f) => pts.map(p => x(p[0]).toFixed(1) + ',' + f(p[1]).toFixed(1)).join(' ');
+  G = { g, x, ya, yc, hayOp, lo, hi, X0, X1, Y0, Y1, W, H };
   const o = [];
+
+  // el relleno se apaga al llegar a la referencia y se intensifica al alejarse: el degradado ES el Delta
+  const fRef = ref != null ? ((ya(ref) - Y0) / (Y1 - Y0) * 100) : 100;
+  o.push(`<defs><linearGradient id="gBtc" gradientUnits="userSpaceOnUse" x1="0" y1="${Y0}" x2="0" y2="${Y1}">`
+    + `<stop offset="0%" stop-color="#22c55e" stop-opacity="0.26"></stop>`
+    + `<stop offset="${Math.max(0, Math.min(100, fRef)).toFixed(1)}%" stop-color="#22c55e" stop-opacity="0.015"></stop>`
+    + `<stop offset="100%" stop-color="#22c55e" stop-opacity="0.26"></stop></linearGradient></defs>`);
 
   if (g.ventana) o.push(`<rect x="${x(BLOQUE - g.ventana).toFixed(1)}" y="${Y0}" width="${(X1 - x(BLOQUE - g.ventana)).toFixed(1)}" height="${Y1 - Y0}" fill="#3b82f6" opacity="0.06"></rect>`);
 
-  // zona en la que el Delta todavia no alcanza: entre referencia menos Delta y referencia mas Delta
+  // zona en la que el Delta todavía no alcanza
   if (dm > 0 && ref != null) {
     const yA = corta(ya(ref + dm)), yB = corta(ya(ref - dm));
     o.push(`<rect x="${X0}" y="${yA.toFixed(1)}" width="${X1 - X0}" height="${(yB - yA).toFixed(1)}" fill="#f59e0b" opacity="0.05"></rect>`);
-    [[ref + dm, '+', 12], [ref - dm, '\u2212', -5]].forEach(([val, sig, dy]) => {
+    [[ref + dm, '+', 12], [ref - dm, '−', -5]].forEach(([val, sig, dy]) => {
       const y = ya(val), fuera = y < Y0 || y > Y1, yv = corta(y);
       o.push(`<line x1="${X0}" y1="${yv.toFixed(1)}" x2="${X1}" y2="${yv.toFixed(1)}" stroke="#f59e0b" stroke-width="1" stroke-dasharray="${fuera ? '2 5' : '4 5'}" opacity="0.35"></line>`);
-      o.push(`<text x="${X1 - 4}" y="${(yv + dy).toFixed(1)}" text-anchor="end" fill="#f59e0b" font-size="11" opacity="0.75">${sig}${n(dm, 0)}${fuera ? ' \u2195' : ''}</text>`);
+      o.push(`<text x="${X1 - 4}" y="${(yv + dy).toFixed(1)}" text-anchor="end" fill="#9097a3" font-size="11">${sig}${n(dm, 0)}${fuera ? ' ↕' : ''}</text>`);
     });
   }
-  if (g.referencia != null) o.push(`<line x1="${X0}" y1="${ya(g.referencia).toFixed(1)}" x2="${X1}" y2="${ya(g.referencia).toFixed(1)}" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.5"></line>`);
+
+  if (ref != null) o.push(`<line x1="${X0}" y1="${ya(ref).toFixed(1)}" x2="${X1}" y2="${ya(ref).toFixed(1)}" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.5"></line>`);
   if (hayOp) {
     o.push(`<line x1="${X0}" y1="${yc(g.tp).toFixed(1)}" x2="${X1}" y2="${yc(g.tp).toFixed(1)}" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.5"></line>`);
     if (g.exit != null) o.push(`<line x1="${X0}" y1="${yc(g.exit).toFixed(1)}" x2="${X1}" y2="${yc(g.exit).toFixed(1)}" stroke="#f87171" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.5"></line>`);
   }
 
-  const pa = linea(g.activo, ya);
-  const y0 = (g.referencia != null ? ya(g.referencia) : Y1).toFixed(1);
-  o.push(`<polygon points="${x(g.activo[0][0]).toFixed(1)},${y0} ${pa} ${x(g.activo[g.activo.length - 1][0]).toFixed(1)},${y0}" fill="#22c55e" opacity="0.1"></polygon>`);
-  o.push(`<polyline points="${pa}" fill="none" stroke="#22c55e" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></polyline>`);
-  const ult = g.activo[g.activo.length - 1];
-  o.push(`<circle cx="${x(ult[0]).toFixed(1)}" cy="${ya(ult[1]).toFixed(1)}" r="4" fill="#22c55e"></circle>`);
+  // BTC: relleno en degradado hasta la referencia, y curva suave
+  const pa = g.activo.map(p => [x(p[0]), ya(p[1])]);
+  const yRef = (ref != null ? ya(ref) : Y1);
+  o.push(`<path d="${curva(pa)} L ${pa[pa.length - 1][0].toFixed(1)} ${yRef.toFixed(1)} L ${pa[0][0].toFixed(1)} ${yRef.toFixed(1)} Z" fill="url(#gBtc)"></path>`);
+  o.push(`<path d="${curva(pa)}" fill="none" stroke="#22c55e" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>`);
+  const u = pa[pa.length - 1];
+  o.push(`<circle cx="${u[0].toFixed(1)}" cy="${u[1].toFixed(1)}" r="7" fill="#22c55e" opacity="0.18"></circle>`);
+  o.push(`<circle cx="${u[0].toFixed(1)}" cy="${u[1].toFixed(1)}" r="3.5" fill="#22c55e"></circle>`);
 
   if (hayOp && g.contrato.length) {
-    o.push(`<polyline points="${linea(g.contrato, yc)}" fill="none" stroke="#e8e8ea" stroke-width="2" stroke-linecap="round"></polyline>`);
-    const uc = g.contrato[g.contrato.length - 1];
-    o.push(`<circle cx="${x(uc[0]).toFixed(1)}" cy="${yc(uc[1]).toFixed(1)}" r="4" fill="#e8e8ea"></circle>`);
-    const xe = x(g.contrato[0][0]).toFixed(1);
-    o.push(`<line x1="${xe}" y1="${Y0}" x2="${xe}" y2="${Y1}" stroke="#e8e8ea" stroke-width="1" opacity="0.3"></line>`);
-    o.push(`<text x="${xe - 6}" y="${Y0 - 6}" text-anchor="end" fill="#e8e8ea" font-size="11" font-weight="600">entra</text>`);
-    o.push(`<text x="${X1 + 8}" y="${(yc(g.tp) + 4).toFixed(1)}" fill="#22c55e" font-size="11" font-weight="600">TP ${n(g.tp, 2)}</text>`);
-    if (g.exit != null) o.push(`<text x="${X1 + 8}" y="${(yc(g.exit) + 4).toFixed(1)}" fill="#f87171" font-size="11" font-weight="600">Exit ${n(g.exit, 2)}</text>`);
-    // la etiqueta del bid solo si no se pisa con la del TP o la del Exit
-    const libre = g.bid != null && Math.abs(yc(g.bid) - yc(g.tp)) > 14 && (g.exit == null || Math.abs(yc(g.bid) - yc(g.exit)) > 14);
-    if (libre) o.push(`<text x="${X1 + 8}" y="${(yc(g.bid) + 4).toFixed(1)}" fill="#e8e8ea" font-size="11" font-weight="600">${n(g.bid, 2)}</text>`);
+    const pc = g.contrato.map(p => [x(p[0]), yc(p[1])]);
+    o.push(`<path d="${curva(pc)}" fill="none" stroke="#e8e8ea" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>`);
+    const uc = pc[pc.length - 1];
+    o.push(`<circle cx="${uc[0].toFixed(1)}" cy="${uc[1].toFixed(1)}" r="7" fill="#e8e8ea" opacity="0.18"></circle>`);
+    o.push(`<circle cx="${uc[0].toFixed(1)}" cy="${uc[1].toFixed(1)}" r="3.5" fill="#e8e8ea"></circle>`);
+    const xe = x(g.contrato[0][0]);
+    o.push(`<line x1="${xe.toFixed(1)}" y1="${Y0}" x2="${xe.toFixed(1)}" y2="${Y1}" stroke="#e8e8ea" stroke-width="1" opacity="0.3"></line>`);
+    o.push(`<text x="${(xe - 6).toFixed(1)}" y="${Y0 - 6}" text-anchor="end" fill="#9097a3" font-size="11">entra</text>`);
   }
 
-  o.push(`<text x="${X0 - 8}" y="${Y0 + 12}" text-anchor="end" fill="#22c55e" font-size="11">${Math.round(hi).toLocaleString('es')}</text>`);
-  o.push(`<text x="${X0 - 8}" y="${Y1 + 4}" text-anchor="end" fill="#22c55e" font-size="11">${Math.round(lo).toLocaleString('es')}</text>`);
-  if (g.referencia != null) o.push(`<text x="${X0 + 4}" y="${(ya(g.referencia) - 4).toFixed(1)}" fill="#f59e0b" font-size="11" font-weight="600">referencia ${Math.round(g.referencia).toLocaleString('es')}</text>`);
-  if (g.ventana) o.push(`<text x="${Math.min(x(BLOQUE - g.ventana) + 8, X1 - 96).toFixed(1)}" y="${Y1 - 6}" fill="#3b82f6" font-size="11">últimos ${Math.round(g.ventana / 60)} min</text>`);
+  // cápsulas del borde derecho
+  const ult = g.activo[g.activo.length - 1][1];
+  o.push(capsula(ya(ult), Math.round(ult).toLocaleString('es'), '#22c55e', '#052e16'));
+  if (hayOp) {
+    o.push(capsula(yc(g.tp), 'TP ' + n(g.tp, 2), '#166534', '#dcfce7'));
+    if (g.exit != null) o.push(capsula(yc(g.exit), 'Exit ' + n(g.exit, 2), '#7f1d1d', '#fee2e2'));
+    const libre = g.bid != null && Math.abs(yc(g.bid) - yc(g.tp)) > 17 && (g.exit == null || Math.abs(yc(g.bid) - yc(g.exit)) > 17);
+    if (libre) o.push(capsula(yc(g.bid), n(g.bid, 2), '#e8e8ea', '#0f1115'));
+  }
+
+  o.push(`<text x="${X0 - 8}" y="${Y0 + 12}" text-anchor="end" fill="#9097a3" font-size="11">${Math.round(hi).toLocaleString('es')}</text>`);
+  o.push(`<text x="${X0 - 8}" y="${Y1 + 4}" text-anchor="end" fill="#9097a3" font-size="11">${Math.round(lo).toLocaleString('es')}</text>`);
+  if (ref != null) o.push(`<text x="${X0 + 4}" y="${(ya(ref) - 4).toFixed(1)}" fill="#9097a3" font-size="11">referencia ${Math.round(ref).toLocaleString('es')}</text>`);
+  if (g.ventana) o.push(`<text x="${Math.min(x(BLOQUE - g.ventana) + 8, X1 - 96).toFixed(1)}" y="${Y1 - 6}" fill="#9097a3" font-size="11">últimos ${Math.round(g.ventana / 60)} min</text>`);
   o.push(`<text x="${X0}" y="${Y1 + 18}" fill="#9097a3" font-size="11">inicio</text>`);
   o.push(`<text x="${X1}" y="${Y1 + 18}" text-anchor="end" fill="#9097a3" font-size="11">cierre</text>`);
 
-  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;max-height:340px;display:block" role="img" aria-label="Precio del índice de BTC durante el bloque frente a la referencia${hayOp ? ', y precio del contrato con su TP y su stop' : ''}.">${o.join('')}</svg>`;
+  o.push('<g id="cruz"></g>');
+  return `<svg id="svgG" viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;max-height:340px;display:block" role="img" aria-label="Precio del índice de BTC durante el bloque frente a la referencia${hayOp ? ', y precio del contrato con su TP y su stop' : ''}.">${o.join('')}</svg>`;
+}
+
+// ---- la cruz y su cajita, se redibujan solas sin rehacer el gráfico ----
+function cercano(serie, xf, px) {
+  let mejor = null, dmin = Infinity;
+  for (const p of serie) { const d = Math.abs(xf(p[0]) - px); if (d < dmin) { dmin = d; mejor = p; } }
+  return mejor;
+}
+
+function dibujarCruz() {
+  const el = document.getElementById('cruz');
+  if (!el) return;
+  if (hoverX == null || !G) { el.innerHTML = ''; return; }
+  const { g, x, ya, yc, hayOp, X0, X1, Y0, Y1 } = G;
+  const px = Math.max(X0, Math.min(X1, hoverX));
+  const pa = cercano(g.activo, x, px);
+  if (!pa) { el.innerHTML = ''; return; }
+  const xx = x(pa[0]);
+  const filas = [['BTC', Math.round(pa[1]).toLocaleString('es'), '#22c55e']];
+  if (g.referencia != null) filas.push(['Delta', (pa[1] - g.referencia >= 0 ? '+' : '') + n(pa[1] - g.referencia, 1), '#f59e0b']);
+  const pc = hayOp && g.contrato.length ? cercano(g.contrato, x, px) : null;
+  if (pc && Math.abs(x(pc[0]) - xx) < 12) filas.push(['Contrato', n(pc[1], 3), '#e8e8ea']);
+  const mm = String(Math.floor(pa[0] / 60)).padStart(2, '0') + ':' + String(pa[0] % 60).padStart(2, '0');
+
+  const anchoCaja = 138, altoCaja = 22 + filas.length * 15;
+  const izq = xx > (X0 + X1) / 2;
+  const cx = izq ? xx - anchoCaja - 10 : xx + 10;
+  const cy = Math.max(Y0, Math.min(Y1 - altoCaja, Y0 + 8));
+  const o = [`<line x1="${xx.toFixed(1)}" y1="${Y0}" x2="${xx.toFixed(1)}" y2="${Y1}" stroke="#9097a3" stroke-width="1" stroke-dasharray="3 3" opacity="0.7"></line>`,
+    `<circle cx="${xx.toFixed(1)}" cy="${ya(pa[1]).toFixed(1)}" r="4" fill="#0f1115" stroke="#22c55e" stroke-width="2"></circle>`];
+  if (pc) o.push(`<circle cx="${x(pc[0]).toFixed(1)}" cy="${yc(pc[1]).toFixed(1)}" r="4" fill="#0f1115" stroke="#e8e8ea" stroke-width="2"></circle>`);
+  o.push(`<rect x="${cx.toFixed(1)}" y="${cy}" width="${anchoCaja}" height="${altoCaja}" rx="6" fill="#0b0d11" stroke="#262b36"></rect>`);
+  o.push(`<text x="${cx + 10}" y="${cy + 15}" fill="#9097a3" font-size="10.5">minuto ${mm}</text>`);
+  filas.forEach(([k, val, col], i) => {
+    const y = cy + 30 + i * 15;
+    o.push(`<line x1="${cx + 10}" y1="${y - 3.5}" x2="${cx + 22}" y2="${y - 3.5}" stroke="${col}" stroke-width="2"></line>`);
+    o.push(`<text x="${cx + 28}" y="${y}" fill="#9097a3" font-size="10.5">${k}</text>`);
+    o.push(`<text x="${cx + anchoCaja - 10}" y="${y}" text-anchor="end" fill="#e8e8ea" font-size="11.5" font-weight="650">${val}</text>`);
+  });
+  el.innerHTML = o.join('');
+}
+
+function armarHover() {
+  const cont = document.getElementById('grafico');
+  if (!cont || cont.dataset.hover) return;
+  cont.dataset.hover = '1';
+  const aX = ev => {
+    const svg = document.getElementById('svgG');
+    if (!svg) return null;
+    const r = svg.getBoundingClientRect();
+    return r.width ? ((ev.clientX - r.left) / r.width) * W_G : null;
+  };
+  cont.addEventListener('pointermove', ev => { hoverX = aX(ev); dibujarCruz(); });
+  cont.addEventListener('pointerleave', () => { hoverX = null; dibujarCruz(); });
 }
 
 function render(d) {
@@ -262,6 +362,8 @@ function render(d) {
     $('gTicker').textContent = v0.mercado;
     $('gQueda').textContent = Math.floor(v0.quedan / 60) + ':' + String(Math.floor(v0.quedan % 60)).padStart(2, '0');
     $('grafico').innerHTML = grafico(v0);
+    armarHover();
+    dibujarCruz();
     const g = v0.grafico, pie = [['Delta', n(v0.delta, 1), clase(v0.delta)]];
     if (g.tp != null) {
       pie.push(['Bid · entrada', n(g.bid, 3) + ' · ' + n(g.entrada, 3), '']);
