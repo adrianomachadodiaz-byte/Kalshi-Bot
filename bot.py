@@ -20,7 +20,7 @@ import requests
 
 import operador
 from ejecutores import EjecutorReal, log_cada
-from estrategia import Config, Estrategia, Foto
+from estrategia import BLOQUE, Config, Estrategia, Foto
 from kalshi import INDICE_URL as INDICE_URL_DEF
 from kalshi import ErrorKalshi, Kalshi, cargar_clave, precio_indice
 from operador import CDT, Estado, Operador, Registro, log
@@ -38,6 +38,7 @@ REST_URL = env("KALSHI_REST_URL", "https://api.elections.kalshi.com/trade-api/v2
 INDICE_URL = env("KALSHI_INDICE_URL", INDICE_URL_DEF)    # feed público del índice ({activo} = btc/eth)
 ACTIVOS_VALIDOS = ("BTC", "ETH")
 CICLO = float(env("CICLO_S", "0.5"))     # segundos entre fotos: con qué rapidez reacciona el stop y la entrada
+PASO_GRAFICO = 3                         # segundos entre puntos de la serie que dibuja el panel
 
 # ---------------------------------------------------------------- ajustes (panel > variables de Railway > defecto)
 # clave, tipo, defecto, etiqueta, ayuda
@@ -256,7 +257,7 @@ class Bot:
         self.op = Operador({}, None, self.estado, self.registro, 1)
         self.activos, self.cfgs = [], {}
         self.aplicar(self.ajustes.valores)
-        self.preparado, self.visto, self.vista = {}, {}, {}
+        self.preparado, self.visto, self.vista, self.historia = {}, {}, {}, {}
         self.ultimo_liquidar = 0.0
         self.saldo_cache = (0.0, None)
         key_id, pem = self.claves.leer()
@@ -335,6 +336,7 @@ class Bot:
         f = Foto(ts=time.time(), ticker=t, cierre=m["cierre"], referencia=m["referencia"],
                  precio=self.precios.get(activo), **libro)
         self.vista[activo] = f
+        self._anotar_grafico(activo, f)
         if not self.ej:
             return
         self.ej.info[t] = m
@@ -347,6 +349,28 @@ class Bot:
         if activo not in self.activos and activo not in self.estado.abiertas:
             return
         self.op.procesar(activo, f)
+
+    def _anotar_grafico(self, activo, f: Foto):
+        """Serie del bloque para el gráfico del panel: un punto cada PASO_GRAFICO s.
+
+        Del activo se guarda siempre el precio; del contrato solo mientras hay una operación abierta,
+        y del lado comprado (que es el que se compara con el TP y el Exit).
+        """
+        h = self.historia.get(activo)
+        if not h or h["ticker"] != f.ticker:
+            h = self.historia[activo] = dict(ticker=f.ticker, activo=[], contrato=[])
+        seg = f.segundo()
+        if seg < 0 or seg > BLOQUE:
+            return
+        if h["activo"] and seg < h["activo"][-1][0]:      # el reloj del bloque retrocedió: empiezo de nuevo
+            h["activo"], h["contrato"] = [], []
+        if f.precio is not None and (not h["activo"] or seg - h["activo"][-1][0] >= PASO_GRAFICO):
+            h["activo"].append([seg, round(f.precio, 2)])
+        op = self.estado.abiertas.get(activo)
+        if op and op.ticker == f.ticker:
+            bid = f.bid(op.lado)
+            if bid is not None and (not h["contrato"] or seg - h["contrato"][-1][0] >= PASO_GRAFICO):
+                h["contrato"].append([seg, round(bid, 3)])
 
     def liquidar(self):
         if not self.ej or time.time() - self.ultimo_liquidar < 3:
@@ -410,6 +434,14 @@ class Bot:
                 else:
                     est = "buscando entrada"
                 d = f.delta()
+                h = self.historia.get(a) or {}
+                fila["grafico"] = dict(
+                    activo=h.get("activo", []) if h.get("ticker") == f.ticker else [],
+                    contrato=h.get("contrato", []) if h.get("ticker") == f.ticker else [],
+                    referencia=f.referencia, ventana=(cfg.delay * 60) if cfg else None,
+                    entrada=op.entrada if op else None, tp=op.objetivo if op else None,
+                    exit=cfg.exit if (op and cfg) else None, lado=op.lado if op else None,
+                    bid=(f.bid(op.lado) if op else None))
                 fila.update(mercado=f.ticker, quedan=quedan, referencia=f.referencia, precio=f.precio,
                             indice_s=self.precios.atraso(a), delta=d,
                             delta_ok=bool(cfg and d is not None and d >= cfg.delta), yes_ask=f.yes_ask,
