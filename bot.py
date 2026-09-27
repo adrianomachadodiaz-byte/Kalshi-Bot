@@ -38,7 +38,7 @@ REST_URL = env("KALSHI_REST_URL", "https://api.elections.kalshi.com/trade-api/v2
 INDICE_URL = env("KALSHI_INDICE_URL", INDICE_URL_DEF)    # feed público del índice ({activo} = btc/eth)
 ACTIVOS_VALIDOS = ("BTC", "ETH")
 CICLO = float(env("CICLO_S", "0.5"))     # segundos entre fotos: con qué rapidez reacciona el stop y la entrada
-PASO_GRAFICO = 3                         # segundos entre puntos de la serie que dibuja el panel
+PASO_GRAFICO = 1                         # segundos entre puntos de la serie que dibuja el panel
 
 # ---------------------------------------------------------------- ajustes (panel > variables de Railway > defecto)
 # clave, tipo, defecto, etiqueta, ayuda
@@ -206,6 +206,7 @@ class Precios:
         self.bot = bot
         self.s = requests.Session()
         self.cache = {}     # activo -> (ts local, precio, atraso del feed)
+        self.series = {}    # activo -> [(epoch, precio)] del último feed leído
         self.nota = ""      # por qué no hay precio (se ve arriba del panel)
 
     def reset(self):
@@ -221,7 +222,7 @@ class Precios:
         if ahora - ts < 0.5:                       # el feed cambia una vez por segundo
             return p
         try:
-            precio, edad = precio_indice(self.s, activo, INDICE_URL)
+            precio, edad, serie = precio_indice(self.s, activo, INDICE_URL)
         except Exception as e:  # noqa: BLE001
             log_cada(f"indice{activo}", f"{activo} el índice de Kalshi no responde: {e}")
             if p is not None and ahora - ts < 5:   # fallo suelto: vale el último, hasta 5 s
@@ -238,6 +239,7 @@ class Precios:
             return None
         self.nota = ""
         self.cache[activo] = (ahora, precio, edad)
+        self.series[activo] = serie
         return precio
 
 # ---------------------------------------------------------------- bot
@@ -351,26 +353,29 @@ class Bot:
         self.op.procesar(activo, f)
 
     def _anotar_grafico(self, activo, f: Foto):
-        """Serie del bloque para el gráfico del panel: un punto cada PASO_GRAFICO s.
+        """Serie del bloque para el gráfico del panel, un punto por segundo.
 
-        Del activo se guarda siempre el precio; del contrato solo mientras hay una operación abierta,
-        y del lado comprado (que es el que se compara con el TP y el Exit).
+        El feed del índice trae los últimos 60 segundos en cada lectura, así que se vuelcan todos:
+        la línea queda con un punto por segundo aunque el bot pregunte más despacio o se pierda una lectura.
+        Del contrato se guarda el bid del lado comprado, solo mientras hay una operación abierta.
         """
         h = self.historia.get(activo)
         if not h or h["ticker"] != f.ticker:
-            h = self.historia[activo] = dict(ticker=f.ticker, activo=[], contrato=[])
+            h = self.historia[activo] = dict(ticker=f.ticker, activo={}, contrato={})
+        ini = f.cierre - BLOQUE
+        for ts, val in (self.precios.series.get(activo) or []):
+            seg = int(round(ts - ini))
+            if 0 <= seg <= BLOQUE and seg not in h["activo"]:
+                h["activo"][seg] = round(val, 2)
         seg = f.segundo()
-        if seg < 0 or seg > BLOQUE:
-            return
-        if h["activo"] and seg < h["activo"][-1][0]:      # el reloj del bloque retrocedió: empiezo de nuevo
-            h["activo"], h["contrato"] = [], []
-        if f.precio is not None and (not h["activo"] or seg - h["activo"][-1][0] >= PASO_GRAFICO):
-            h["activo"].append([seg, round(f.precio, 2)])
-        op = self.estado.abiertas.get(activo)
-        if op and op.ticker == f.ticker:
-            bid = f.bid(op.lado)
-            if bid is not None and (not h["contrato"] or seg - h["contrato"][-1][0] >= PASO_GRAFICO):
-                h["contrato"].append([seg, round(bid, 3)])
+        if 0 <= seg <= BLOQUE:
+            if f.precio is not None and seg not in h["activo"]:
+                h["activo"][seg] = round(f.precio, 2)
+            op = self.estado.abiertas.get(activo)
+            if op and op.ticker == f.ticker:
+                bid = f.bid(op.lado)
+                if bid is not None and seg not in h["contrato"]:
+                    h["contrato"][seg] = round(bid, 3)
 
     def liquidar(self):
         if not self.ej or time.time() - self.ultimo_liquidar < 3:
@@ -435,9 +440,10 @@ class Bot:
                     est = "buscando entrada"
                 d = f.delta()
                 h = self.historia.get(a) or {}
+                mio = h.get("ticker") == f.ticker
+                orden = lambda k: sorted([s_, v_] for s_, v_ in (h.get(k) or {}).items()) if mio else []
                 fila["grafico"] = dict(
-                    activo=h.get("activo", []) if h.get("ticker") == f.ticker else [],
-                    contrato=h.get("contrato", []) if h.get("ticker") == f.ticker else [],
+                    activo=orden("activo"), contrato=orden("contrato"),
                     referencia=f.referencia, ventana=(cfg.delay * 60) if cfg else None,
                     delta_min=cfg.delta if cfg else None,
                     entrada=op.entrada if op else None, tp=op.objetivo if op else None,
