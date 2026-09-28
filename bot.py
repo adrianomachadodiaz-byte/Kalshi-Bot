@@ -203,13 +203,18 @@ class Precios:
     operaciones: no usa ninguna otra fuente.
     """
 
-    MAX_ATRASO = 15        # segundos: más viejo que esto, el precio no sirve para operar
+    MAX_ATRASO = 2         # segundos: más viejo que esto, el precio no sirve para operar.
+                           # Con 15 s el Delta se calcula sobre un movimiento que ya se dio la vuelta:
+                           # medido el 27-28 sep, el bot entraba con un precio ~28 s viejo y eso se comía
+                           # más de la mitad de la ventaja (backtest 30 días: +4.22 -> +1.91 c/op).
+    MAX_CONGELADO = 3      # segundos: si el archivo no avanza más que esto, está congelado
 
     def __init__(self, bot):
         self.bot = bot
         self.s = requests.Session()
         self.cache = {}     # activo -> (ts local, precio, atraso del feed)
         self.series = {}    # activo -> [(epoch, precio)] del último feed leído
+        self.ult_ms = {}    # activo -> (marca del archivo, hora local en que la vimos avanzar)
         self.nota = ""      # por qué no hay precio (se ve arriba del panel)
 
     def reset(self):
@@ -234,6 +239,16 @@ class Precios:
             return None
         if precio is None or precio <= 0:
             self.nota = "el índice de Kalshi llegó vacío; sin precio no se abren operaciones"
+            return None
+        # feed congelado: el archivo responde pero su marca de tiempo no avanza
+        marca = ahora - (edad or 0)
+        vieja, visto = self.ult_ms.get(activo, (None, ahora))
+        if vieja is None or marca > vieja + 0.5:
+            self.ult_ms[activo] = (marca, ahora)
+        elif ahora - visto > self.MAX_CONGELADO:
+            self.nota = f"el índice de Kalshi lleva {ahora - visto:.0f} s sin avanzar; no opero con un precio congelado"
+            log_cada(f"congelado{activo}", f"{activo} el índice lleva {ahora - visto:.0f} s congelado: no opero")
+            self.cache[activo] = (ahora, None, ahora - visto)
             return None
         if edad is not None and edad > self.MAX_ATRASO:
             self.nota = f"el índice de Kalshi está atrasado {edad:.0f} s; no opero con un precio viejo"
@@ -339,7 +354,7 @@ class Bot:
             log(f"{activo} nuevo bloque {t} | referencia {m['referencia']} | shard {m['exchange_index']}")
         libro = self.k.libro(t)
         f = Foto(ts=time.time(), ticker=t, cierre=m["cierre"], referencia=m["referencia"],
-                 precio=self.precios.get(activo), **libro)
+                 precio=self.precios.get(activo), atraso=self.precios.atraso(activo), **libro)
         self.vista[activo] = f
         self._anotar_grafico(activo, f)
         if not self.ej:

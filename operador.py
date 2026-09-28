@@ -16,7 +16,7 @@ from estrategia import Estrategia, Foto, Operacion
 
 CDT = ZoneInfo("America/Chicago")
 COLUMNAS = ["fecha", "hora_entrada", "hora_salida", "activo", "mercado", "lado", "entrada", "salida",
-            "precio_salida", "contratos", "min_restantes", "delta", "pnl_c", "pnl_usd", "resultado", "modo"]
+            "precio_salida", "contratos", "min_restantes", "delta", "atraso_s", "pnl_c", "pnl_usd", "resultado", "modo"]
 
 
 LOGS = deque(maxlen=500)   # últimas líneas, para el panel
@@ -91,6 +91,7 @@ class Registro:
             salida="+".join(motivos), precio_salida=round(sum(s["n"] * s["precio"] for s in op.salidas) / n_sal, 4),
             contratos=op.contratos, min_restantes=round((op.cierre - op.ts_entrada) / 60, 1),
             delta=round(op.delta, 1) if op.delta is not None else "",
+            atraso_s=round(op.atraso, 1) if op.atraso is not None else "",
             pnl_c=round(pnl / op.contratos * 100, 2) if op.contratos else 0, pnl_usd=round(pnl, 2),
             resultado="GANA" if pnl > 0 else "PIERDE", modo=self.modo)
         nuevo = not self.ruta.exists()

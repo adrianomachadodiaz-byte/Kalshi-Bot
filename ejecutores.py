@@ -28,7 +28,7 @@ def log_cada(clave, msg, seg=30):
 def nueva_operacion(activo, f: Foto, lado, entrada, n, cfg: Config, comision_total, shard=None):
     return Operacion(activo=activo, ticker=f.ticker, lado=lado, entrada=round(entrada, 4), contratos=n, cierre=f.cierre,
                      objetivo=round(min(entrada + cfg.tp, 0.99), 4), ts_entrada=f.ts, delta=f.delta(),
-                     comision_entrada=comision_total, shard=shard)
+                     atraso=f.atraso, comision_entrada=comision_total, shard=shard)
 
 
 class EjecutorSim:

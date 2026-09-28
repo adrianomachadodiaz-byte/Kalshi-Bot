@@ -44,6 +44,7 @@ class Foto:
     no_ask: Optional[float]
     yes_bid: Optional[float]
     no_bid: Optional[float]
+    atraso: Optional[float] = None   # segundos de antigüedad del precio (para vigilar el feed)
 
     def valida(self):
         """Igual que el backtest: los dos asks existen y suman entre 0.97 y 1.10."""
@@ -88,6 +89,7 @@ class Operacion:
     tp_llenos: float = 0.0     # contratos del TP ya registrados (modo real)
     tp_comision: float = 0.0
     shard: Optional[int] = None  # exchange_index del mercado (modo real)
+    atraso: Optional[float] = None   # antigüedad del precio con el que se decidió entrar
 
     def abiertos(self):
         return round(self.contratos - sum(s["n"] for s in self.salidas), 2)

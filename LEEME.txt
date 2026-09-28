@@ -1,0 +1,24 @@
+ARREGLO DEL ATRASO DEL PRECIO (28 s) - 28-sep-2026
+
+QUE HACER
+  1. Para el bot.
+  2. Copia los 5 archivos de esta carpeta encima de los que tienes en la carpeta del bot,
+     reemplazandolos: bot.py, kalshi.py, estrategia.py, ejecutores.py, operador.py
+  3. Arranca el bot.
+
+QUE CAMBIO (nada de la estrategia: los parametros siguen exactamente iguales)
+  - kalshi.py: el precio de BTC sale de un archivo en S3. El "Cache-Control: no-cache" que
+    mandaba el bot NO obliga a S3/CloudFront a saltarse su cache, asi que el bot recibia
+    copias guardadas de hasta ~30 s. Ahora la URL cambia en cada pedido y el borde no puede
+    servir una copia vieja. Ademas se lee la cabecera Age por si aun asi la sirve.
+  - bot.py: MAX_ATRASO de 15 s a 2 s, y si el archivo deja de avanzar 3 s el bot no opera.
+  - operador.py: cada operacion del CSV ahora guarda una columna nueva, atraso_s.
+
+QUE MIRAR DESPUES
+  Abre el CSV de operaciones y mira la columna atraso_s en las primeras operaciones.
+    0 a 2  -> arreglado.
+    10, 20 o 30 -> el atraso no viene del cache sino de Kalshi; avisame y lo vemos por websocket.
+
+COMPROBADO
+  probar_con_datos.py sobre los datos del 27-28 sep da el mismo resultado que antes del cambio
+  (20 ops, 70% WR, -4.49 c/op), asi que la estrategia no se toco.

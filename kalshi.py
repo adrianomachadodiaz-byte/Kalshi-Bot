@@ -89,10 +89,16 @@ def precio_indice(sesion, activo, url=INDICE_URL):
     y los 59 anteriores rellenan el segundo a segundo aunque el bot pregunte más despacio.
     Es el mismo número que la app pone como "NOW", y el strike del bloque (floor_strike) sale de esta misma serie.
     """
-    r = sesion.get(url.format(activo=activo.lower()), timeout=3,
-                   headers={"Cache-Control": "no-cache", "Accept-Encoding": "gzip"})
+    # El "Cache-Control: no-cache" de la PETICION no obliga a S3/CloudFront a saltarse su cache:
+    # hay que cambiar la URL en cada pedido para que el borde no pueda servir una copia guardada.
+    r = sesion.get(url.format(activo=activo.lower()), timeout=3, params={"_": int(time.time() * 1000)},
+                   headers={"Cache-Control": "no-cache", "Pragma": "no-cache", "Accept-Encoding": "gzip"})
     r.raise_for_status()
     d = r.json()
+    try:                      # si el borde igual sirvio una copia guardada, lo dice en la cabecera Age
+        cdn = float(r.headers.get("Age") or 0)
+    except ValueError:
+        cdn = 0.0
     crudo = ((d.get("timeseries") or {}).get("second")) or []
     p = num(crudo[-1]) if crudo else num(((d.get("candlesticks") or {}).get("1M") or {}).get("close"))
     ms = num(d.get("maturity_ts_ms"))
@@ -104,7 +110,11 @@ def precio_indice(sesion, activo, url=INDICE_URL):
             x = num(v)
             if x and x > 0:
                 serie.append((fin - (len(crudo) - 1 - i), x))
-    return p, (time.time() - ms / 1000 if ms else None), serie
+    # antiguedad real = lo que diga el archivo, pero nunca menos de lo que el CDN admite haber guardado
+    edad = (time.time() - ms / 1000) if ms else None
+    if edad is not None:
+        edad = max(edad, cdn)
+    return p, edad, serie
 
 
 class Kalshi:
