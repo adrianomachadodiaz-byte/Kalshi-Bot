@@ -41,21 +41,20 @@ CICLO = float(env("CICLO_S", "0.5"))     # segundos entre fotos: con qué rapide
 PASO_GRAFICO = 1                         # segundos entre puntos de la serie que dibuja el panel
 
 # ---------------------------------------------------------------- ajustes (panel > variables de Railway > defecto)
-# clave, tipo, defecto, etiqueta, ayuda
+# clave, tipo, defecto, etiqueta, ayuda, sección ("" = básico, "av" = avanzado)
 CAMPOS = [
-    ("activos", "activos", "BTC", "Activos", "BTC, o BTC,ETH"),
-    ("contratos", "num", 1.0, "Contratos", "por operación"),
-    ("delta_btc", "num", 100.0, "Delta BTC ($)", "|precio − referencia| mínimo"),
-    ("delta_eth", "num", 6.0, "Delta ETH ($)", "solo si operas ETH"),
-    ("delay", "ent", 7, "Delay (min)", "entra en los últimos X min"),
-    ("entrada_min", "num", 0.81, "Entrada mínima", "EntryRange desde"),
-    ("entrada_max", "num", 0.86, "Entrada máxima", "EntryRange hasta"),
-    ("tp", "num", 0.13, "Take profit (+)", "puntos sobre la entrada"),
-    ("exit", "opc", 0.46, "Exit (stop)", "vacío = sin Exit"),
-    ("breakeven", "opc", None, "BreakEven (+)", "vacío = sin BreakEven"),
-    ("max_perdida_dia", "num", 0.0, "Pérdida máxima del día ($)", "0 = sin límite"),
-    ("meta_ganancia_dia", "num", 0.0, "Meta de ganancia del día ($)", "0 = sin meta"),
-    ("desliz_entrada", "num", 0.02, "Deslizamiento de entrada", "máximo sobre el ask"),
+    ("activos", "activos", "BTC", "Cripto", "BTC o ETH", ""),
+    ("delta", "num", 100.0, "Delta ($)", "mínimo para entrar", ""),
+    ("delay", "ent", 7, "Delay (min)", "ventana de entrada", ""),
+    ("entrada_min", "num", 0.81, "Entrada mínima", "EntryRange desde", ""),
+    ("entrada_max", "num", 0.86, "Entrada máxima", "EntryRange hasta", ""),
+    ("tp", "num", 0.13, "Take profit (+)", "sobre la entrada", ""),
+    ("exit", "opc", 0.46, "Exit (stop)", "vacío = sin Exit", ""),
+    ("contratos", "num", 1.0, "Contratos", "por operación", "av"),
+    ("breakeven", "opc", None, "BreakEven (+)", "vacío = sin BE", "av"),
+    ("max_perdida_dia", "num", 0.0, "Pérdida máx. ($)", "0 = sin límite", "av"),
+    ("meta_ganancia_dia", "num", 0.0, "Meta ($)", "0 = sin meta", "av"),
+    ("desliz_entrada", "num", 0.02, "Deslizamiento", "sobre el ask", "av"),
 ]
 
 
@@ -75,7 +74,7 @@ def convertir(tipo, v):
 def validar(crudo):
     """(valores, errores). crudo: dict clave -> texto o número."""
     v, err = {}, {}
-    for clave, tipo, _, _, _ in CAMPOS:
+    for clave, tipo, _, _, _, _ in CAMPOS:
         try:
             v[clave] = convertir(tipo, crudo.get(clave))
         except (TypeError, ValueError):
@@ -84,12 +83,11 @@ def validar(crudo):
         return v, err
     activos = v["activos"].split(",") if v["activos"] else []
     if not activos or any(a not in ACTIVOS_VALIDOS for a in activos):
-        err["activos"] = "usa BTC, ETH o BTC,ETH"
+        err["activos"] = "usa BTC o ETH"
     if not 0 < v["contratos"] <= 10000:
         err["contratos"] = "entre 0.01 y 10000"
-    for d in ("delta_btc", "delta_eth"):
-        if v[d] < 0:
-            err[d] = "no puede ser negativo"
+    if v["delta"] < 0:
+        err["delta"] = "no puede ser negativo"
     if not 1 <= v["delay"] <= 15:
         err["delay"] = "entre 1 y 15 minutos"
     if not 0 < v["entrada_min"] < 1:
@@ -116,11 +114,16 @@ class Ajustes:
     def __init__(self, carpeta: Path):
         self.ruta = carpeta / "ajustes.json"
         crudo = {}
-        for clave, tipo, defecto, _, _ in CAMPOS:
+        for clave, tipo, defecto, _, _, _ in CAMPOS:
             crudo[clave] = env(clave.upper()) or defecto
         if self.ruta.exists():
             try:
-                crudo.update(json.loads(self.ruta.read_text(encoding="utf-8")))
+                guardado = json.loads(self.ruta.read_text(encoding="utf-8"))
+                if "delta" not in guardado:          # ajustes de antes: había un Delta por activo
+                    a = (guardado.get("activos") or "BTC").split(",")[0].lower()
+                    if guardado.get(f"delta_{a}") is not None:
+                        guardado["delta"] = guardado[f"delta_{a}"]
+                crudo.update({k: x for k, x in guardado.items() if k in {c[0] for c in CAMPOS}})
             except Exception as e:  # noqa: BLE001
                 log(f"no pude leer {self.ruta.name}: {e}")
         v, err = validar(crudo)
@@ -161,7 +164,7 @@ class Claves:
 
 
 def config_de(activo, v):
-    return Config(delta=v[f"delta_{activo.lower()}"], delay=v["delay"], entrada_min=v["entrada_min"],
+    return Config(delta=v["delta"], delay=v["delay"], entrada_min=v["entrada_min"],
                   entrada_max=v["entrada_max"], tp=v["tp"], exit=v["exit"], breakeven=v["breakeven"])
 
 
@@ -467,25 +470,56 @@ class Bot:
             pendientes=len(self.estado.pendientes),
             operaciones=filas[-50:][::-1], logs=list(operador.LOGS)[-250:],
             ajustes=self.ajustes.valores,
-            campos=[dict(clave=c, tipo=t, etiqueta=e, ayuda=h) for c, t, _, e, h in CAMPOS])
+            campos=[dict(clave=c, tipo=t, etiqueta=e, ayuda=h, seccion=sec) for c, t, _, e, h, sec in CAMPOS])
 
 
 # ---------------------------------------------------------------- panel web
 AQUI = Path(__file__).parent
 SESION = hashlib.sha256(("kalshi-bot:" + ACCESS_TOKEN).encode()).hexdigest() if ACCESS_TOKEN else ""
 
-LOGIN = """<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Kalshi Bot</title><style>body{font-family:system-ui,sans-serif;background:#0f1115;color:#e8e8ea;display:flex;align-items:center;
-justify-content:center;min-height:100vh;margin:0}form{background:#181b22;border:1px solid #2a2f3a;border-radius:12px;padding:28px;width:280px}
-h1{font-size:20px;font-weight:600;margin:0 0 16px}input{width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1px solid #2a2f3a;
-background:#0f1115;color:#e8e8ea;font-size:16px}button{margin-top:12px;width:100%;padding:10px;border:0;border-radius:8px;background:#3b82f6;
-color:#fff;font-size:16px;cursor:pointer}p{color:#f87171;font-size:14px}</style></head><body><form method="post" action="/login">
-<h1>Kalshi Bot</h1><input type="password" name="clave" placeholder="Clave (ACCESS_TOKEN)" autofocus>{error}<button>Entrar</button></form></body></html>"""
+FUENTE = ('<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+          '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap">')
+ICONO = ("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E"
+         "%3Crect width='32' height='32' rx='8' fill='%230d0f14'/%3E%3Cpath d='M5 21 L12 13 L17 18 L27 7' "
+         "fill='none' stroke='%232ed673' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
 
-SIN_TOKEN = """<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Kalshi Bot</title></head><body style="font-family:system-ui;background:#0f1115;color:#e8e8ea;padding:24px;max-width:560px">
-<h2>Falta la clave del panel</h2><p>Para proteger el bot, el panel solo abre con una clave. En Railway ve a
-<b>Variables</b>, agrega <code>ACCESS_TOKEN</code> con una clave tuya y vuelve a entrar.</p></body></html>"""
+BASE = """<!doctype html><html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark">
+<title>Kalshi Bot</title><link rel="icon" href="{icono}">{fuente}<style>
+*{{box-sizing:border-box}}
+body{{margin:0;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px;
+background:#0d0f14;color:#e9ebf0;font:15px/1.55 Geist,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}}
+body::before{{content:"";position:fixed;inset:0;pointer-events:none;opacity:.035;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E")}}
+.caja{{position:relative;background:linear-gradient(158deg,#181c24,#14171e 62%);border:1px solid #232834;border-radius:14px;
+padding:28px;width:100%;max-width:340px;box-shadow:0 2px 4px rgba(5,7,12,.6),0 18px 44px -20px rgba(5,7,12,1)}}
+.marca{{display:flex;align-items:center;gap:9px;margin-bottom:18px}}
+h1{{font-size:17px;font-weight:600;margin:0;letter-spacing:-.015em}}
+p{{color:#8d94a3;font-size:13.5px;margin:0 0 16px}}
+label{{display:block;font-size:12.5px;color:#8d94a3;margin-bottom:5px}}
+input{{width:100%;padding:10px 12px;border-radius:9px;border:1px solid #2d3341;background:#0a0c10;color:#e9ebf0;
+font:inherit;transition:border-color 180ms}}
+input:hover{{border-color:#646b7a}} input:focus{{outline:none;border-color:#4c8dff}}
+button{{margin-top:14px;width:100%;padding:10px;border:0;border-radius:9px;background:#4c8dff;color:#fff;
+font:inherit;font-weight:550;cursor:pointer;transition:background 180ms,transform 180ms,box-shadow 180ms}}
+button:hover{{background:#649dff;box-shadow:0 6px 18px -8px rgba(76,141,255,.75)}}
+button:active{{transform:translateY(1px) scale(.99)}}
+:focus-visible{{outline:2px solid #4c8dff;outline-offset:2px}}
+.err{{color:#ff6b6b;font-size:13px;margin:10px 0 0}}
+code{{background:#0a0c10;border:1px solid #232834;border-radius:5px;padding:1px 6px;font-family:"Geist Mono",ui-monospace,monospace}}
+</style></head><body><div class="caja"><div class="marca">
+<svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#14171e"></rect>
+<path d="M5 21 L12 13 L17 18 L27 7" fill="none" stroke="#2ed673" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+<h1>Kalshi Bot</h1></div>{cuerpo}</div></body></html>"""
+
+LOGIN = BASE.format(icono=ICONO, fuente=FUENTE, cuerpo="""<form method="post" action="/login">
+<p>Entra con la clave del panel para ver el bot.</p>
+<label for="clave">Clave de acceso</label>
+<input id="clave" type="password" name="clave" autofocus autocomplete="current-password">
+{error}<button>Entrar</button></form>""")
+
+SIN_TOKEN = BASE.format(icono=ICONO, fuente=FUENTE, cuerpo="""<p style="color:#e9ebf0;font-size:15px;margin-bottom:10px">
+Falta la clave del panel</p><p>El panel solo abre con una clave, para que nadie más pueda encender el bot.
+En Railway ve a <b style="color:#e9ebf0">Variables</b>, agrega <code>ACCESS_TOKEN</code> con una clave tuya y vuelve a entrar.</p>""")
 
 
 def servidor(bot: Bot):

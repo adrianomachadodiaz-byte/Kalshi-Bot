@@ -3,115 +3,257 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Panel del bot de Kalshi: bloque en vivo, operaciones y ajustes.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0d0f14">
 <title>Kalshi Bot</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230d0f14'/%3E%3Cpath d='M5 21 L12 13 L17 18 L27 7' fill='none' stroke='%232ed673' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap">
 <style>
-:root{--bg:#0f1115;--card:#171a21;--line:#262b36;--text:#e8e8ea;--muted:#9097a3;--blue:#3b82f6;--green:#22c55e;--red:#f87171;--amber:#f59e0b;
---greenbg:#0f2e1c;--redbg:#351717;--amberbg:#33260b}
+:root{
+  /* superficies: una sola familia de grises, todos tirando a frío */
+  --bg:#0d0f14; --bg-2:#0a0c10; --card:#14171e; --card-2:#181c24; --line:#232834; --line-2:#2d3341;
+  --text:#e9ebf0; --muted:#8d94a3; --muted-2:#646b7a;
+  /* un acento de acción y tres estados */
+  --blue:#4c8dff; --green:#2ed673; --red:#ff6b6b; --amber:#e0a63a;
+  --greenbg:#0e2a1b; --redbg:#2e1616; --amberbg:#2b220c;
+  --sombra:0 1px 2px rgba(5,7,12,.6), 0 10px 30px -18px rgba(5,7,12,.9);
+  --sombra-alta:0 2px 4px rgba(5,7,12,.6), 0 18px 44px -20px rgba(5,7,12,1);
+  --r-card:14px; --r-int:9px; --t:180ms cubic-bezier(.2,.7,.3,1);
+}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
-main{max-width:1100px;margin:0 auto;padding:16px}
-header{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:16px}
-h1{font-size:22px;margin:0;font-weight:650}
-h2{font-size:16px;margin:0 0 12px;font-weight:600}
-.pill{padding:4px 12px;border-radius:999px;font-size:13px;font-weight:600}
-.on{background:var(--greenbg);color:var(--green)}.off{background:#23262e;color:var(--muted)}.warn{background:var(--amberbg);color:var(--amber)}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.55 Geist,system-ui,-apple-system,"Segoe UI",sans-serif;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+/* grano fino: quita la sensación de plano digital */
+body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E")}
+main{max-width:1180px;margin:0 auto;padding:14px 18px 56px;position:relative;z-index:2}
+
+.salta{position:absolute;left:-9999px;top:0;background:var(--blue);color:#fff;padding:10px 16px;border-radius:0 0 10px 0;z-index:20}
+.salta:focus{left:0}
+
+/* ---------------- cabecera ---------------- */
+.top{position:sticky;top:0;z-index:10;display:flex;flex-wrap:wrap;align-items:center;gap:10px;
+  padding:14px 0 12px;margin-bottom:14px;background:linear-gradient(var(--bg) 72%,rgba(13,15,20,0));
+  border-bottom:1px solid transparent}
+.marca{display:flex;align-items:center;gap:9px;margin-right:2px}
+.marca svg{display:block}
+h1{font-size:17px;margin:0;font-weight:600;letter-spacing:-.015em}
+h2{font-size:15px;margin:0;font-weight:600;letter-spacing:-.01em}
 .sp{flex:1}
-button{font:inherit;border:0;border-radius:8px;padding:9px 18px;cursor:pointer;font-weight:600}
-.b-on{background:var(--green);color:#052e16}.b-off{background:var(--red);color:#3b0a0a}.b-main{background:var(--blue);color:#fff}
-.b-ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
-button:disabled{opacity:.5;cursor:default}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
-.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
-.stat .k{color:var(--muted);font-size:13px}.stat .v{font-size:22px;font-weight:650;margin-top:2px}.stat .s{color:var(--muted);font-size:12px}
+
+.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 11px;border-radius:999px;font-size:12.5px;
+  font-weight:500;letter-spacing:.01em;border:1px solid transparent}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.on{background:var(--greenbg);color:var(--green);border-color:rgba(46,214,115,.22)}
+.off{background:#1a1e26;color:var(--muted);border-color:var(--line)}
+.warn{background:var(--amberbg);color:var(--amber);border-color:rgba(224,166,58,.22)}
+
+button{font:inherit;font-weight:550;border:1px solid transparent;border-radius:var(--r-int);padding:8px 16px;
+  cursor:pointer;transition:background var(--t),border-color var(--t),transform var(--t),box-shadow var(--t),color var(--t)}
+button:active:not(:disabled){transform:translateY(1px) scale(.99)}
+button:disabled{opacity:.45;cursor:default}
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-radius:6px}
+.b-on{background:var(--green);color:#03240f}
+.b-on:hover:not(:disabled){background:#42e084;box-shadow:0 6px 18px -8px rgba(46,214,115,.8)}
+.b-off{background:var(--red);color:#2b0808}
+.b-off:hover:not(:disabled){background:#ff8080;box-shadow:0 6px 18px -8px rgba(255,107,107,.7)}
+.b-main{background:var(--blue);color:#fff}
+.b-main:hover:not(:disabled){background:#649dff;box-shadow:0 6px 18px -8px rgba(76,141,255,.75)}
+.b-ghost{background:transparent;color:var(--muted);border-color:var(--line-2)}
+.b-ghost:hover:not(:disabled){color:var(--text);border-color:var(--muted-2);background:var(--card-2)}
+.msg{font-size:13.5px}
+.top .msg{max-width:min(46ch,32vw);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ---------------- avisos ---------------- */
+.aviso{padding:11px 15px;border-radius:var(--r-int);margin-bottom:10px;font-size:13.5px;
+  border:1px solid transparent;display:flex;align-items:center;gap:9px}
+.aviso.on{background:var(--greenbg);color:#8ff0bb;border-color:rgba(46,214,115,.2)}
+.aviso.warn{background:var(--amberbg);color:#f0cf8a;border-color:rgba(224,166,58,.25)}
+.aviso.off{background:var(--card);color:var(--muted);border-color:var(--line)}
+.aviso.grande{font-size:15px;font-weight:550;padding:14px 16px}
+
+/* ---------------- números ---------------- */
+.num{font-family:"Geist Mono",ui-monospace,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums;
+  font-feature-settings:"tnum" 1;letter-spacing:-.01em}
 .pos{color:var(--green)}.neg{color:var(--red)}
-.wrap{overflow-x:auto}
-table{border-collapse:collapse;width:100%;font-size:14px}
-th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}th{color:var(--muted);font-weight:500}
-#logs{background:#0b0d11;border:1px solid var(--line);border-radius:8px;height:320px;overflow:auto;padding:10px;
-font:12.5px/1.55 ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-word}
-.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
-label{display:block;font-size:13px;color:var(--muted)}
-input,textarea{width:100%;margin-top:4px;padding:9px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:inherit}
-textarea{font:12px ui-monospace,Consolas,monospace;height:140px;resize:vertical}
-.ayuda{font-size:12px;color:var(--muted)}.err{font-size:12px;color:var(--red)}
-.msg{margin-left:12px;font-size:14px}
-.row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}
-.aviso{padding:10px 14px;border-radius:8px;margin-bottom:12px;font-size:14px}
-.grid2{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}.grid2>*{min-width:0}
+
+/* ---------------- resumen ---------------- */
+.resumen{display:grid;gap:12px;grid-template-columns:minmax(0,1fr);margin-bottom:12px}
+@media(min-width:880px){.resumen{grid-template-columns:288px minmax(0,1fr)}}
+.hero{background:linear-gradient(158deg,var(--card-2),var(--card) 62%);border:1px solid var(--line);
+  border-radius:var(--r-card);padding:17px 19px 19px;box-shadow:var(--sombra);display:flex;flex-direction:column;justify-content:center}
+.hero .k{color:var(--muted);font-size:12.5px;letter-spacing:.02em}
+.hero .v{font-size:38px;font-weight:600;line-height:1.04;margin:7px 0 6px;letter-spacing:-.03em}
+.hero .s{color:var(--muted);font-size:13px}
+.minis{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(148px,1fr))}
+@media(min-width:880px){.minis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:var(--r-card);padding:12px 14px 13px;
+  box-shadow:var(--sombra);transition:border-color var(--t)}
+.stat:hover{border-color:var(--line-2)}
+.stat .k{color:var(--muted);font-size:12.5px}
+.stat .v{font-size:21px;font-weight:600;margin-top:3px;letter-spacing:-.02em}
+.stat .s{color:var(--muted-2);font-size:11.5px;margin-top:2px}
+.skel{color:transparent!important;background:linear-gradient(90deg,var(--line) 25%,var(--line-2) 50%,var(--line) 75%);
+  background-size:200% 100%;border-radius:5px;animation:sk 1.4s ease-in-out infinite}
+@keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* ---------------- tarjetas ---------------- */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-card);padding:15px 17px 17px;
+  margin-bottom:12px;box-shadow:var(--sombra)}
+.cab{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin-bottom:12px}
+.wrap{overflow-x:auto;margin:0 -17px;padding:0 17px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{padding:8px 10px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--line)}
+th{color:var(--muted-2);font-weight:500;font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;
+  position:sticky;top:0;background:var(--card)}
+tbody tr{transition:background var(--t)}
+tbody tr:hover{background:var(--card-2)}
+tbody tr:last-child td{border-bottom:0}
+.vacio{color:var(--muted-2);font-style:italic}
+
+#logs{background:var(--bg-2);border:1px solid var(--line);border-radius:var(--r-int);height:280px;overflow:auto;
+  padding:11px 13px;font:12px/1.62 "Geist Mono",ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-word;
+  color:#b9c0cd}
+a{color:var(--blue);text-decoration:none;border-bottom:1px solid transparent;transition:border-color var(--t)}
+a:hover{border-bottom-color:var(--blue)}
+
+/* ---------------- formularios ---------------- */
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(146px,1fr));gap:13px}
+label{display:block;font-size:12.5px;color:var(--muted)}
+input,textarea{width:100%;margin-top:5px;padding:9px 11px;border-radius:var(--r-int);border:1px solid var(--line-2);
+  background:var(--bg-2);color:var(--text);font:inherit;transition:border-color var(--t),background var(--t)}
+input:hover,textarea:hover{border-color:var(--muted-2)}
+input:focus,textarea:focus{outline:none;border-color:var(--blue);background:var(--bg)}
+.form input{font-family:"Geist Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+textarea{font:12px "Geist Mono",ui-monospace,Consolas,monospace;height:132px;resize:vertical}
+.ayuda{font-size:11.5px;color:var(--muted-2);margin-top:4px}
+.err{font-size:11.5px;color:var(--red);margin-top:3px}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin-top:13px}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start}.grid2>*{min-width:0}
+.form .et{display:block;min-height:2.6em}
+.avanzado{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+/* los dos cuadros de configuración van más apretados que el resto del panel */
+.compacto{padding:13px 15px 15px}
+.compacto .cab{margin-bottom:9px}
+.compacto .form{gap:10px;grid-template-columns:repeat(auto-fit,minmax(118px,1fr))}
+.compacto .form .et{min-height:2.3em;font-size:12px;line-height:1.3}
+.compacto input,.compacto textarea{margin-top:4px;padding:7px 9px;font-size:14px}
+.compacto textarea{height:94px;font-size:11.5px}
+.compacto .ayuda{margin-top:3px;font-size:11px}
+.compacto .row{margin-top:11px}
+.compacto button{padding:7px 14px}
+.compacto .aviso{padding:9px 12px;margin-bottom:11px;font-size:13px}
+.compacto label{font-size:12px}
+.avanzado summary{cursor:pointer;font-size:13px;color:var(--muted);list-style:none;display:flex;align-items:center;gap:7px;
+  width:fit-content;transition:color var(--t)}
+.avanzado summary:hover{color:var(--text)}
+.avanzado summary::-webkit-details-marker{display:none}
+.avanzado summary::before{content:"";width:6px;height:6px;border-right:1.5px solid currentColor;
+  border-bottom:1.5px solid currentColor;transform:rotate(-45deg);transition:transform var(--t)}
+.avanzado[open] summary::before{transform:rotate(45deg)}
 @media(min-width:900px){.grid2{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
-.stats{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+
+/* ---------------- bloque en vivo ---------------- */
+#grafico svg{border-radius:8px}
+.lado{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:12.5px;
+  background:var(--bg-2);border:1px solid var(--line);transition:border-color var(--t),background var(--t)}
+.lado.dentro{background:rgba(46,214,115,.1);border-color:rgba(46,214,115,.55)}
+.lado b{font-weight:600}
+#gPie{gap:26px}
+#gPie .k{font-size:11.5px;color:var(--muted)}
+#gPie .v{font-size:19px;font-weight:600;letter-spacing:-.02em;margin-top:1px}
+@media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
 </head>
 <body>
+<a class="salta" href="#contenido">Saltar al contenido</a>
 <main>
-<header>
-  <h1>Kalshi Bot</h1>
+<header class="top">
+  <span class="marca">
+    <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#14171e"></rect><path d="M5 21 L12 13 L17 18 L27 7" fill="none" stroke="#2ed673" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+    <h1>Kalshi Bot</h1>
+  </span>
   <span id="pill" class="pill off">cargando…</span>
-  <span id="uptime" class="ayuda"></span>
+  <span id="uptime" class="ayuda" style="margin:0"></span>
   <span class="sp"></span>
-  <span id="msgPower" class="msg"></span>
+  <span id="msgPower" class="msg" role="status" aria-live="polite"></span>
+  <button id="cancelar" class="b-ghost" hidden>Cancelar</button>
   <button id="power" class="b-on" disabled>Encender</button>
   <form method="post" action="/logout" style="margin:0"><button class="b-ghost">Salir</button></form>
 </header>
 
 <div id="avisos"></div>
 
-<div class="stats">
-  <div class="stat"><div class="k">Profit total</div><div class="v" id="sProfit">–</div><div class="s" id="sProfitHoy"></div></div>
-  <div class="stat"><div class="k">Operaciones</div><div class="v" id="sOps">–</div><div class="s" id="sOpsHoy"></div></div>
-  <div class="stat"><div class="k">Ganadas</div><div class="v pos" id="sWin">–</div><div class="s" id="sWinMedia"></div></div>
-  <div class="stat"><div class="k">Perdidas</div><div class="v neg" id="sLoss">–</div><div class="s" id="sLossMedia"></div></div>
-  <div class="stat"><div class="k">% de acierto</div><div class="v" id="sWr">–</div><div class="s">para no perder hace falta ~78%</div></div>
-  <div class="stat"><div class="k">Tiempo encendido</div><div class="v" id="sOn">–</div><div class="s" id="sServer"></div></div>
-  <div class="stat"><div class="k">Saldo Kalshi</div><div class="v" id="sSaldo">–</div><div class="s" id="sKey"></div></div>
-</div>
+<section class="resumen" id="contenido" aria-label="Resumen">
+  <div class="hero">
+    <div class="k">Resultado total</div>
+    <div class="v num skel" id="sProfit">–</div>
+    <div class="s" id="sProfitHoy"></div>
+  </div>
+  <div class="minis">
+    <div class="stat"><div class="k">Operaciones</div><div class="v num skel" id="sOps">–</div><div class="s" id="sOpsHoy"></div></div>
+    <div class="stat"><div class="k">Ganadas</div><div class="v num pos skel" id="sWin">–</div><div class="s" id="sWinMedia"></div></div>
+    <div class="stat"><div class="k">Perdidas</div><div class="v num neg skel" id="sLoss">–</div><div class="s" id="sLossMedia"></div></div>
+    <div class="stat"><div class="k">% de acierto</div><div class="v num skel" id="sWr">–</div><div class="s">hace falta ~78% para no perder</div></div>
+    <div class="stat"><div class="k">Encendido</div><div class="v num skel" id="sOn">–</div><div class="s" id="sServer"></div></div>
+    <div class="stat"><div class="k">Saldo Kalshi</div><div class="v num skel" id="sSaldo">–</div><div class="s" id="sKey"></div></div>
+  </div>
+</section>
 
-<div class="card" id="cardGrafico" style="display:none">
-  <div class="row" style="margin:0 0 10px"><h2 style="margin:0">Bloque en vivo</h2><span id="gTicker" class="ayuda"></span>
-    <span class="sp"></span><span class="ayuda">ask/bid</span><span id="gLados" style="display:flex;gap:8px"></span>
-    <span class="ayuda" style="margin-left:6px">quedan</span><span id="gQueda" style="font-weight:600"></span></div>
+<section class="card" id="cardGrafico" style="display:none" aria-label="Bloque en vivo">
+  <div class="cab"><h2>Bloque en vivo</h2><span id="gTicker" class="ayuda num" style="margin:0"></span>
+    <span class="sp"></span><span class="ayuda" style="margin:0">ask/bid</span><span id="gLados" style="display:flex;gap:8px"></span>
+    <span class="ayuda" style="margin:0 0 0 6px">quedan</span><span id="gQueda" class="num" style="font-weight:600"></span></div>
   <div id="grafico"></div>
-  <div class="row" id="gPie" style="gap:24px;margin-top:10px;padding-top:8px;border-top:1px solid var(--line)"></div>
-</div>
+  <div class="row" id="gPie" style="margin-top:12px;padding-top:11px;border-top:1px solid var(--line)"></div>
+</section>
 
-<div class="card">
-  <h2>En vivo</h2>
+<section class="card" aria-label="En vivo">
+  <div class="cab"><h2>En vivo</h2></div>
   <div class="wrap"><table>
-    <thead><tr><th>Activo</th><th>Mercado</th><th>Queda</th><th>Referencia</th><th>Precio</th><th>Índice</th><th>Delta</th><th>YES ask/bid</th><th>NO ask/bid</th><th>Estado</th></tr></thead>
+    <thead><tr><th scope="col">Activo</th><th scope="col">Mercado</th><th scope="col">Queda</th><th scope="col">Referencia</th><th scope="col">Precio</th><th scope="col">Índice</th><th scope="col">Delta</th><th scope="col">YES ask/bid</th><th scope="col">NO ask/bid</th><th scope="col">Estado</th></tr></thead>
     <tbody id="vivo"></tbody>
   </table></div>
-</div>
+</section>
 
-<div class="card">
-  <div class="row" style="margin:0 0 10px"><h2 style="margin:0">Logs</h2><span class="sp"></span>
-    <label style="display:flex;align-items:center;gap:6px;margin:0"><input type="checkbox" id="auto" checked style="width:auto;margin:0">seguir los nuevos</label></div>
-  <div id="logs"></div>
-</div>
+<section class="card" aria-label="Registro">
+  <div class="cab"><h2>Registro</h2><span class="sp"></span>
+    <label style="display:flex;align-items:center;gap:7px;margin:0;cursor:pointer"><input type="checkbox" id="auto" checked style="width:auto;margin:0;accent-color:var(--blue)">seguir los nuevos</label></div>
+  <div id="logs" tabindex="0"></div>
+</section>
 
-<div class="card">
-  <div class="row" style="margin:0 0 10px"><h2 style="margin:0">Operaciones</h2><span class="sp"></span><a href="/operaciones.csv" style="color:var(--blue)">bajar todas (CSV)</a></div>
+<section class="card" aria-label="Operaciones">
+  <div class="cab"><h2>Operaciones</h2><span class="sp"></span><a href="/operaciones.csv">bajar todas (CSV)</a></div>
   <div class="wrap"><table>
-    <thead><tr><th>Fecha (CDT)</th><th>Activo</th><th>Lado</th><th>Entrada</th><th>Salida</th><th>Precio salida</th><th>Contratos</th><th>Resultado</th><th>$</th></tr></thead>
+    <thead><tr><th scope="col">Fecha (CDT)</th><th scope="col">Activo</th><th scope="col">Lado</th><th scope="col">Entrada</th><th scope="col">Salida</th><th scope="col">Precio salida</th><th scope="col">Contratos</th><th scope="col">Resultado</th><th scope="col">$</th></tr></thead>
     <tbody id="ops"></tbody>
   </table></div>
-</div>
+</section>
 
 <div class="grid2">
-  <div class="card">
-    <h2>Ajustes</h2>
-    <p class="ayuda" style="margin-top:-6px">Se aplican al instante al guardar. Una operación ya abierta mantiene su TP.</p>
+  <section class="card compacto" aria-label="Ajustes">
+    <div class="cab"><h2>Ajustes</h2></div>
+    <p class="ayuda" style="margin:-4px 0 11px">Se aplican al instante al guardar. Una operación ya abierta mantiene su TP.</p>
     <div class="form" id="form"></div>
-    <div class="row"><button class="b-main" id="guardar">Guardar ajustes</button><button class="b-ghost" id="deshacer">Deshacer cambios</button><span id="msgAjustes" class="msg"></span></div>
-  </div>
-  <div class="card">
-    <h2>API de Kalshi</h2>
-    <p class="ayuda" style="margin-top:-6px">Se crean en kalshi.com → Account → API Keys. La private key no se vuelve a mostrar después de guardarla.</p>
+    <details id="bloqueAv" class="avanzado" hidden>
+      <summary>Avanzado</summary>
+      <div class="form" id="formAv" style="margin-top:12px"></div>
+    </details>
+    <div class="row"><button class="b-main" id="guardar">Guardar ajustes</button><button class="b-ghost" id="deshacer">Deshacer</button><span id="msgAjustes" class="msg" role="status" aria-live="polite"></span></div>
+  </section>
+  <section class="card compacto" aria-label="API de Kalshi">
+    <div class="cab"><h2>API de Kalshi</h2></div>
+    <p class="ayuda" style="margin:-4px 0 11px">Se crean en kalshi.com → Account → API Keys. La private key no se vuelve a mostrar después de guardarla.</p>
     <div id="keyEstado" class="aviso off">cargando…</div>
-    <label>API key ID<input id="keyId" autocomplete="off" spellcheck="false" placeholder="ej. a1b2c3d4-…"></label>
-    <label style="margin-top:12px">Private key (.pem completo)<textarea id="pem" spellcheck="false" placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;…&#10;-----END RSA PRIVATE KEY-----"></textarea></label>
-    <div class="row"><button class="b-main" id="guardarKey">Guardar y probar</button><span id="msgKey" class="msg"></span></div>
-  </div>
+    <label>API key ID<input id="keyId" autocomplete="off" spellcheck="false" placeholder="a1b2c3d4-…"></label>
+    <label style="margin-top:11px">Private key (.pem completo)<textarea id="pem" spellcheck="false" placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;…&#10;-----END RSA PRIVATE KEY-----"></textarea></label>
+    <div class="row"><button class="b-main" id="guardarKey">Guardar y probar</button><span id="msgKey" class="msg" role="status" aria-live="polite"></span></div>
+  </section>
 </div>
 </main>
 
@@ -133,7 +275,7 @@ function dur(s) {
   s = Math.floor(s); const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
   return d ? `${d} d ${h} h` : h ? `${h} h ${m} min` : `${m} min ${s % 60} s`;
 }
-function msg(el, texto, ok) { el.textContent = texto; el.className = 'msg ' + (ok ? 'pos' : 'neg'); }
+function msg(el, texto, ok) { el.textContent = texto; el.title = texto; el.className = 'msg ' + (ok ? 'pos' : 'neg'); }
 
 let G = null, hoverX = null;   // estado del gráfico para la cruz
 
@@ -299,7 +441,7 @@ function grafico(v) {
   o.push(`<text x="${X1}" y="${Y1 + 18}" text-anchor="end" fill="${NEUTRO}" font-size="11">cierre</text>`);
 
   o.push('<g id="cruz"></g>');
-  return `<svg id="svgG" viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;max-height:360px;display:block" role="img" aria-label="Precio del índice de BTC durante el bloque: verde por encima de la referencia de ${ref != null ? Math.round(ref) : '–'} y rojo por debajo${hayOp ? ', con el precio del contrato, su TP y su stop' : ''}.">${o.join('')}</svg>`;
+  return `<svg id="svgG" viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;max-height:360px;display:block;font-family:'Geist Mono',ui-monospace,monospace" role="img" aria-label="Precio del índice de BTC durante el bloque: verde por encima de la referencia de ${ref != null ? Math.round(ref) : '–'} y rojo por debajo${hayOp ? ', con el precio del contrato, su TP y su stop' : ''}.">${o.join('')}</svg>`;
 }
 
 // ---- la cruz y su cajita, se redibujan solas sin rehacer el gráfico ----
@@ -363,13 +505,16 @@ function render(d) {
   if (!d.conectado) { pill.textContent = 'sin API key'; pill.className = 'pill warn'; }
   else if (d.encendido) { pill.textContent = 'encendido'; pill.className = 'pill on'; }
   else { pill.textContent = 'apagado'; pill.className = 'pill off'; }
-  btn.disabled = false;
-  btn.textContent = d.encendido ? 'Apagar' : 'Encender';
-  btn.className = d.encendido ? 'b-off' : 'b-on';
+  if (!confirmando) {
+    btn.disabled = false;
+    btn.textContent = d.encendido ? 'Apagar' : 'Encender';
+    btn.className = d.encendido ? 'b-off' : 'b-on';
+  }
   $('uptime').textContent = 'servidor activo hace ' + dur(d.servidor_s);
 
   const av = [];
   if (!d.conectado) av.push(['warn', 'Falta conectar tu API key de Kalshi (abajo, en "API de Kalshi"). Sin ella el bot solo mira precios.']);
+  if (d.conectado && !d.encendido) av.push(['warn grande', 'El bot está APAGADO: no va a abrir ninguna operación.']);
   if (d.limite_diario) av.push(['warn', 'Se alcanzó el límite del día: no abre operaciones nuevas hasta mañana (CDT).']);
   if (d.aviso_precio) av.push(['warn', 'Precio de BTC: ' + d.aviso_precio + '.']);
   if (d.abiertas.length) av.push(['on', 'Operación abierta: ' + d.abiertas.map(o => `${o.activo} ${o.lado} ${o.contratos} a ${n(o.entrada)} → TP ${n(o.objetivo)}`).join(' · ')]);
@@ -377,7 +522,7 @@ function render(d) {
   $('avisos').innerHTML = av.map(([c, t]) => `<div class="aviso ${c}">${esc(t)}</div>`).join('');
 
   const t = d.total, h = d.hoy;
-  $('sProfit').textContent = usd(t.usd); $('sProfit').className = 'v ' + clase(t.usd);
+  $('sProfit').textContent = usd(t.usd); $('sProfit').className = 'v num ' + clase(t.usd);
   $('sProfitHoy').innerHTML = `hoy <span class="${clase(h.usd)}">${usd(h.usd)}</span>`;
   $('sOps').textContent = t.ops; $('sOpsHoy').textContent = `hoy ${h.ops}`;
   $('sWin').textContent = t.ganadas; $('sWinMedia').textContent = t.media_ganada != null ? `media ${usd(t.media_ganada)} · hoy ${h.ganadas}` : `hoy ${h.ganadas}`;
@@ -388,10 +533,10 @@ function render(d) {
   $('sSaldo').textContent = d.saldo == null ? '–' : '$' + d.saldo.toFixed(2);
   $('sKey').textContent = d.conectado ? 'key ' + d.key_id : 'sin API key';
 
-  $('vivo').innerHTML = d.vivo.map(v => v.mercado ? `<tr><td>${v.activo}</td><td>${esc(v.mercado)}</td>
-    <td>${Math.floor(v.quedan / 60)}:${String(Math.floor(v.quedan % 60)).padStart(2, '0')}</td><td>${n(v.referencia, 2)}</td><td>${n(v.precio, 2)}</td><td class="ayuda">${v.indice_s == null ? '–' : 'hace ' + v.indice_s.toFixed(0) + ' s'}</td>
-    <td class="${v.delta_ok ? 'pos' : ''}">${n(v.delta, 1)}</td><td>${n(v.yes_ask)} / ${n(v.yes_bid)}</td><td>${n(v.no_ask)} / ${n(v.no_bid)}</td>
-    <td>${esc(v.estado)}</td></tr>` : `<tr><td>${v.activo}</td><td colspan="9" class="ayuda">esperando datos…</td></tr>`).join('');
+  $('vivo').innerHTML = d.vivo.map(v => v.mercado ? `<tr><td>${v.activo}</td><td class="num">${esc(v.mercado)}</td>
+    <td class="num">${Math.floor(v.quedan / 60)}:${String(Math.floor(v.quedan % 60)).padStart(2, '0')}</td><td class="num">${n(v.referencia, 2)}</td><td class="num">${n(v.precio, 2)}</td><td class="ayuda num">${v.indice_s == null ? '–' : Math.max(0, v.indice_s).toFixed(0) + ' s'}</td>
+    <td class="num ${v.delta_ok ? 'pos' : ''}">${n(v.delta, 1)}</td><td class="num">${n(v.yes_ask)} / ${n(v.yes_bid)}</td><td class="num">${n(v.no_ask)} / ${n(v.no_bid)}</td>
+    <td>${esc(v.estado)}</td></tr>` : `<tr><td>${v.activo}</td><td colspan="9" class="vacio">esperando datos…</td></tr>`).join('');
 
   const v0 = d.vivo.find(v => v.mercado && v.grafico && v.grafico.activo && v.grafico.activo.length > 1);
   $('cardGrafico').style.display = v0 ? '' : 'none';
@@ -403,10 +548,9 @@ function render(d) {
     $('gLados').innerHTML = [['YES', v0.yes_ask, v0.yes_bid, 'var(--green)'], ['NO', v0.no_ask, v0.no_bid, 'var(--red)']]
       .map(([k, ask, bid, col]) => {
         const dentro = ask != null && ask >= emin - 1e-9 && ask <= emax + 1e-9;
-        return `<span style="display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;font-size:13px;`
-          + `background:${dentro ? 'rgba(34,197,94,.12)' : '#0b0d11'};border:1px solid ${dentro ? 'var(--green)' : 'var(--line)'}">`
-          + `<b style="color:${col}">${k}</b><span style="font-weight:600">${n(ask, 3)}</span>`
-          + `<span class="ayuda">/ ${n(bid, 3)}</span></span>`;
+        return `<span class="lado${dentro ? ' dentro' : ''}"><b style="color:${col}">${k}</b>`
+          + `<span class="num" style="font-weight:600">${n(ask, 3)}</span>`
+          + `<span class="num" style="color:var(--muted-2)">/ ${n(bid, 3)}</span></span>`;
       }).join('');
     $('grafico').innerHTML = grafico(v0);
     armarHover();
@@ -418,28 +562,36 @@ function render(d) {
       pie.push(['Ganancia', pnl == null ? '–' : usd(pnl * (d.abiertas[0] ? d.abiertas[0].contratos : 1)), clase(pnl)]);
       pie.push(['Al TP · al stop', (g.bid == null ? '–' : n(g.tp - g.bid, 2)) + ' · ' + (g.bid == null || g.exit == null ? '–' : n(g.bid - g.exit, 2)), '']);
     }
-    $('gPie').innerHTML = pie.map(([k, val, c]) => `<div><div class="k" style="font-size:11px;color:var(--muted)">${esc(k)}</div><div class="${c}" style="font-size:19px;font-weight:650">${esc(val)}</div></div>`).join('');
+    $('gPie').innerHTML = pie.map(([k, val, c]) => `<div><div class="k">${esc(k)}</div><div class="v num ${c}">${esc(val)}</div></div>`).join('');
   }
 
   const box = $('logs'), abajo = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
   box.textContent = d.logs.join('\n') || 'sin mensajes todavía';
   if ($('auto').checked && abajo) box.scrollTop = box.scrollHeight;
 
-  $('ops').innerHTML = d.operaciones.length ? d.operaciones.map(r => `<tr><td>${r.fecha} ${r.hora_entrada}</td><td>${r.activo}</td><td>${r.lado}</td>
-    <td>${r.entrada}</td><td>${r.salida}</td><td>${r.precio_salida}</td><td>${r.contratos}</td>
+  $('ops').innerHTML = d.operaciones.length ? d.operaciones.map(r => `<tr><td class="num">${r.fecha} ${r.hora_entrada}</td><td>${r.activo}</td><td>${r.lado}</td>
+    <td class="num">${r.entrada}</td><td>${r.salida}</td><td class="num">${r.precio_salida}</td><td class="num">${r.contratos}</td>
     <td class="${r.resultado === 'GANA' ? 'pos' : 'neg'}">${r.resultado === 'GANA' ? 'ganada' : 'perdida'}</td>
-    <td class="${clase(+r.pnl_usd)}">${usd(+r.pnl_usd)}</td></tr>`).join('') : '<tr><td colspan="9" class="ayuda">todavía no hay operaciones</td></tr>';
+    <td class="num ${clase(+r.pnl_usd)}">${usd(+r.pnl_usd)}</td></tr>`).join('')
+    : '<tr><td colspan="9" class="vacio">Todavía no hay operaciones. Aparecerán aquí en cuanto el bot cierre la primera.</td></tr>';
 
   const ke = $('keyEstado');
   ke.className = 'aviso ' + (d.conectado ? 'on' : 'warn');
   ke.textContent = d.conectado ? `Conectada · key ${d.key_id} · saldo ${d.saldo == null ? '–' : '$' + d.saldo.toFixed(2)}` : 'No conectada';
 
+  document.querySelectorAll('.skel').forEach(e => e.classList.remove('skel'));
   if (!campos.length) { campos = d.campos; ajustesGuardados = d.ajustes; armarForm(); }
 }
 
+function campoHTML(c) {
+  return `<div><label><span class="et">${esc(c.etiqueta)}</span><input id="f_${c.clave}" inputmode="${c.tipo === 'num' || c.tipo === 'ent' || c.tipo === 'opc' ? 'decimal' : 'text'}"></label>
+    <div class="ayuda">${esc(c.ayuda)}</div><div class="err" id="e_${c.clave}"></div></div>`;
+}
 function armarForm() {
-  $('form').innerHTML = campos.map(c => `<div><label>${esc(c.etiqueta)}<input id="f_${c.clave}" inputmode="${c.tipo === 'num' || c.tipo === 'ent' || c.tipo === 'opc' ? 'decimal' : 'text'}"></label>
-    <div class="ayuda">${esc(c.ayuda)}</div><div class="err" id="e_${c.clave}"></div></div>`).join('');
+  const base = campos.filter(c => c.seccion !== 'av'), av = campos.filter(c => c.seccion === 'av');
+  $('form').innerHTML = base.map(campoHTML).join('');
+  $('formAv').innerHTML = av.map(campoHTML).join('');
+  $('bloqueAv').hidden = !av.length;
   llenarForm(ajustesGuardados);
 }
 function llenarForm(v) {
@@ -448,14 +600,29 @@ function llenarForm(v) {
 
 async function refrescar() { try { const d = await api('/api/estado'); if (d) render(d); } catch (e) { $('pill').textContent = 'sin conexión'; $('pill').className = 'pill warn'; } }
 
+// encender mueve dinero real: se confirma en dos pasos, aquí mismo
+let confirmando = false, relojConfirm = null;
+function salirConfirm() {
+  confirmando = false; clearTimeout(relojConfirm); $('cancelar').hidden = true;
+  if (ultimo) render(ultimo);
+}
 $('power').onclick = async () => {
   const encender = !ultimo.encendido;
-  if (encender && !confirm('El bot va a operar con DINERO REAL. ¿Encender?')) return;
+  if (encender && !confirmando) {
+    confirmando = true;
+    $('cancelar').hidden = false;
+    $('power').textContent = 'Confirmar · dinero real';
+    $('power').className = 'b-off';
+    relojConfirm = setTimeout(salirConfirm, 6000);
+    return;
+  }
+  salirConfirm();
   $('power').disabled = true;
   const r = await api(encender ? '/api/encender' : '/api/apagar', {});
   if (r) msg($('msgPower'), r.msg, r.ok);
   refrescar();
 };
+$('cancelar').onclick = salirConfirm;
 
 $('guardar').onclick = async () => {
   const datos = {};
