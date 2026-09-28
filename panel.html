@@ -13,181 +13,248 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap">
 <style>
 :root{
-  /* superficies: una sola familia de grises, todos tirando a frío */
   --bg:#0d0f14; --bg-2:#0a0c10; --card:#14171e; --card-2:#181c24; --line:#232834; --line-2:#2d3341;
   --text:#e9ebf0; --muted:#8d94a3; --muted-2:#646b7a;
-  /* un acento de acción y tres estados */
   --blue:#4c8dff; --green:#2ed673; --red:#ff6b6b; --amber:#e0a63a;
   --greenbg:#0e2a1b; --redbg:#2e1616; --amberbg:#2b220c;
+  --estado:var(--muted-2);
   --sombra:0 1px 2px rgba(5,7,12,.6), 0 10px 30px -18px rgba(5,7,12,.9);
-  --sombra-alta:0 2px 4px rgba(5,7,12,.6), 0 18px 44px -20px rgba(5,7,12,1);
-  --r-card:14px; --r-int:9px; --t:180ms cubic-bezier(.2,.7,.3,1);
+  --r-card:14px; --r-int:9px;
+  --sal:cubic-bezier(.16,1,.3,1);       /* llegada confiada */
+  --t:180ms var(--sal); --t-rapido:140ms var(--sal);
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
 body{margin:0;background:var(--bg);color:var(--text);
   font:15px/1.55 Geist,system-ui,-apple-system,"Segoe UI",sans-serif;
   -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
-/* grano fino: quita la sensación de plano digital */
 body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E")}
-main{max-width:1180px;margin:0 auto;padding:14px 18px 56px;position:relative;z-index:2}
+/* el estado del bot se lee con visión periférica */
+.barra-estado{position:fixed;top:0;left:0;right:0;height:2px;z-index:12;background:var(--estado);
+  transition:background 260ms var(--sal)}
+main{max-width:1180px;margin:0 auto;padding:12px 18px 56px;position:relative;z-index:2}
+::selection{background:rgba(76,141,255,.3)}
+*{scrollbar-color:var(--line-2) transparent;scrollbar-width:thin}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:6px;border:3px solid var(--bg)}
+::-webkit-scrollbar-track{background:transparent}
 
 .salta{position:absolute;left:-9999px;top:0;background:var(--blue);color:#fff;padding:10px 16px;border-radius:0 0 10px 0;z-index:20}
 .salta:focus{left:0}
 
-/* ---------------- cabecera ---------------- */
+/* ---------------- cabecera: el instrumento ---------------- */
 .top{position:sticky;top:0;z-index:10;display:flex;flex-wrap:wrap;align-items:center;gap:10px;
-  padding:14px 0 12px;margin-bottom:14px;background:linear-gradient(var(--bg) 72%,rgba(13,15,20,0));
-  border-bottom:1px solid transparent}
-.marca{display:flex;align-items:center;gap:9px;margin-right:2px}
-.marca svg{display:block}
-h1{font-size:17px;margin:0;font-weight:600;letter-spacing:-.015em}
-h2{font-size:15px;margin:0;font-weight:600;letter-spacing:-.01em}
+  padding:14px 0 12px;margin-bottom:12px;background:linear-gradient(var(--bg) 74%,rgba(13,15,20,0))}
+.marca{display:flex;align-items:center;gap:9px}
+h1{font-size:16px;margin:0;font-weight:600;letter-spacing:-.015em}
+h2{font-size:14.5px;margin:0;font-weight:600;letter-spacing:-.01em}
 .sp{flex:1}
-
 .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 11px;border-radius:999px;font-size:12.5px;
-  font-weight:500;letter-spacing:.01em;border:1px solid transparent}
+  font-weight:500;border:1px solid transparent}
 .pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
 .on{background:var(--greenbg);color:var(--green);border-color:rgba(46,214,115,.22)}
 .off{background:#1a1e26;color:var(--muted);border-color:var(--line)}
 .warn{background:var(--amberbg);color:var(--amber);border-color:rgba(224,166,58,.22)}
 
-button{font:inherit;font-weight:550;border:1px solid transparent;border-radius:var(--r-int);padding:8px 16px;
-  cursor:pointer;transition:background var(--t),border-color var(--t),transform var(--t),box-shadow var(--t),color var(--t)}
-button:active:not(:disabled){transform:translateY(1px) scale(.99)}
+/* Delta y tiempo restante: lo que se mira cada segundo */
+.instr{display:flex;align-items:baseline;gap:18px;padding:0 16px;border-left:1px solid var(--line);
+  border-right:1px solid var(--line)}
+.instr > div{display:flex;flex-direction:column;gap:1px}
+.instr .k{font-size:10.5px;color:var(--muted-2);letter-spacing:.06em;text-transform:uppercase}
+.instr .v{font-size:23px;font-weight:600;line-height:1;letter-spacing:-.025em}
+.instr .v.chico{font-size:19px}
+
+button{font:inherit;font-weight:550;border:1px solid transparent;border-radius:var(--r-int);padding:8px 15px;
+  cursor:pointer;transition:background var(--t),border-color var(--t),color var(--t),transform var(--t-rapido),box-shadow var(--t)}
+button:active:not(:disabled){transform:scale(.97)}
 button:disabled{opacity:.45;cursor:default}
 :focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-radius:6px}
-.b-on{background:var(--green);color:#03240f}
-.b-on:hover:not(:disabled){background:#42e084;box-shadow:0 6px 18px -8px rgba(46,214,115,.8)}
-.b-off{background:var(--red);color:#2b0808}
-.b-off:hover:not(:disabled){background:#ff8080;box-shadow:0 6px 18px -8px rgba(255,107,107,.7)}
 .b-main{background:var(--blue);color:#fff}
-.b-main:hover:not(:disabled){background:#649dff;box-shadow:0 6px 18px -8px rgba(76,141,255,.75)}
 .b-ghost{background:transparent;color:var(--muted);border-color:var(--line-2)}
-.b-ghost:hover:not(:disabled){color:var(--text);border-color:var(--muted-2);background:var(--card-2)}
-.msg{font-size:13.5px}
-.top .msg{max-width:min(46ch,32vw);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.b-danger{background:var(--red);color:#2b0808;border-color:transparent}
+@media (hover:hover) and (pointer:fine){
+  .b-main:hover:not(:disabled){background:#649dff;box-shadow:0 6px 18px -8px rgba(76,141,255,.75)}
+  .b-ghost:hover:not(:disabled){color:var(--text);border-color:var(--muted-2);background:var(--card-2)}
+  .b-danger:hover:not(:disabled){background:#ff8080}
+  .b-encender:hover:not(:disabled){background:rgba(46,214,115,.14);border-color:var(--green);color:#7ee8ad}
+  .b-apagar:hover:not(:disabled){color:var(--red);border-color:rgba(255,107,107,.5);background:rgba(255,107,107,.07)}
+}
+/* encender es la acción principal; apagar no compite con los datos */
+.b-encender{background:rgba(46,214,115,.1);border-color:rgba(46,214,115,.45);color:var(--green)}
+.b-apagar{background:transparent;border-color:var(--line-2);color:var(--muted)}
+.msg{font-size:13px}
+.top .msg{max-width:min(40ch,26vw);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* ---------------- avisos ---------------- */
-.aviso{padding:11px 15px;border-radius:var(--r-int);margin-bottom:10px;font-size:13.5px;
-  border:1px solid transparent;display:flex;align-items:center;gap:9px}
+.aviso{padding:10px 14px;border-radius:var(--r-int);margin-bottom:9px;font-size:13.5px;border:1px solid transparent}
 .aviso.on{background:var(--greenbg);color:#8ff0bb;border-color:rgba(46,214,115,.2)}
 .aviso.warn{background:var(--amberbg);color:#f0cf8a;border-color:rgba(224,166,58,.25)}
 .aviso.off{background:var(--card);color:var(--muted);border-color:var(--line)}
-.aviso.grande{font-size:15px;font-weight:550;padding:14px 16px}
+.aviso.grande{font-size:14.5px;font-weight:550;padding:13px 15px}
 
 /* ---------------- números ---------------- */
 .num{font-family:"Geist Mono",ui-monospace,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums;
   font-feature-settings:"tnum" 1;letter-spacing:-.01em}
 .pos{color:var(--green)}.neg{color:var(--red)}
-
-/* ---------------- resumen ---------------- */
-.resumen{display:grid;gap:12px;grid-template-columns:minmax(0,1fr);margin-bottom:12px}
-@media(min-width:880px){.resumen{grid-template-columns:288px minmax(0,1fr)}}
-.hero{background:linear-gradient(158deg,var(--card-2),var(--card) 62%);border:1px solid var(--line);
-  border-radius:var(--r-card);padding:17px 19px 19px;box-shadow:var(--sombra);display:flex;flex-direction:column;justify-content:center}
-.hero .k{color:var(--muted);font-size:12.5px;letter-spacing:.02em}
-.hero .v{font-size:38px;font-weight:600;line-height:1.04;margin:7px 0 6px;letter-spacing:-.03em}
-.hero .s{color:var(--muted);font-size:13px}
-.minis{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(148px,1fr))}
-@media(min-width:880px){.minis{grid-template-columns:repeat(3,minmax(0,1fr))}}
-.stat{background:var(--card);border:1px solid var(--line);border-radius:var(--r-card);padding:12px 14px 13px;
-  box-shadow:var(--sombra);transition:border-color var(--t)}
-.stat:hover{border-color:var(--line-2)}
-.stat .k{color:var(--muted);font-size:12.5px}
-.stat .v{font-size:21px;font-weight:600;margin-top:3px;letter-spacing:-.02em}
-.stat .s{color:var(--muted-2);font-size:11.5px;margin-top:2px}
-.skel{color:transparent!important;background:linear-gradient(90deg,var(--line) 25%,var(--line-2) 50%,var(--line) 75%);
-  background-size:200% 100%;border-radius:5px;animation:sk 1.4s ease-in-out infinite}
-@keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
+/* solo destellan los números que cambian pocas veces al día */
+@keyframes destello{from{color:var(--blue)}to{color:inherit}}
+.destello{animation:destello 700ms var(--sal)}
 
 /* ---------------- tarjetas ---------------- */
-.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-card);padding:15px 17px 17px;
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-card);padding:14px 16px 16px;
   margin-bottom:12px;box-shadow:var(--sombra)}
-.cab{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin-bottom:12px}
-.wrap{overflow-x:auto;margin:0 -17px;padding:0 17px}
+.cab{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin-bottom:11px}
+.wrap{overflow-x:auto;margin:0 -16px;padding:0 16px}
 table{border-collapse:collapse;width:100%;font-size:13.5px}
-th,td{padding:8px 10px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--line)}
-th{color:var(--muted-2);font-weight:500;font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;
+th,td{padding:7px 10px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--line)}
+th{color:var(--muted-2);font-weight:500;font-size:11px;letter-spacing:.05em;text-transform:uppercase;
   position:sticky;top:0;background:var(--card)}
 tbody tr{transition:background var(--t)}
 tbody tr:hover{background:var(--card-2)}
 tbody tr:last-child td{border-bottom:0}
 .vacio{color:var(--muted-2);font-style:italic}
 
-#logs{background:var(--bg-2);border:1px solid var(--line);border-radius:var(--r-int);height:280px;overflow:auto;
-  padding:11px 13px;font:12px/1.62 "Geist Mono",ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-word;
-  color:#b9c0cd}
+/* ---------------- resumen ---------------- */
+.resumen{display:grid;gap:12px;grid-template-columns:minmax(0,1fr);margin-bottom:12px}
+@media(min-width:880px){.resumen{grid-template-columns:276px minmax(0,1fr)}}
+.hero{background:linear-gradient(158deg,var(--card-2),var(--card) 62%);border:1px solid var(--line);
+  border-radius:var(--r-card);padding:16px 18px 18px;box-shadow:var(--sombra);
+  display:flex;flex-direction:column;justify-content:center}
+.hero .k{color:var(--muted);font-size:12.5px}
+.hero .v{font-size:36px;font-weight:600;line-height:1.04;margin:6px 0 5px;letter-spacing:-.03em}
+.hero .s{color:var(--muted);font-size:13px}
+.minis{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(148px,1fr))}
+@media(min-width:880px){.minis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:var(--r-card);padding:11px 13px 12px;
+  box-shadow:var(--sombra);transition:border-color var(--t)}
+.stat:hover{border-color:var(--line-2)}
+.stat .k{color:var(--muted);font-size:12.5px}
+.stat .v{font-size:20px;font-weight:600;margin-top:2px;letter-spacing:-.02em}
+.stat .s{color:var(--muted-2);font-size:11.5px;margin-top:1px}
+.skel{color:transparent!important;background:linear-gradient(90deg,var(--line) 25%,var(--line-2) 50%,var(--line) 75%);
+  background-size:200% 100%;border-radius:5px;animation:sk 1.4s ease-in-out infinite}
+@keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* ---------------- bloque en vivo ---------------- */
+.lado{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:12.5px;
+  background:var(--bg-2);border:1px solid var(--line);transition:border-color var(--t),background var(--t)}
+.lado.dentro{background:rgba(46,214,115,.1);border-color:rgba(46,214,115,.55)}
+.lado b{font-weight:600}
+#gPie{display:flex;flex-wrap:wrap;gap:24px;margin-top:11px;padding-top:10px;border-top:1px solid var(--line)}
+#gPie .k{font-size:11px;color:var(--muted-2);letter-spacing:.04em;text-transform:uppercase}
+#gPie .v{font-size:18px;font-weight:600;letter-spacing:-.02em;margin-top:2px}
+/* medidor de la posición abierta */
+.medidor{margin-top:12px;padding-top:11px;border-top:1px solid var(--line)}
+.pista{position:relative;height:6px;border-radius:3px;background:linear-gradient(90deg,var(--redbg),var(--line),var(--greenbg))}
+.tramo{position:absolute;top:0;height:6px;border-radius:3px;transition:left var(--t),width var(--t)}
+.tramo.gana{background:var(--green)}.tramo.pierde{background:var(--red)}
+.marca-ent{position:absolute;top:-3px;width:1px;height:12px;background:var(--muted);transform:translateX(-.5px)}
+.marca-bid{position:absolute;top:-4px;width:3px;height:14px;border-radius:2px;background:var(--text);
+  box-shadow:0 0 0 2px var(--card);transform:translateX(-1.5px);transition:left var(--t)}
+.pista-pies{position:relative;height:16px;margin-top:6px;font-size:11px}
+.pista-pies > span:first-child{position:absolute;left:0}
+.pista-pies > span:last-child{position:absolute;right:0}
+.pista-pies > span:nth-child(2){position:absolute;transform:translateX(-50%);white-space:nowrap}
+
+/* ---------------- registro ---------------- */
+#logs{background:var(--bg-2);border:1px solid var(--line);border-radius:var(--r-int);
+  min-height:64px;max-height:280px;overflow:auto;padding:10px 12px;
+  font:12px/1.6 "Geist Mono",ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-word;color:#b9c0cd}
 a{color:var(--blue);text-decoration:none;border-bottom:1px solid transparent;transition:border-color var(--t)}
 a:hover{border-bottom-color:var(--blue)}
 
 /* ---------------- formularios ---------------- */
-.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(146px,1fr));gap:13px}
-label{display:block;font-size:12.5px;color:var(--muted)}
-input,textarea{width:100%;margin-top:5px;padding:9px 11px;border-radius:var(--r-int);border:1px solid var(--line-2);
-  background:var(--bg-2);color:var(--text);font:inherit;transition:border-color var(--t),background var(--t)}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:10px}
+label{display:block;font-size:12px;color:var(--muted)}
+.form .et{display:block;min-height:2.3em;line-height:1.3}
+input,textarea{width:100%;margin-top:4px;padding:7px 9px;border-radius:var(--r-int);border:1px solid var(--line-2);
+  background:var(--bg-2);color:var(--text);font:inherit;font-size:14px;transition:border-color var(--t),background var(--t)}
 input:hover,textarea:hover{border-color:var(--muted-2)}
 input:focus,textarea:focus{outline:none;border-color:var(--blue);background:var(--bg)}
+input.malo,input.malo:focus{border-color:var(--red)}
 .form input{font-family:"Geist Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
-textarea{font:12px "Geist Mono",ui-monospace,Consolas,monospace;height:132px;resize:vertical}
-.ayuda{font-size:11.5px;color:var(--muted-2);margin-top:4px}
-.err{font-size:11.5px;color:var(--red);margin-top:3px}
-.row{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin-top:13px}
+textarea{font:11.5px/1.6 "Geist Mono",ui-monospace,Consolas,monospace;height:94px;resize:vertical}
+.ayuda{font-size:11px;color:var(--muted-2);margin-top:3px}
+.err{font-size:11px;color:var(--red);margin-top:3px}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin-top:11px}
 .grid2{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start}.grid2>*{min-width:0}
-.form .et{display:block;min-height:2.6em}
-.avanzado{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
-/* los dos cuadros de configuración van más apretados que el resto del panel */
+@media(min-width:900px){.grid2{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
 .compacto{padding:13px 15px 15px}
 .compacto .cab{margin-bottom:9px}
-.compacto .form{gap:10px;grid-template-columns:repeat(auto-fit,minmax(118px,1fr))}
-.compacto .form .et{min-height:2.3em;font-size:12px;line-height:1.3}
-.compacto input,.compacto textarea{margin-top:4px;padding:7px 9px;font-size:14px}
-.compacto textarea{height:94px;font-size:11.5px}
-.compacto .ayuda{margin-top:3px;font-size:11px}
-.compacto .row{margin-top:11px}
-.compacto button{padding:7px 14px}
 .compacto .aviso{padding:9px 12px;margin-bottom:11px;font-size:13px}
-.compacto label{font-size:12px}
-.avanzado summary{cursor:pointer;font-size:13px;color:var(--muted);list-style:none;display:flex;align-items:center;gap:7px;
-  width:fit-content;transition:color var(--t)}
+.avanzado{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+.avanzado summary{cursor:pointer;font-size:12.5px;color:var(--muted);list-style:none;display:flex;align-items:center;
+  gap:7px;width:fit-content;transition:color var(--t)}
 .avanzado summary:hover{color:var(--text)}
 .avanzado summary::-webkit-details-marker{display:none}
 .avanzado summary::before{content:"";width:6px;height:6px;border-right:1.5px solid currentColor;
   border-bottom:1.5px solid currentColor;transform:rotate(-45deg);transition:transform var(--t)}
 .avanzado[open] summary::before{transform:rotate(45deg)}
-@media(min-width:900px){.grid2{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+/* estados de guardado */
+.estado-guardado{display:inline-flex;align-items:center;gap:6px;font-size:13px}
+.estado-guardado::before{content:"";width:13px;height:13px;border-radius:50%;flex:none}
+.estado-guardado.ok{color:var(--green)}
+.estado-guardado.ok::before{background:var(--green);
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat}
+.estado-guardado.mal{color:var(--red)}
+.estado-guardado.mal::before{background:var(--red);
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 4v5M8 11.6v.2' stroke='%23000' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 4v5M8 11.6v.2' stroke='%23000' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat}
+.estado-guardado.yendo{color:var(--muted)}
+.estado-guardado.yendo::before{border:2px solid var(--line-2);border-top-color:var(--muted);
+  border-radius:50%;animation:gira 700ms linear infinite;background:none}
+@keyframes gira{to{transform:rotate(360deg)}}
 
-/* ---------------- bloque en vivo ---------------- */
-#grafico svg{border-radius:8px}
-.lado{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:12.5px;
-  background:var(--bg-2);border:1px solid var(--line);transition:border-color var(--t),background var(--t)}
-.lado.dentro{background:rgba(46,214,115,.1);border-color:rgba(46,214,115,.55)}
-.lado b{font-weight:600}
-#gPie{gap:26px}
-#gPie .k{font-size:11.5px;color:var(--muted)}
-#gPie .v{font-size:19px;font-weight:600;letter-spacing:-.02em;margin-top:1px}
+@media(max-width:640px){
+  main{padding:10px 12px 40px}
+  .solo-pc,#uptime{display:none}
+  #logs{max-height:200px}
+  #gPie{gap:14px 20px}
+  .instr{padding:0;border:0;gap:14px}
+  .instr .v{font-size:20px}
+  .top{gap:8px;padding:10px 0}
+  .top .msg{max-width:100%;white-space:normal}
+  .card{padding:12px 13px 14px}
+  .wrap{margin:0 -13px;padding:0 13px}
+}
 @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
 </head>
 <body>
+<div class="barra-estado" aria-hidden="true"></div>
 <a class="salta" href="#contenido">Saltar al contenido</a>
 <main>
 <header class="top">
   <span class="marca">
-    <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#14171e"></rect><path d="M5 21 L12 13 L17 18 L27 7" fill="none" stroke="#2ed673" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+    <svg width="21" height="21" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#14171e"></rect><path d="M5 21 L12 13 L17 18 L27 7" fill="none" stroke="#2ed673" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path></svg>
     <h1>Kalshi Bot</h1>
   </span>
   <span id="pill" class="pill off">cargando…</span>
-  <span id="uptime" class="ayuda" style="margin:0"></span>
+  <span class="sp"></span>
+  <div class="instr" id="instr" hidden>
+    <div><span class="k">Delta</span><span class="v num" id="hDelta">–</span></div>
+    <div><span class="k">Queda</span><span class="v num chico" id="hQueda">–</span></div>
+  </div>
   <span class="sp"></span>
   <span id="msgPower" class="msg" role="status" aria-live="polite"></span>
   <button id="cancelar" class="b-ghost" hidden>Cancelar</button>
-  <button id="power" class="b-on" disabled>Encender</button>
+  <button id="power" class="b-encender" disabled>Encender</button>
   <form method="post" action="/logout" style="margin:0"><button class="b-ghost">Salir</button></form>
+  <span id="uptime" class="ayuda" style="margin:0;width:100%"></span>
 </header>
 
 <div id="avisos"></div>
+
+<section class="card" id="cardGrafico" style="display:none" aria-label="Bloque en vivo">
+  <div class="cab"><h2>Bloque en vivo</h2><span id="gTicker" class="ayuda num" style="margin:0"></span>
+    <span class="sp"></span><span class="ayuda" style="margin:0">ask/bid</span><span id="gLados" style="display:flex;gap:8px"></span>
+    <span class="solo-pc ayuda" style="margin:0 0 0 6px">quedan</span><span id="gQueda" class="solo-pc num" style="font-weight:600"></span></div>
+  <div id="grafico"></div>
+  <div id="medidor"></div>
+  <div id="gPie"></div>
+</section>
 
 <section class="resumen" id="contenido" aria-label="Resumen">
   <div class="hero">
@@ -205,26 +272,12 @@ textarea{font:12px "Geist Mono",ui-monospace,Consolas,monospace;height:132px;res
   </div>
 </section>
 
-<section class="card" id="cardGrafico" style="display:none" aria-label="Bloque en vivo">
-  <div class="cab"><h2>Bloque en vivo</h2><span id="gTicker" class="ayuda num" style="margin:0"></span>
-    <span class="sp"></span><span class="ayuda" style="margin:0">ask/bid</span><span id="gLados" style="display:flex;gap:8px"></span>
-    <span class="ayuda" style="margin:0 0 0 6px">quedan</span><span id="gQueda" class="num" style="font-weight:600"></span></div>
-  <div id="grafico"></div>
-  <div class="row" id="gPie" style="margin-top:12px;padding-top:11px;border-top:1px solid var(--line)"></div>
-</section>
-
 <section class="card" aria-label="En vivo">
   <div class="cab"><h2>En vivo</h2></div>
   <div class="wrap"><table>
     <thead><tr><th scope="col">Activo</th><th scope="col">Mercado</th><th scope="col">Queda</th><th scope="col">Referencia</th><th scope="col">Precio</th><th scope="col">Índice</th><th scope="col">Delta</th><th scope="col">YES ask/bid</th><th scope="col">NO ask/bid</th><th scope="col">Estado</th></tr></thead>
     <tbody id="vivo"></tbody>
   </table></div>
-</section>
-
-<section class="card" aria-label="Registro">
-  <div class="cab"><h2>Registro</h2><span class="sp"></span>
-    <label style="display:flex;align-items:center;gap:7px;margin:0;cursor:pointer"><input type="checkbox" id="auto" checked style="width:auto;margin:0;accent-color:var(--blue)">seguir los nuevos</label></div>
-  <div id="logs" tabindex="0"></div>
 </section>
 
 <section class="card" aria-label="Operaciones">
@@ -235,6 +288,12 @@ textarea{font:12px "Geist Mono",ui-monospace,Consolas,monospace;height:132px;res
   </table></div>
 </section>
 
+<section class="card" aria-label="Registro">
+  <div class="cab"><h2>Registro</h2><span class="sp"></span>
+    <label style="display:flex;align-items:center;gap:7px;margin:0;cursor:pointer"><input type="checkbox" id="auto" checked style="width:auto;margin:0;accent-color:var(--blue)">seguir los nuevos</label></div>
+  <div id="logs" tabindex="0"></div>
+</section>
+
 <div class="grid2">
   <section class="card compacto" aria-label="Ajustes">
     <div class="cab"><h2>Ajustes</h2></div>
@@ -242,7 +301,7 @@ textarea{font:12px "Geist Mono",ui-monospace,Consolas,monospace;height:132px;res
     <div class="form" id="form"></div>
     <details id="bloqueAv" class="avanzado" hidden>
       <summary>Avanzado</summary>
-      <div class="form" id="formAv" style="margin-top:12px"></div>
+      <div class="form" id="formAv" style="margin-top:11px"></div>
     </details>
     <div class="row"><button class="b-main" id="guardar">Guardar ajustes</button><button class="b-ghost" id="deshacer">Deshacer</button><span id="msgAjustes" class="msg" role="status" aria-live="polite"></span></div>
   </section>
@@ -275,12 +334,28 @@ function dur(s) {
   s = Math.floor(s); const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
   return d ? `${d} d ${h} h` : h ? `${h} h ${m} min` : `${m} min ${s % 60} s`;
 }
-function msg(el, texto, ok) { el.textContent = texto; el.title = texto; el.className = 'msg ' + (ok ? 'pos' : 'neg'); }
+// estado de guardado: girando, hecho o error, con el texto que manda el bot
+function msg(el, texto, estado) {
+  el.textContent = texto; el.title = texto;
+  el.className = 'msg estado-guardado ' + (estado === 'yendo' ? 'yendo' : estado ? 'ok' : 'mal');
+}
+// cambia el texto y, si cambio, lo enciende un instante (solo numeros de baja frecuencia)
+function destellar(el, texto, cls) {
+  const cambio = el.textContent !== texto && el.textContent !== '\u2013' && !el.classList.contains('skel');
+  el.textContent = texto;
+  if (cls != null) el.className = cls;
+  if (cambio) { el.classList.remove('destello'); void el.offsetWidth; el.classList.add('destello'); }
+}
 
 let G = null, hoverX = null;   // estado del gráfico para la cruz
 
-const VERDE = '#22c55e', ROJO = '#f87171', NEUTRO = '#9097a3';
-const X_0 = 76, X_1 = 796, ALTO_G = 252, Y_0 = 26, Y_1 = ALTO_G - 46, W_G = 880, BLOQUE_S = 900;
+const VERDE = '#2ed673', ROJO = '#ff6b6b', NEUTRO = '#8d94a3', TENUE = '#646b7a';
+const BLOQUE_S = 900;
+const angosto = () => window.innerWidth < 640;
+// el lienzo se adapta: si fuera siempre de 880 de ancho, en el movil las etiquetas
+// quedarian a media escala y no se leerian
+const geo = () => angosto() ? { W: 440, X0: 44, X1: 378, H: 300 } : { W: 880, X0: 62, X1: 806, H: 210 };
+let GX1 = 806;   // borde derecho vigente, para las capsulas de precio
 
 // curva monótona: suaviza sin inventar subidas ni bajadas que no están en los datos
 function curva(p) {
@@ -304,147 +379,153 @@ function curva(p) {
   return d;
 }
 
-// etiqueta de precio pegada al eje, como las de TradingView
 function capsula(y, texto, fondo, tinta) {
   const w = texto.length * 6.1 + 12;
-  return `<rect x="${(X_1 + 6).toFixed(1)}" y="${(y - 8).toFixed(1)}" width="${w.toFixed(1)}" height="16" rx="3" fill="${fondo}"></rect>`
-    + `<text x="${(X_1 + 6 + w / 2).toFixed(1)}" y="${(y + 3.6).toFixed(1)}" text-anchor="middle" fill="${tinta}" font-size="10.5" font-weight="700">${texto}</text>`;
+  return `<rect x="${(GX1 + 6).toFixed(1)}" y="${(y - 8).toFixed(1)}" width="${w.toFixed(1)}" height="16" rx="3" fill="${fondo}"></rect>`
+    + `<text x="${(GX1 + 6 + w / 2).toFixed(1)}" y="${(y + 3.6).toFixed(1)}" text-anchor="middle" fill="${tinta}" font-size="10.5" font-weight="700">${texto}</text>`;
 }
 
 function grafico(v) {
   const g = v.grafico;
   if (!g || !g.activo || g.activo.length < 2) { G = null; return ''; }
-  const X0 = X_0, X1 = X_1, Y0 = Y_0, Y1 = Y_1, W = W_G, H = ALTO_G, BLOQUE = BLOQUE_S;
+  const { W, X0, X1, H } = geo();
+  GX1 = X1;
+  const Y0 = 22, Y1 = H - 40, BLOQUE = BLOQUE_S;
   const x = s => X0 + (Math.max(0, Math.min(BLOQUE, s)) / BLOQUE) * (X1 - X0);
 
   const ps = g.activo.map(p => p[1]).concat(g.referencia != null ? [g.referencia] : []);
   let lo = Math.min(...ps), hi = Math.max(...ps);
   const ref = g.referencia, dm = g.delta_min;
-  if (dm > 0 && ref != null) {
-    const tope = Math.max(hi - ref, ref - lo, 1) * 3;
+  if (dm > 0 && ref != null) {                     // los umbrales entran, pero sin aplastar la línea
+    const tope = Math.max(hi - ref, ref - lo, 1) * 2.4;
     const d = Math.min(dm, tope);
     lo = Math.min(lo, ref - d); hi = Math.max(hi, ref + d);
   }
-  const pad = Math.max((hi - lo) * 0.12, 8);
+  const pad = Math.max((hi - lo) * 0.14, 8);
   lo -= pad; hi += pad;
   const ya = p => Y1 - (p - lo) / (hi - lo) * (Y1 - Y0);
   const corta = y => Math.max(Y0, Math.min(Y1, y));
 
-  const hayOp = g.tp != null;
-  const bids = (g.contrato || []).map(p => p[1]);
-  let clo = 0.4, chi = 1;
-  if (hayOp) {
-    clo = Math.max(0, Math.min(g.exit != null ? g.exit : 0.4, ...(bids.length ? bids : [1])) - 0.05);
-    chi = Math.min(1, Math.max(g.tp, ...(bids.length ? bids : [0])) + 0.05);
-  }
-  const yc = p => Y1 - (p - clo) / (chi - clo) * (Y1 - Y0);
-
-  G = { g, x, ya, yc, hayOp, lo, hi, X0, X1, Y0, Y1, W, H };
+  G = { g, x, ya, lo, hi, X0, X1, Y0, Y1, W, H };
   const o = [];
   const ult = g.activo[g.activo.length - 1];
   const arriba = ref == null || ult[1] >= ref;
-  const colAhora = arriba ? VERDE : ROJO;
+  const col = arriba ? VERDE : ROJO;
   const yRef = ref != null ? corta(ya(ref)) : Y1;
 
-  // --- degradados verde arriba / rojo abajo, apagándose los dos en la referencia ---
   o.push(`<defs>`
     + `<linearGradient id="gArr" gradientUnits="userSpaceOnUse" x1="0" y1="${Y0}" x2="0" y2="${yRef.toFixed(1)}">`
-    + `<stop offset="0%" stop-color="${VERDE}" stop-opacity="0.3"></stop>`
-    + `<stop offset="100%" stop-color="${VERDE}" stop-opacity="0.015"></stop></linearGradient>`
+    + `<stop offset="0%" stop-color="${VERDE}" stop-opacity="0.26"></stop>`
+    + `<stop offset="100%" stop-color="${VERDE}" stop-opacity="0.012"></stop></linearGradient>`
     + `<linearGradient id="gAba" gradientUnits="userSpaceOnUse" x1="0" y1="${yRef.toFixed(1)}" x2="0" y2="${Y1}">`
-    + `<stop offset="0%" stop-color="${ROJO}" stop-opacity="0.015"></stop>`
-    + `<stop offset="100%" stop-color="${ROJO}" stop-opacity="0.3"></stop></linearGradient>`
+    + `<stop offset="0%" stop-color="${ROJO}" stop-opacity="0.012"></stop>`
+    + `<stop offset="100%" stop-color="${ROJO}" stop-opacity="0.26"></stop></linearGradient>`
     + `<clipPath id="cArr"><rect x="0" y="${Y0 - 4}" width="${W}" height="${(yRef - Y0 + 4).toFixed(1)}"></rect></clipPath>`
     + `<clipPath id="cAba"><rect x="0" y="${yRef.toFixed(1)}" width="${W}" height="${(Y1 - yRef + 4).toFixed(1)}"></rect></clipPath>`
-    + `<filter id="glow" x="-5%" y="-20%" width="110%" height="140%"><feGaussianBlur stdDeviation="3"></feGaussianBlur></filter>`
+    + `<filter id="glow" x="-5%" y="-25%" width="110%" height="150%"><feGaussianBlur stdDeviation="2.6"></feGaussianBlur></filter>`
+    + `<pattern id="rayas" width="6" height="6" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">`
+    + `<line x1="0" y1="0" x2="0" y2="6" stroke="${TENUE}" stroke-width="1" opacity="0.28"></line></pattern>`
     + `</defs>`);
 
-  if (g.ventana) o.push(`<rect x="${x(BLOQUE - g.ventana).toFixed(1)}" y="${Y0}" width="${(X1 - x(BLOQUE - g.ventana)).toFixed(1)}" height="${Y1 - Y0}" fill="#3b82f6" opacity="0.05"></rect>`);
+  // tramo del bloque que el bot no llegó a ver
+  const xIni = x(g.activo[0][0]);
+  if (xIni > X0 + 3) {
+    o.push(`<rect x="${X0}" y="${Y0}" width="${(xIni - X0).toFixed(1)}" height="${Y1 - Y0}" fill="url(#rayas)"></rect>`);
+    if (xIni - X0 > (X1 - X0) * 0.12) o.push(`<text x="${((X0 + xIni) / 2).toFixed(1)}" y="${(Y0 + (Y1 - Y0) / 2).toFixed(1)}" text-anchor="middle" fill="${TENUE}" font-size="10.5">sin datos</text>`);
+  }
 
-  // --- umbrales del Delta: verde el de arriba, rojo el de abajo; se encienden al cumplirse ---
-  const cumple = dm > 0 && ref != null && Math.abs(ult[1] - ref) >= dm;
+  if (g.ventana) o.push(`<rect x="${x(BLOQUE - g.ventana).toFixed(1)}" y="${Y0}" width="${(X1 - x(BLOQUE - g.ventana)).toFixed(1)}" height="${Y1 - Y0}" fill="#4c8dff" opacity="0.05"></rect>`);
+
+  // umbrales del Delta: se encienden al cumplirse
   if (dm > 0 && ref != null) {
-    [[ref + dm, VERDE, '+', -5, ult[1] - ref >= dm], [ref - dm, ROJO, '−', 12, ref - ult[1] >= dm]].forEach(([val, col, sig, dy, activo]) => {
+    [[ref + dm, VERDE, '+', -5, ult[1] - ref >= dm], [ref - dm, ROJO, '−', 12, ref - ult[1] >= dm]].forEach(([val, c, sig, dy, activo]) => {
       const y = ya(val), fuera = y < Y0 || y > Y1, yv = corta(y);
-      o.push(`<line x1="${X0}" y1="${yv.toFixed(1)}" x2="${X1}" y2="${yv.toFixed(1)}" stroke="${col}" stroke-width="${activo ? 1.5 : 1}" stroke-dasharray="${fuera ? '2 5' : '5 4'}" opacity="${activo ? 0.85 : 0.3}"></line>`);
-      o.push(`<text x="${X0 + 98}" y="${(yv + dy).toFixed(1)}" fill="${activo ? col : NEUTRO}" font-size="11" font-weight="${activo ? 700 : 400}">${sig}${n(dm, 0)}${fuera ? ' ↕' : ''}${activo ? '  ✓' : ''}</text>`);
+      o.push(`<line x1="${X0}" y1="${yv.toFixed(1)}" x2="${X1}" y2="${yv.toFixed(1)}" stroke="${c}" stroke-width="${activo ? 1.5 : 1}" stroke-dasharray="${fuera ? '2 5' : '5 4'}" opacity="${activo ? 0.85 : 0.28}"></line>`);
+      o.push(`<text x="${X1 - 4}" y="${(yv + dy).toFixed(1)}" text-anchor="end" fill="${activo ? c : TENUE}" font-size="11" font-weight="${activo ? 600 : 400}">${sig}${n(dm, 0)}${fuera ? ' ↕' : ''}${activo ? '  ✓' : ''}</text>`);
     });
   }
 
-  // --- referencia: la línea que parte el gráfico, neutra y sólida ---
-  if (hayOp) {
-    o.push(`<line x1="${X0}" y1="${yc(g.tp).toFixed(1)}" x2="${X1}" y2="${yc(g.tp).toFixed(1)}" stroke="${VERDE}" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.4"></line>`);
-    if (g.exit != null) o.push(`<line x1="${X0}" y1="${yc(g.exit).toFixed(1)}" x2="${X1}" y2="${yc(g.exit).toFixed(1)}" stroke="${ROJO}" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.4"></line>`);
-  }
-  if (ref != null) {
-    o.push(`<line x1="${X0}" y1="${yRef.toFixed(1)}" x2="${X1}" y2="${yRef.toFixed(1)}" stroke="${NEUTRO}" stroke-width="1" opacity="0.45"></line>`);
-    o.push(`<text x="${X0 + 4}" y="${(yRef - 5).toFixed(1)}" fill="${NEUTRO}" font-size="11">referencia ${Math.round(ref).toLocaleString('es')}</text>`);
-  }
-
-  // --- BTC en dos mitades: verde sobre la referencia, roja debajo, con brillo ---
+  // BTC en dos mitades, con brillo
   const pa = g.activo.map(p => [x(p[0]), ya(p[1])]);
   const dLinea = curva(pa);
   const dArea = `${dLinea} L ${pa[pa.length - 1][0].toFixed(1)} ${yRef.toFixed(1)} L ${pa[0][0].toFixed(1)} ${yRef.toFixed(1)} Z`;
-  [['cArr', 'gArr', VERDE], ['cAba', 'gAba', ROJO]].forEach(([clip, grad, col]) => {
+  [['cArr', 'gArr', VERDE], ['cAba', 'gAba', ROJO]].forEach(([clip, grad, c]) => {
     o.push(`<g clip-path="url(#${clip})">`
       + `<path d="${dArea}" fill="url(#${grad})"></path>`
-      + `<path d="${dLinea}" fill="none" stroke="${col}" stroke-width="3" opacity="0.35" filter="url(#glow)"></path>`
-      + `<path d="${dLinea}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>`
+      + `<path d="${dLinea}" fill="none" stroke="${c}" stroke-width="3" opacity="0.3" filter="url(#glow)"></path>`
+      + `<path d="${dLinea}" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>`
       + `</g>`);
   });
 
-  // --- máximo y mínimo del bloque ---
-  if (ref != null && g.activo.length > 4) {
+  // la referencia parte el gráfico: neutra, sólida y por encima de todo
+  if (ref != null) {
+    o.push(`<line x1="${X0}" y1="${yRef.toFixed(1)}" x2="${X1}" y2="${yRef.toFixed(1)}" stroke="${NEUTRO}" stroke-width="1" opacity="0.5"></line>`);
+    o.push(`<text x="${X0 + 4}" y="${(yRef - 5).toFixed(1)}" fill="${NEUTRO}" font-size="11">referencia ${Math.round(ref).toLocaleString('es')}</text>`);
+  }
+
+  // extremos del bloque
+  if (ref != null && g.activo.length > 8) {
     let mx = g.activo[0], mn = g.activo[0];
     for (const p of g.activo) { if (p[1] > mx[1]) mx = p; if (p[1] < mn[1]) mn = p; }
-    [[mx, VERDE, -9, 'max'], [mn, ROJO, 16, 'min']].forEach(([p, col, dy]) => {
-      if (Math.abs(x(p[0]) - x(ult[0])) < 26) return;       // pegado al punto vivo: no lo marco
-      const px = x(p[0]), py = ya(p[1]), d = p[1] - ref;
-      o.push(`<line x1="${px.toFixed(1)}" y1="${(py + (dy < 0 ? -3 : 3)).toFixed(1)}" x2="${px.toFixed(1)}" y2="${(py + (dy < 0 ? -7 : 7)).toFixed(1)}" stroke="${col}" stroke-width="1" opacity="0.6"></line>`);
-      o.push(`<text x="${px.toFixed(1)}" y="${(py + dy).toFixed(1)}" text-anchor="middle" fill="${NEUTRO}" font-size="10">${d >= 0 ? '+' : ''}${n(d, 0)}</text>`);
+    [[mx, VERDE, -8], [mn, ROJO, 15]].forEach(([p, c, dy]) => {
+      if (Math.abs(x(p[0]) - x(ult[0])) < 30) return;
+      const px = x(p[0]), py = ya(p[1]);
+      o.push(`<line x1="${px.toFixed(1)}" y1="${(py + (dy < 0 ? -2 : 2)).toFixed(1)}" x2="${px.toFixed(1)}" y2="${(py + (dy < 0 ? -6 : 6)).toFixed(1)}" stroke="${c}" stroke-width="1" opacity="0.55"></line>`);
+      o.push(`<text x="${px.toFixed(1)}" y="${(py + dy).toFixed(1)}" text-anchor="middle" fill="${TENUE}" font-size="10">${p[1] - ref >= 0 ? '+' : ''}${n(p[1] - ref, 0)}</text>`);
     });
   }
 
-  o.push(`<circle cx="${pa[pa.length - 1][0].toFixed(1)}" cy="${pa[pa.length - 1][1].toFixed(1)}" r="7" fill="${colAhora}" opacity="0.2"></circle>`);
-  o.push(`<circle cx="${pa[pa.length - 1][0].toFixed(1)}" cy="${pa[pa.length - 1][1].toFixed(1)}" r="3.5" fill="${colAhora}"></circle>`);
+  o.push(`<circle cx="${pa[pa.length - 1][0].toFixed(1)}" cy="${pa[pa.length - 1][1].toFixed(1)}" r="6.5" fill="${col}" opacity="0.2"></circle>`);
+  o.push(`<circle cx="${pa[pa.length - 1][0].toFixed(1)}" cy="${pa[pa.length - 1][1].toFixed(1)}" r="3.2" fill="${col}"></circle>`);
+  o.push(capsula(ya(ult[1]), Math.round(ult[1]).toLocaleString('es'), col, arriba ? '#03240f' : '#2b0808'));
 
-  if (hayOp && g.contrato.length) {
-    const pc = g.contrato.map(p => [x(p[0]), yc(p[1])]);
-    o.push(`<path d="${curva(pc)}" fill="none" stroke="#e8e8ea" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>`);
-    const uc = pc[pc.length - 1];
-    o.push(`<circle cx="${uc[0].toFixed(1)}" cy="${uc[1].toFixed(1)}" r="7" fill="#e8e8ea" opacity="0.18"></circle>`);
-    o.push(`<circle cx="${uc[0].toFixed(1)}" cy="${uc[1].toFixed(1)}" r="3.5" fill="#e8e8ea"></circle>`);
+  // marca de la entrada
+  if (g.contrato && g.contrato.length) {
     const xe = x(g.contrato[0][0]);
-    o.push(`<line x1="${xe.toFixed(1)}" y1="${Y0}" x2="${xe.toFixed(1)}" y2="${Y1}" stroke="#e8e8ea" stroke-width="1" opacity="0.3"></line>`);
-    o.push(`<text x="${(xe - 6).toFixed(1)}" y="${Y0 - 6}" text-anchor="end" fill="${NEUTRO}" font-size="11">entra</text>`);
+    o.push(`<line x1="${xe.toFixed(1)}" y1="${Y0}" x2="${xe.toFixed(1)}" y2="${Y1}" stroke="#e9ebf0" stroke-width="1" opacity="0.28"></line>`);
+    o.push(`<text x="${(xe + 5).toFixed(1)}" y="${Y0 + 10}" fill="${NEUTRO}" font-size="10.5">entra</text>`);
   }
 
-  // --- cápsulas del borde derecho: solo lo que está vivo y lo que se persigue ---
-  o.push(capsula(ya(ult[1]), Math.round(ult[1]).toLocaleString('es'), colAhora, arriba ? '#052e16' : '#3b0a0a'));
-  if (hayOp) {
-    o.push(capsula(yc(g.tp), 'TP ' + n(g.tp, 2), '#166534', '#dcfce7'));
-    if (g.exit != null) o.push(capsula(yc(g.exit), 'Exit ' + n(g.exit, 2), '#7f1d1d', '#fee2e2'));
-    const libre = g.bid != null && Math.abs(yc(g.bid) - yc(g.tp)) > 17 && (g.exit == null || Math.abs(yc(g.bid) - yc(g.exit)) > 17);
-    if (libre) o.push(capsula(yc(g.bid), n(g.bid, 2), '#e8e8ea', '#0f1115'));
-  }
+  o.push(`<text x="${X0 - 7}" y="${Y0 + 10}" text-anchor="end" fill="${TENUE}" font-size="10.5">${Math.round(hi).toLocaleString('es')}</text>`);
+  o.push(`<text x="${X0 - 7}" y="${Y1 + 3}" text-anchor="end" fill="${TENUE}" font-size="10.5">${Math.round(lo).toLocaleString('es')}</text>`);
+  if (g.ventana) o.push(`<text x="${Math.min(x(BLOQUE - g.ventana) + 7, X1 - 80).toFixed(1)}" y="${Y1 - 6}" fill="${TENUE}" font-size="10.5">últimos ${Math.round(g.ventana / 60)} min</text>`);
 
-  o.push(`<text x="${X0 - 8}" y="${Y0 + 12}" text-anchor="end" fill="${NEUTRO}" font-size="11">${Math.round(hi).toLocaleString('es')}</text>`);
-  o.push(`<text x="${X0 - 8}" y="${Y1 + 4}" text-anchor="end" fill="${NEUTRO}" font-size="11">${Math.round(lo).toLocaleString('es')}</text>`);
-  if (g.ventana) o.push(`<text x="${Math.min(x(BLOQUE - g.ventana) + 8, X1 - 96).toFixed(1)}" y="${Y1 - 6}" fill="${NEUTRO}" font-size="11">últimos ${Math.round(g.ventana / 60)} min</text>`);
-
-  // --- barra de avance del bloque ---
+  // avance del bloque
   const frac = Math.max(0, Math.min(1, ult[0] / BLOQUE));
   const enVentana = g.ventana ? ult[0] >= BLOQUE - g.ventana : false;
-  o.push(`<rect x="${X0}" y="${Y1 + 26}" width="${X1 - X0}" height="4" rx="2" fill="#262b36"></rect>`);
-  o.push(`<rect x="${X0}" y="${Y1 + 26}" width="${((X1 - X0) * frac).toFixed(1)}" height="4" rx="2" fill="${enVentana ? '#3b82f6' : NEUTRO}" opacity="${enVentana ? 0.9 : 0.5}"></rect>`);
-  o.push(`<text x="${X0}" y="${Y1 + 18}" fill="${NEUTRO}" font-size="11">inicio</text>`);
-  o.push(`<text x="${X1}" y="${Y1 + 18}" text-anchor="end" fill="${NEUTRO}" font-size="11">cierre</text>`);
+  o.push(`<text x="${X0}" y="${Y1 + 17}" fill="${TENUE}" font-size="10.5">inicio</text>`);
+  o.push(`<text x="${X1}" y="${Y1 + 17}" text-anchor="end" fill="${TENUE}" font-size="10.5">cierre</text>`);
+  o.push(`<rect x="${X0}" y="${Y1 + 24}" width="${X1 - X0}" height="3" rx="1.5" fill="#232834"></rect>`);
+  o.push(`<rect x="${X0}" y="${Y1 + 24}" width="${((X1 - X0) * frac).toFixed(1)}" height="3" rx="1.5" fill="${enVentana ? '#4c8dff' : TENUE}" opacity="${enVentana ? 0.9 : 0.5}"></rect>`);
 
   o.push('<g id="cruz"></g>');
-  return `<svg id="svgG" viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;max-height:360px;display:block;font-family:'Geist Mono',ui-monospace,monospace" role="img" aria-label="Precio del índice de BTC durante el bloque: verde por encima de la referencia de ${ref != null ? Math.round(ref) : '–'} y rojo por debajo${hayOp ? ', con el precio del contrato, su TP y su stop' : ''}.">${o.join('')}</svg>`;
+  return `<svg id="svgG" viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-family:'Geist Mono',ui-monospace,monospace" role="img" aria-label="Índice de BTC durante el bloque: verde por encima de la referencia de ${ref != null ? Math.round(ref) : '–'} y rojo por debajo.">${o.join('')}</svg>`;
 }
 
-// ---- la cruz y su cajita, se redibujan solas sin rehacer el gráfico ----
+// medidor de la posición: dónde está el bid entre el stop y el objetivo
+function medidor(g, contratos) {
+  if (g.tp == null || g.bid == null) return '';
+  const ex = g.exit != null ? g.exit : 0;
+  const lo = Math.min(ex, g.bid, g.entrada), hi = Math.max(g.tp, g.bid);
+  const pct = v => ((v - lo) / (hi - lo || 1)) * 100;
+  const pBid = Math.max(0, Math.min(100, pct(g.bid))), pEnt = Math.max(0, Math.min(100, pct(g.entrada)));
+  const gana = g.bid >= g.entrada;
+  const izq = Math.min(pBid, pEnt), anc = Math.abs(pBid - pEnt);
+  return `<div class="medidor" role="img" aria-label="Posición: bid ${n(g.bid, 3)}, entrada ${n(g.entrada, 3)}, stop ${n(ex, 2)}, objetivo ${n(g.tp, 2)}.">
+    <div class="pista">
+      <div class="tramo ${gana ? 'gana' : 'pierde'}" style="left:${izq}%;width:${anc}%"></div>
+      <div class="marca-ent" style="left:${pEnt}%"></div>
+      <div class="marca-bid" style="left:${pBid}%"></div>
+    </div>
+    <div class="pista-pies">
+      <span class="neg num">stop ${n(ex, 2)}</span>
+      <span class="ayuda num" style="left:${pEnt}%">entrada ${n(g.entrada, 3)}</span>
+      <span class="pos num">TP ${n(g.tp, 2)}</span>
+    </div>
+  </div>`;
+}
+
+// ---- la cruz y su cajita ----
 function cercano(serie, xf, px) {
   let mejor = null, dmin = Infinity;
   for (const p of serie) { const d = Math.abs(xf(p[0]) - px); if (d < dmin) { dmin = d; mejor = p; } }
@@ -455,7 +536,7 @@ function dibujarCruz() {
   const el = document.getElementById('cruz');
   if (!el) return;
   if (hoverX == null || !G) { el.innerHTML = ''; return; }
-  const { g, x, ya, yc, hayOp, X0, X1, Y0, Y1 } = G;
+  const { g, x, ya, X0, X1, Y0, Y1 } = G;
   const px = Math.max(X0, Math.min(X1, hoverX));
   const pa = cercano(g.activo, x, px);
   if (!pa) { el.innerHTML = ''; return; }
@@ -463,24 +544,19 @@ function dibujarCruz() {
   const col = (g.referencia == null || pa[1] >= g.referencia) ? VERDE : ROJO;
   const filas = [['BTC', Math.round(pa[1]).toLocaleString('es'), col]];
   if (g.referencia != null) filas.push(['Delta', (pa[1] - g.referencia >= 0 ? '+' : '') + n(pa[1] - g.referencia, 1), NEUTRO]);
-  const pc = hayOp && g.contrato.length ? cercano(g.contrato, x, px) : null;
-  if (pc && Math.abs(x(pc[0]) - xx) < 12) filas.push(['Contrato', n(pc[1], 3), '#e8e8ea']);
   const mm = String(Math.floor(pa[0] / 60)).padStart(2, '0') + ':' + String(pa[0] % 60).padStart(2, '0');
-
-  const anchoCaja = 138, altoCaja = 22 + filas.length * 15;
-  const izq = xx > (X0 + X1) / 2;
-  const cx = izq ? xx - anchoCaja - 10 : xx + 10;
-  const cy = Math.max(Y0, Math.min(Y1 - altoCaja, Y0 + 8));
-  const o = [`<line x1="${xx.toFixed(1)}" y1="${Y0}" x2="${xx.toFixed(1)}" y2="${Y1}" stroke="${NEUTRO}" stroke-width="1" stroke-dasharray="3 3" opacity="0.7"></line>`,
-    `<circle cx="${xx.toFixed(1)}" cy="${ya(pa[1]).toFixed(1)}" r="4" fill="#0f1115" stroke="${col}" stroke-width="2"></circle>`];
-  if (pc) o.push(`<circle cx="${x(pc[0]).toFixed(1)}" cy="${yc(pc[1]).toFixed(1)}" r="4" fill="#0f1115" stroke="#e8e8ea" stroke-width="2"></circle>`);
-  o.push(`<rect x="${cx.toFixed(1)}" y="${cy}" width="${anchoCaja}" height="${altoCaja}" rx="6" fill="#0b0d11" stroke="#262b36"></rect>`);
-  o.push(`<text x="${cx + 10}" y="${cy + 15}" fill="${NEUTRO}" font-size="10.5">minuto ${mm}</text>`);
+  const ancho = 132, alto = 22 + filas.length * 15;
+  const cx = xx > (X0 + X1) / 2 ? xx - ancho - 10 : xx + 10;
+  const cy = Y0 + 4;
+  const o = [`<line x1="${xx.toFixed(1)}" y1="${Y0}" x2="${xx.toFixed(1)}" y2="${Y1}" stroke="${NEUTRO}" stroke-width="1" stroke-dasharray="3 3" opacity="0.65"></line>`,
+    `<circle cx="${xx.toFixed(1)}" cy="${ya(pa[1]).toFixed(1)}" r="4" fill="#0d0f14" stroke="${col}" stroke-width="2"></circle>`,
+    `<rect x="${cx.toFixed(1)}" y="${cy}" width="${ancho}" height="${alto}" rx="6" fill="#0a0c10" stroke="#232834"></rect>`,
+    `<text x="${cx + 10}" y="${cy + 15}" fill="${TENUE}" font-size="10.5">minuto ${mm}</text>`];
   filas.forEach(([k, val, c], i) => {
     const y = cy + 30 + i * 15;
-    o.push(`<line x1="${cx + 10}" y1="${y - 3.5}" x2="${cx + 22}" y2="${y - 3.5}" stroke="${c}" stroke-width="2"></line>`);
-    o.push(`<text x="${cx + 28}" y="${y}" fill="${NEUTRO}" font-size="10.5">${k}</text>`);
-    o.push(`<text x="${cx + anchoCaja - 10}" y="${y}" text-anchor="end" fill="#e8e8ea" font-size="11.5" font-weight="650">${val}</text>`);
+    o.push(`<line x1="${cx + 10}" y1="${y - 3.5}" x2="${cx + 21}" y2="${y - 3.5}" stroke="${c}" stroke-width="2"></line>`);
+    o.push(`<text x="${cx + 27}" y="${y}" fill="${NEUTRO}" font-size="10.5">${k}</text>`);
+    o.push(`<text x="${cx + ancho - 10}" y="${y}" text-anchor="end" fill="#e9ebf0" font-size="11.5" font-weight="600">${val}</text>`);
   });
   el.innerHTML = o.join('');
 }
@@ -493,7 +569,7 @@ function armarHover() {
     const svg = document.getElementById('svgG');
     if (!svg) return null;
     const r = svg.getBoundingClientRect();
-    return r.width ? ((ev.clientX - r.left) / r.width) * W_G : null;
+    return r.width ? ((ev.clientX - r.left) / r.width) * (G ? G.W : 880) : null;
   };
   cont.addEventListener('pointermove', ev => { hoverX = aX(ev); dibujarCruz(); });
   cont.addEventListener('pointerleave', () => { hoverX = null; dibujarCruz(); });
@@ -505,10 +581,13 @@ function render(d) {
   if (!d.conectado) { pill.textContent = 'sin API key'; pill.className = 'pill warn'; }
   else if (d.encendido) { pill.textContent = 'encendido'; pill.className = 'pill on'; }
   else { pill.textContent = 'apagado'; pill.className = 'pill off'; }
+  // la banda de arriba repite el estado en color, para verlo de reojo
+  document.documentElement.style.setProperty('--estado',
+    !d.conectado ? 'var(--amber)' : d.encendido ? 'var(--green)' : 'var(--muted-2)');
   if (!confirmando) {
     btn.disabled = false;
     btn.textContent = d.encendido ? 'Apagar' : 'Encender';
-    btn.className = d.encendido ? 'b-off' : 'b-on';
+    btn.className = d.encendido ? 'b-apagar' : 'b-encender';
   }
   $('uptime').textContent = 'servidor activo hace ' + dur(d.servidor_s);
 
@@ -522,21 +601,32 @@ function render(d) {
   $('avisos').innerHTML = av.map(([c, t]) => `<div class="aviso ${c}">${esc(t)}</div>`).join('');
 
   const t = d.total, h = d.hoy;
-  $('sProfit').textContent = usd(t.usd); $('sProfit').className = 'v num ' + clase(t.usd);
+  destellar($('sProfit'), usd(t.usd), 'v num ' + clase(t.usd));
   $('sProfitHoy').innerHTML = `hoy <span class="${clase(h.usd)}">${usd(h.usd)}</span>`;
-  $('sOps').textContent = t.ops; $('sOpsHoy').textContent = `hoy ${h.ops}`;
-  $('sWin').textContent = t.ganadas; $('sWinMedia').textContent = t.media_ganada != null ? `media ${usd(t.media_ganada)} · hoy ${h.ganadas}` : `hoy ${h.ganadas}`;
-  $('sLoss').textContent = t.perdidas; $('sLossMedia').textContent = t.media_perdida != null ? `media ${usd(t.media_perdida)} · hoy ${h.perdidas}` : `hoy ${h.perdidas}`;
+  destellar($('sOps'), String(t.ops), 'v num'); $('sOpsHoy').textContent = `hoy ${h.ops}`;
+  destellar($('sWin'), String(t.ganadas), 'v num pos'); $('sWinMedia').textContent = t.media_ganada != null ? `media ${usd(t.media_ganada)} · hoy ${h.ganadas}` : `hoy ${h.ganadas}`;
+  destellar($('sLoss'), String(t.perdidas), 'v num neg'); $('sLossMedia').textContent = t.media_perdida != null ? `media ${usd(t.media_perdida)} · hoy ${h.perdidas}` : `hoy ${h.perdidas}`;
   $('sWr').textContent = t.wr == null ? '–' : t.wr + '%';
   $('sOn').textContent = d.encendido ? dur(d.encendido_s) : 'apagado';
   $('sServer').textContent = 'servidor: ' + dur(d.servidor_s);
-  $('sSaldo').textContent = d.saldo == null ? '–' : '$' + d.saldo.toFixed(2);
+  destellar($('sSaldo'), d.saldo == null ? '–' : '$' + d.saldo.toFixed(2), 'v num');
   $('sKey').textContent = d.conectado ? 'key ' + d.key_id : 'sin API key';
 
   $('vivo').innerHTML = d.vivo.map(v => v.mercado ? `<tr><td>${v.activo}</td><td class="num">${esc(v.mercado)}</td>
     <td class="num">${Math.floor(v.quedan / 60)}:${String(Math.floor(v.quedan % 60)).padStart(2, '0')}</td><td class="num">${n(v.referencia, 2)}</td><td class="num">${n(v.precio, 2)}</td><td class="ayuda num">${v.indice_s == null ? '–' : Math.max(0, v.indice_s).toFixed(0) + ' s'}</td>
     <td class="num ${v.delta_ok ? 'pos' : ''}">${n(v.delta, 1)}</td><td class="num">${n(v.yes_ask)} / ${n(v.yes_bid)}</td><td class="num">${n(v.no_ask)} / ${n(v.no_bid)}</td>
     <td>${esc(v.estado)}</td></tr>` : `<tr><td>${v.activo}</td><td colspan="9" class="vacio">esperando datos…</td></tr>`).join('');
+
+  // cabecera-instrumento: lo que se mira cada segundo
+  const vc = d.vivo.find(v => v.mercado);
+  $('instr').hidden = !vc;
+  if (vc) {
+    const dl = $('hDelta');
+    dl.textContent = vc.delta == null ? '–' : (vc.delta >= 0 ? '+' : '−') + n(Math.abs(vc.delta), 0);
+    dl.className = 'v num ' + clase(vc.delta);
+    $('hQueda').textContent = vc.quedan == null ? '–'
+      : Math.floor(vc.quedan / 60) + ':' + String(Math.floor(vc.quedan % 60)).padStart(2, '0');
+  }
 
   const v0 = d.vivo.find(v => v.mercado && v.grafico && v.grafico.activo && v.grafico.activo.length > 1);
   $('cardGrafico').style.display = v0 ? '' : 'none';
@@ -555,13 +645,21 @@ function render(d) {
     $('grafico').innerHTML = grafico(v0);
     armarHover();
     dibujarCruz();
-    const g = v0.grafico, pie = [['Delta', n(v0.delta, 1), clase(v0.delta)]];
-    if (g.tp != null) {
-      pie.push(['Bid · entrada', n(g.bid, 3) + ' · ' + n(g.entrada, 3), '']);
-      const pnl = (g.bid != null && g.entrada != null) ? (g.bid - g.entrada) : null;
-      pie.push(['Ganancia', pnl == null ? '–' : usd(pnl * (d.abiertas[0] ? d.abiertas[0].contratos : 1)), clase(pnl)]);
-      pie.push(['Al TP · al stop', (g.bid == null ? '–' : n(g.tp - g.bid, 2)) + ' · ' + (g.bid == null || g.exit == null ? '–' : n(g.bid - g.exit, 2)), '']);
+    const g = v0.grafico;
+    let mx = null, mn = null;
+    if (g.referencia != null) for (const p of g.activo) {
+      const dd = p[1] - g.referencia;
+      if (mx == null || dd > mx) mx = dd;
+      if (mn == null || dd < mn) mn = dd;
     }
+    const sig = z => z == null ? '–' : (z >= 0 ? '+' : '−') + n(Math.abs(z), 0);
+    const pie = [['Máx. Delta', sig(mx), ''], ['Mín. Delta', sig(mn), '']];
+    const contratos = d.abiertas[0] ? d.abiertas[0].contratos : 1;
+    if (g.tp != null) {
+      const pnl = (g.bid != null && g.entrada != null) ? (g.bid - g.entrada) : null;
+      pie.push(['Ganancia', pnl == null ? '–' : usd(pnl * contratos), clase(pnl)]);
+    }
+    $('medidor').innerHTML = medidor(g, contratos);
     $('gPie').innerHTML = pie.map(([k, val, c]) => `<div><div class="k">${esc(k)}</div><div class="v num ${c}">${esc(val)}</div></div>`).join('');
   }
 
@@ -595,12 +693,17 @@ function armarForm() {
   llenarForm(ajustesGuardados);
 }
 function llenarForm(v) {
-  for (const c of campos) { $('f_' + c.clave).value = v[c.clave] == null ? '' : v[c.clave]; $('e_' + c.clave).textContent = ''; }
+  for (const c of campos) {
+    const el = $('f_' + c.clave);
+    el.value = v[c.clave] == null ? '' : v[c.clave];
+    el.classList.remove('malo');
+    $('e_' + c.clave).textContent = '';
+  }
 }
 
 async function refrescar() { try { const d = await api('/api/estado'); if (d) render(d); } catch (e) { $('pill').textContent = 'sin conexión'; $('pill').className = 'pill warn'; } }
 
-// encender mueve dinero real: se confirma en dos pasos, aquí mismo
+// encender mueve dinero real y apagar deja de operar: los dos se confirman en dos pasos
 let confirmando = false, relojConfirm = null;
 function salirConfirm() {
   confirmando = false; clearTimeout(relojConfirm); $('cancelar').hidden = true;
@@ -608,11 +711,12 @@ function salirConfirm() {
 }
 $('power').onclick = async () => {
   const encender = !ultimo.encendido;
-  if (encender && !confirmando) {
+  if (!confirmando) {
     confirmando = true;
     $('cancelar').hidden = false;
-    $('power').textContent = 'Confirmar · dinero real';
-    $('power').className = 'b-off';
+    $('power').textContent = encender ? 'Confirmar · dinero real' : 'Confirmar apagado';
+    $('power').className = encender ? 'b-danger' : 'b-main';
+    $('power').focus();
     relojConfirm = setTimeout(salirConfirm, 6000);
     return;
   }
@@ -626,17 +730,32 @@ $('cancelar').onclick = salirConfirm;
 
 $('guardar').onclick = async () => {
   const datos = {};
-  for (const c of campos) { datos[c.clave] = $('f_' + c.clave).value; $('e_' + c.clave).textContent = ''; }
+  for (const c of campos) {
+    datos[c.clave] = $('f_' + c.clave).value;
+    $('e_' + c.clave).textContent = ''; $('f_' + c.clave).classList.remove('malo');
+  }
+  $('guardar').disabled = true; msg($('msgAjustes'), 'guardando…', 'yendo');
   const r = await api('/api/ajustes', datos);
+  $('guardar').disabled = false;
   if (!r) return;
   msg($('msgAjustes'), r.msg, r.ok);
   if (r.ok) { ajustesGuardados = r.ajustes; llenarForm(r.ajustes); }
-  else for (const [k, t] of Object.entries(r.errores || {})) $('e_' + k).textContent = t;
+  else {
+    let primero = null;
+    for (const [k, t] of Object.entries(r.errores || {})) {
+      $('e_' + k).textContent = t; $('f_' + k).classList.add('malo'); primero = primero || k;
+    }
+    if (primero) {                                  // si el campo malo esta en Avanzado, se abre
+      const caja = $('f_' + primero).closest('details');
+      if (caja) caja.open = true;
+      $('f_' + primero).focus();
+    }
+  }
 };
-$('deshacer').onclick = () => { llenarForm(ajustesGuardados); $('msgAjustes').textContent = ''; };
+$('deshacer').onclick = () => { llenarForm(ajustesGuardados); $('msgAjustes').textContent = ''; $('msgAjustes').className = 'msg'; };
 
 $('guardarKey').onclick = async () => {
-  $('guardarKey').disabled = true; msg($('msgKey'), 'probando…', true);
+  $('guardarKey').disabled = true; msg($('msgKey'), 'probando…', 'yendo');
   const r = await api('/api/claves', {key_id: $('keyId').value, private_key: $('pem').value});
   $('guardarKey').disabled = false;
   if (!r) return;
@@ -647,6 +766,7 @@ $('guardarKey').onclick = async () => {
 
 refrescar();
 setInterval(refrescar, 1000);
+addEventListener('resize', () => { if (ultimo) render(ultimo); });
 </script>
 </body>
 </html>

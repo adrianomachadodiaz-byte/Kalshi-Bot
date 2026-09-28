@@ -24,13 +24,22 @@ Dos veces por segundo mira el bloque abierto de BTC (libro de Kalshi + índice d
 
 Todo se maneja desde el panel (el dominio de Railway, con tu clave `ACCESS_TOKEN`):
 
-- **Encender / Apagar.** Arranca **apagado** la primera vez. Apagado no abre operaciones nuevas; si hay una abierta,
+- **Encender / Apagar.** Los dos piden confirmación en dos pasos (encender mueve dinero real; apagar deja de operar),
+  y la confirmación se cae sola a los 6 segundos. Una **banda de color** en el borde de arriba repite el estado:
+  verde encendido, gris apagado, ámbar si falta la API key. Además, mientras está apagado, un aviso amarillo lo dice
+  con todas las letras. Arranca **apagado** la primera vez. Apagado no abre operaciones nuevas; si hay una abierta,
   la sigue cuidando hasta el TP, el stop o el cierre. Queda guardado aunque Railway reinicie.
+- **Cabecera**: el Delta y el tiempo que queda del bloque siempre visibles arriba (la cabecera se queda fija al
+  bajar), para verlos de un vistazo sin buscar.
 - **Estadísticas**: profit total y de hoy, operaciones, ganadas, perdidas (con la media de cada una), % de acierto,
   tiempo encendido y saldo de Kalshi.
 - **En vivo**: bloque, tiempo que queda, referencia, precio, antigüedad del índice, Delta, asks/bids y qué
   está haciendo.
-- **Logs**: los últimos mensajes del bot (entradas, TP, stops, errores), se actualizan cada 2 segundos.
+- **Bloque en vivo**: el gráfico del índice durante el bloque (verde por encima de la referencia, rojo por debajo),
+  con las líneas de ±Delta que se encienden al cumplirse, la ventana de entrada sombreada, el máximo y el mínimo
+  del bloque y, si hay una operación abierta, una barra que muestra dónde está el bid entre el stop y el TP.
+  Pasando el ratón sale la cruz con el precio y el Delta de ese segundo.
+- **Registro**: los últimos mensajes del bot (entradas, TP, stops, errores), se actualizan cada segundo.
 - **Operaciones**: las últimas 50 y un botón para bajarlas todas en CSV.
 - **Ajustes**: contratos, Delta, Delay, rango de entrada, TP, Exit, BreakEven, límites del día y deslizamiento.
   Se aplican al instante al guardar (sin reiniciar) y revisa que tengan sentido (por ejemplo, entrada máxima + TP ≤ 0.99).
@@ -67,7 +76,7 @@ El panel manda: lo que guardes ahí gana sobre estas variables. Sirven solo como
 | `KALSHI_API_KEY_ID`, `KALSHI_PRIVATE_KEY` | API key si prefieres ponerla aquí en vez de en el panel |
 | `CICLO_S` | Segundos entre fotos (por defecto `0.5`): con qué rapidez reaccionan la entrada y el stop |
 | `KALSHI_INDICE_URL` | URL del feed del índice (por defecto el público de Kalshi; `{activo}` se cambia por btc/eth) |
-| `CONTRATOS`, `ACTIVOS`, `DELTA_BTC`, `DELTA_ETH`, `DELAY`, `ENTRADA_MIN`, `ENTRADA_MAX`, `TP`, `EXIT`, `BREAKEVEN`, `MAX_PERDIDA_DIA`, `META_GANANCIA_DIA`, `DESLIZ_ENTRADA` | Ajustes iniciales (los mismos del panel) |
+| `ACTIVOS`, `DELTA`, `DELAY`, `ENTRADA_MIN`, `ENTRADA_MAX`, `TP`, `EXIT`, `CONTRATOS`, `BREAKEVEN`, `MAX_PERDIDA_DIA`, `META_GANANCIA_DIA`, `DESLIZ_ENTRADA` | Ajustes iniciales (los mismos del panel) |
 | `DATA_DIR` | Carpeta del Volume (por defecto `/data`) |
 
 ## Cosas a saber
