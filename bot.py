@@ -55,6 +55,7 @@ CAMPOS = [
     ("max_perdida_dia", "num", 0.0, "Pérdida máx. ($)", "0 = sin límite", "av"),
     ("meta_ganancia_dia", "num", 0.0, "Meta ($)", "0 = sin meta", "av"),
     ("desliz_entrada", "num", 0.02, "Deslizamiento", "sobre el ask", "av"),
+    ("espera_entrada", "num", 2.0, "Espera al entrar (s)", "0 = IOC; 2 = deja la orden puesta", "av"),
 ]
 
 
@@ -107,6 +108,8 @@ def validar(crudo):
             err[d] = "0 o más"
     if not 0 <= v["desliz_entrada"] <= 0.10:
         err["desliz_entrada"] = "entre 0 y 0.10"
+    if not 0 <= v["espera_entrada"] <= 10:
+        err["espera_entrada"] = "entre 0 y 10 segundos"
     return v, err
 
 
@@ -203,13 +206,20 @@ class Precios:
     operaciones: no usa ninguna otra fuente.
     """
 
-    MAX_ATRASO = 15        # segundos: más viejo que esto, el precio no sirve para operar
+    MAX_ATRASO = 6         # segundos: más viejo que esto, el precio no sirve para operar.
+                           # El feed viene ~3-4 s por detrás de fábrica, así que por debajo de 5 s el bot
+                           # no operaría nunca. Con 15 s pasaban precios de ~28 s: medido el 27-28 sep,
+                           # el Delta salía inflado (+$21 de mediana) y el bot entraba en movimientos que
+                           # ya se habían dado la vuelta. Coste en el backtest de 30 días:
+                           #   0 s +4.22 c/op | 4 s +2.67 | 6 s +2.23 | 15 s +2.23 | 28 s +1.91
+    MAX_CONGELADO = 6      # segundos: si el archivo no avanza más que esto, está congelado
 
     def __init__(self, bot):
         self.bot = bot
         self.s = requests.Session()
         self.cache = {}     # activo -> (ts local, precio, atraso del feed)
         self.series = {}    # activo -> [(epoch, precio)] del último feed leído
+        self.ult_ms = {}    # activo -> (marca del archivo, hora local en que la vimos avanzar)
         self.nota = ""      # por qué no hay precio (se ve arriba del panel)
 
     def reset(self):
@@ -234,6 +244,16 @@ class Precios:
             return None
         if precio is None or precio <= 0:
             self.nota = "el índice de Kalshi llegó vacío; sin precio no se abren operaciones"
+            return None
+        # feed congelado: el archivo responde pero su marca de tiempo no avanza
+        marca = ahora - (edad or 0)
+        vieja, visto = self.ult_ms.get(activo, (None, ahora))
+        if vieja is None or marca > vieja + 0.5:
+            self.ult_ms[activo] = (marca, ahora)
+        elif ahora - visto > self.MAX_CONGELADO:
+            self.nota = f"el índice de Kalshi lleva {ahora - visto:.0f} s sin avanzar; no opero con un precio congelado"
+            log_cada(f"congelado{activo}", f"{activo} el índice lleva {ahora - visto:.0f} s congelado: no opero")
+            self.cache[activo] = (ahora, None, ahora - visto)
             return None
         if edad is not None and edad > self.MAX_ATRASO:
             self.nota = f"el índice de Kalshi está atrasado {edad:.0f} s; no opero con un precio viejo"
@@ -287,6 +307,7 @@ class Bot:
             self.op.meta_dia = v["meta_ganancia_dia"]
             if self.ej:
                 self.ej.contratos, self.ej.desliz, self.ej.n_activos = v["contratos"], v["desliz_entrada"], len(activos)
+                self.ej.espera = v["espera_entrada"]
         for a, c in self.cfgs.items():
             log(f"ajustes {a}: {c.texto()} · {v['contratos']:g} contratos")
 
@@ -308,7 +329,7 @@ class Bot:
             return False, f"no pude conectar con Kalshi: {e}"
         v = self.ajustes.valores
         with self.op.lock:
-            ej = EjecutorReal(k, v["contratos"], v["desliz_entrada"], len(self.activos))
+            ej = EjecutorReal(k, v["contratos"], v["desliz_entrada"], len(self.activos), v["espera_entrada"])
             if self.ej:
                 ej.info = self.ej.info
             self.k, self.ej, self.op.ej, self.mercados.k = k, ej, ej, k
@@ -339,7 +360,7 @@ class Bot:
             log(f"{activo} nuevo bloque {t} | referencia {m['referencia']} | shard {m['exchange_index']}")
         libro = self.k.libro(t)
         f = Foto(ts=time.time(), ticker=t, cierre=m["cierre"], referencia=m["referencia"],
-                 precio=self.precios.get(activo), **libro)
+                 precio=self.precios.get(activo), atraso=self.precios.atraso(activo), **libro)
         self.vista[activo] = f
         self._anotar_grafico(activo, f)
         if not self.ej:
@@ -574,8 +595,7 @@ def servidor(bot: Bot):
                 return self._json(bot.resumen_json())
             if url.path == "/operaciones.csv":
                 ruta = bot.registro.ruta
-                vacio = (",".join(operador.COLUMNAS) + "\n").encode()
-                return self._send(200, ruta.read_bytes() if ruta.exists() else vacio, "text/csv; charset=utf-8",
+                return self._send(200, ruta.read_bytes() if ruta.exists() else b"", "text/csv; charset=utf-8",
                                   {"Content-Disposition": 'attachment; filename="operaciones.csv"'})
             return self._send(404, "No encontrado", "text/plain; charset=utf-8")
 
@@ -607,13 +627,6 @@ def servidor(bot: Bot):
                 abiertas = len(bot.estado.abiertas)
                 extra = f" Hay {abiertas} operación abierta: se sigue cuidando hasta el TP, el stop o el cierre." if abiertas else ""
                 return self._json({"ok": True, "msg": "Bot apagado." + extra})
-            if url.path == "/api/reiniciar":
-                n, copia = bot.registro.archivar()
-                extra = f" Historial guardado en {copia}." if copia else ""
-                if bot.estado.abiertas:
-                    extra += " La operación abierta contará en la cuenta nueva."
-                log(f"estadísticas reiniciadas desde el panel: {n} operaciones archivadas")
-                return self._json({"ok": True, "msg": f"Reiniciado: {n} operaciones archivadas.{extra}"})
             if url.path == "/api/ajustes":
                 v, err = validar(datos)
                 if err:
