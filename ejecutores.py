@@ -19,6 +19,9 @@ from operador import log
 _ultimo_log = {}
 
 
+TOPE_TP = 0.99      # el TP nunca se pone por encima de esto
+
+
 def log_cada(clave, msg, seg=30):
     if time.time() - _ultimo_log.get(clave, 0) >= seg:
         _ultimo_log[clave] = time.time()
@@ -27,7 +30,7 @@ def log_cada(clave, msg, seg=30):
 
 def nueva_operacion(activo, f: Foto, lado, entrada, n, cfg: Config, comision_total, shard=None):
     return Operacion(activo=activo, ticker=f.ticker, lado=lado, entrada=round(entrada, 4), contratos=n, cierre=f.cierre,
-                     objetivo=round(min(entrada + cfg.tp, 0.99), 4), ts_entrada=f.ts, delta=f.delta(),
+                     objetivo=round(min(entrada + cfg.tp, TOPE_TP), 4), ts_entrada=f.ts, delta=f.delta(),
                      atraso=f.atraso, comision_entrada=comision_total, shard=shard)
 
 
@@ -59,10 +62,11 @@ class EjecutorSim:
 class EjecutorReal:
     modo = "real"
 
-    def __init__(self, k: Kalshi, contratos, desliz_entrada=0.02, n_activos=1):
+    def __init__(self, k: Kalshi, contratos, desliz_entrada=0.02, n_activos=1, espera_entrada=2.0):
         self.k = k
         self.contratos = contratos
         self.desliz = desliz_entrada
+        self.espera = espera_entrada   # segundos que la orden de entrada se queda puesta (0 = IOC)
         self.n_activos = n_activos
         self.info = {}          # ticker -> info del mercado (shard, ticks)
         self.fondos = {}        # ticker -> True si el shard tiene saldo para operar
@@ -114,13 +118,29 @@ class EjecutorReal:
         if not self.fondos.get(f.ticker):
             log_cada(f"fondos{f.ticker}", f"{activo} señal de entrada pero sin saldo en el shard: no entro")
             return None
-        limite = min(ask + self.desliz, cfg.entrada_max)     # nunca paga más que el máximo del EntryRange
+        # Cuánto se puede pagar de más para asegurar el llenado (como NightShark, pero acotado).
+        # El TP se topa en TOPE_TP (0.99). Si el ask ya está tan arriba que entrada + TP pasa de 0.99,
+        # el TP se queda en 0.99 pase lo que pase: pagar 1-2 c más NO cambia si ganas, solo cuánto ganas.
+        # Ahí sí conviene cruzar para no quedarse fuera. Por debajo de ese punto, pagar de más SUBE el TP
+        # y baja el acierto, así que se respeta el máximo del EntryRange.
+        # Medido en el backtest de 30 días (BTC, 100 contratos, TP topado):
+        #   pagar +2 c siempre     -> +2.43 c/op (-$835); harían falta 2.3 llenados extra al día
+        #   pagar +2 c solo arriba -> +3.68 c/op (-$252); harían falta 0.7 llenados extra al día
+        #   no pagar de más        -> +4.22 c/op
+        tp_ya_topado = (cfg.entrada_max + cfg.tp) >= TOPE_TP - 1e-9
+        if tp_ya_topado and ask >= cfg.entrada_max - 1e-9:
+            limite = ask + self.desliz                       # el TP ya está en el tope: cruzo para llenar
+        else:
+            limite = min(ask + self.desliz, cfg.entrada_max)  # nunca paga más que el máximo del EntryRange
         if lado == "yes":
             libro, precio_yes = "bid", ajustar_tick(limite, m["rangos"], "arriba")
         else:
             libro, precio_yes = "ask", ajustar_tick(1 - limite, m["rangos"], "abajo")
+        # Con espera > 0 la orden se queda puesta ese rato (como NightShark, que la deja 2 s) para
+        # atrapar la liquidez que llega enseguida; después se cancela lo que quede. Con espera 0 es IOC.
+        tif = "good_till_canceled" if self.espera > 0 else "immediate_or_cancel"
         try:
-            r = self.k.crear_orden(f.ticker, libro, precio_yes, n, "immediate_or_cancel", m["exchange_index"])
+            r = self.k.crear_orden(f.ticker, libro, precio_yes, n, tif, m["exchange_index"])
         except ErrorKalshi as e:
             if e.status < 500:
                 log_cada(f"entrada{f.ticker}", f"{activo} orden de entrada rechazada: {e}")
@@ -128,18 +148,69 @@ class EjecutorReal:
             return self._entrada_dudosa(activo, f, lado, ask, cfg, m, e)
         except requests.RequestException as e:
             return self._entrada_dudosa(activo, f, lado, ask, cfg, m, e)
-        if r["llenos"] <= 0:
-            log_cada(f"nolleno{f.ticker}", f"{activo} {lado.upper()} a {ask:.3f}: la orden IOC no se llenó, reintento", 10)
+
+        llenos, py, comision = r["llenos"], r["precio_yes"], r["comision_media"] * r["llenos"]
+        if tif == "good_till_canceled" and r["order_id"]:
+            llenos, py, comision = self._descansar_y_cerrar(activo, f, r["order_id"], lado, m, n)
+            if llenos is None:                  # no se pudo dejar la orden en un estado seguro
+                return self._entrada_dudosa(activo, f, lado, ask, cfg, m, "no pude cerrar la orden de entrada")
+
+        if llenos <= 0:
+            log_cada(f"nolleno{f.ticker}", f"{activo} {lado.upper()} a {ask:.3f}: la orden no se llenó, reintento", 10)
             return None
-        py = r["precio_yes"]
         entrada = (py if lado == "yes" else 1 - py) if py is not None else ask
         # average_fee_paid es por contrato (NightShark lo multiplica por la cantidad)
-        op = nueva_operacion(activo, f, lado, entrada, r["llenos"], cfg, r["comision_media"] * r["llenos"],
-                             m["exchange_index"])
-        if r["llenos"] < n:
-            log(f"{activo} entrada parcial: {r['llenos']:g} de {n:g} contratos")
+        op = nueva_operacion(activo, f, lado, entrada, llenos, cfg, comision, m["exchange_index"])
+        if llenos < n:
+            log(f"{activo} entrada parcial: {llenos:g} de {n:g} contratos")
         self._poner_tp(op)
         return op
+
+    def _descansar_y_cerrar(self, activo, f, oid, lado, m, n):
+        """Deja la orden puesta hasta `self.espera` s, la cancela y devuelve lo REALMENTE ejecutado.
+
+        Devuelve (contratos, precio medio del lado, comisiones $), o (None, None, None) si no se puede
+        confirmar que la orden dejó de estar abierta: ahí no se acepta la posición a ciegas.
+        """
+        shard = m["exchange_index"]
+        fin = time.time() + self.espera
+        while time.time() < fin:
+            time.sleep(min(0.25, max(0.05, fin - time.time())))
+            try:
+                o = self.k.orden(oid, shard)
+            except Exception:  # noqa: BLE001
+                continue                        # si no puedo mirarla, sigo esperando y luego cancelo igual
+            if o["restantes"] <= 1e-9:
+                break                           # ya se llenó entera: no hay nada que cancelar
+        # Congelar lo ejecutado: cancelar lo que quede ANTES de aceptar el costo de entrada.
+        cerrada = False
+        for intento in range(3):
+            try:
+                self.k.cancelar(oid, shard)
+            except Exception as e:  # noqa: BLE001
+                log(f"{activo} no pude cancelar el resto de la entrada ({e}), reintento {intento + 1}/3")
+            try:
+                o = self.k.orden(oid, shard)
+                if o["estado"] != "resting" or o["restantes"] <= 1e-9:
+                    cerrada = True
+                    break
+            except Exception:  # noqa: BLE001
+                pass
+            time.sleep(0.4)
+        if not cerrada:
+            log(f"{activo} ATENCIÓN: la orden de entrada {oid} puede seguir abierta en Kalshi; "
+                f"revísala a mano. No abro la operación para no contar mal la posición.")
+            return None, None, None
+        try:                                    # los fills mandan: traen precio medio y comisiones reales
+            c, precio, fee = self.k.llenados(oid, lado)
+            return c, precio, fee
+        except Exception as e:  # noqa: BLE001
+            log(f"{activo} no pude leer los llenados de la entrada ({e}); uso lo que reportó la orden")
+            try:
+                o = self.k.orden(oid, shard)
+                return o["llenos"], None, o["comision"]
+            except Exception:  # noqa: BLE001
+                return None, None, None
 
     def _entrada_dudosa(self, activo, f, lado, ask, cfg, m, err):
         """No se sabe si la orden entró: se mira la posición antes de hacer nada más."""

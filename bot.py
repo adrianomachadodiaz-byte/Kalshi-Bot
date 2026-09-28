@@ -55,6 +55,7 @@ CAMPOS = [
     ("max_perdida_dia", "num", 0.0, "Pérdida máx. ($)", "0 = sin límite", "av"),
     ("meta_ganancia_dia", "num", 0.0, "Meta ($)", "0 = sin meta", "av"),
     ("desliz_entrada", "num", 0.02, "Deslizamiento", "sobre el ask", "av"),
+    ("espera_entrada", "num", 2.0, "Espera al entrar (s)", "0 = IOC; 2 = deja la orden puesta", "av"),
 ]
 
 
@@ -107,6 +108,8 @@ def validar(crudo):
             err[d] = "0 o más"
     if not 0 <= v["desliz_entrada"] <= 0.10:
         err["desliz_entrada"] = "entre 0 y 0.10"
+    if not 0 <= v["espera_entrada"] <= 10:
+        err["espera_entrada"] = "entre 0 y 10 segundos"
     return v, err
 
 
@@ -203,11 +206,13 @@ class Precios:
     operaciones: no usa ninguna otra fuente.
     """
 
-    MAX_ATRASO = 2         # segundos: más viejo que esto, el precio no sirve para operar.
-                           # Con 15 s el Delta se calcula sobre un movimiento que ya se dio la vuelta:
-                           # medido el 27-28 sep, el bot entraba con un precio ~28 s viejo y eso se comía
-                           # más de la mitad de la ventaja (backtest 30 días: +4.22 -> +1.91 c/op).
-    MAX_CONGELADO = 3      # segundos: si el archivo no avanza más que esto, está congelado
+    MAX_ATRASO = 6         # segundos: más viejo que esto, el precio no sirve para operar.
+                           # El feed viene ~3-4 s por detrás de fábrica, así que por debajo de 5 s el bot
+                           # no operaría nunca. Con 15 s pasaban precios de ~28 s: medido el 27-28 sep,
+                           # el Delta salía inflado (+$21 de mediana) y el bot entraba en movimientos que
+                           # ya se habían dado la vuelta. Coste en el backtest de 30 días:
+                           #   0 s +4.22 c/op | 4 s +2.67 | 6 s +2.23 | 15 s +2.23 | 28 s +1.91
+    MAX_CONGELADO = 6      # segundos: si el archivo no avanza más que esto, está congelado
 
     def __init__(self, bot):
         self.bot = bot
@@ -302,6 +307,7 @@ class Bot:
             self.op.meta_dia = v["meta_ganancia_dia"]
             if self.ej:
                 self.ej.contratos, self.ej.desliz, self.ej.n_activos = v["contratos"], v["desliz_entrada"], len(activos)
+                self.ej.espera = v["espera_entrada"]
         for a, c in self.cfgs.items():
             log(f"ajustes {a}: {c.texto()} · {v['contratos']:g} contratos")
 
@@ -323,7 +329,7 @@ class Bot:
             return False, f"no pude conectar con Kalshi: {e}"
         v = self.ajustes.valores
         with self.op.lock:
-            ej = EjecutorReal(k, v["contratos"], v["desliz_entrada"], len(self.activos))
+            ej = EjecutorReal(k, v["contratos"], v["desliz_entrada"], len(self.activos), v["espera_entrada"])
             if self.ej:
                 ej.info = self.ej.info
             self.k, self.ej, self.op.ej, self.mercados.k = k, ej, ej, k
