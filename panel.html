@@ -83,6 +83,7 @@ button:disabled{opacity:.45;cursor:default}
 /* encender es la acción principal; apagar no compite con los datos */
 .b-encender{background:rgba(46,214,115,.1);border-color:rgba(46,214,115,.45);color:var(--green)}
 .b-apagar{background:transparent;border-color:var(--line-2);color:var(--muted)}
+button.chico{padding:5px 11px;font-size:13px}
 .msg{font-size:13px}
 .top .msg{max-width:min(40ch,26vw);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
@@ -106,6 +107,11 @@ button:disabled{opacity:.45;cursor:default}
   margin-bottom:12px;box-shadow:var(--sombra)}
 .cab{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin-bottom:11px}
 .wrap{overflow-x:auto;margin:0 -16px;padding:0 16px}
+/* la lista de operaciones no crece sin fin: techo y barra propia, con el encabezado fijo */
+.alto-tope{max-height:320px;overflow-y:auto;overscroll-behavior:contain}
+.alto-tope table{border-collapse:separate;border-spacing:0}
+.alto-tope th{box-shadow:inset 0 -1px 0 var(--line)}
+.alto-tope td{border-bottom:1px solid var(--line)}
 table{border-collapse:collapse;width:100%;font-size:13.5px}
 th,td{padding:7px 10px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--line)}
 th{color:var(--muted-2);font-weight:500;font-size:11px;letter-spacing:.05em;text-transform:uppercase;
@@ -281,8 +287,11 @@ textarea{font:11.5px/1.6 "Geist Mono",ui-monospace,Consolas,monospace;height:94p
 </section>
 
 <section class="card" aria-label="Operaciones">
-  <div class="cab"><h2>Operaciones</h2><span class="sp"></span><a href="/operaciones.csv">bajar todas (CSV)</a></div>
-  <div class="wrap"><table>
+  <div class="cab"><h2>Operaciones</h2><span id="opsCuenta" class="ayuda" style="margin:0"></span>
+    <span class="sp"></span><a href="/operaciones.csv">bajar todas (CSV)</a>
+    <button id="reiniciar" class="b-ghost chico">Reiniciar resultados</button>
+    <span id="msgReiniciar" class="msg" role="status" aria-live="polite"></span></div>
+  <div class="wrap alto-tope"><table>
     <thead><tr><th scope="col">Fecha (CDT)</th><th scope="col">Activo</th><th scope="col">Lado</th><th scope="col">Entrada</th><th scope="col">Salida</th><th scope="col">Precio salida</th><th scope="col">Contratos</th><th scope="col">Resultado</th><th scope="col">$</th></tr></thead>
     <tbody id="ops"></tbody>
   </table></div>
@@ -672,6 +681,8 @@ function render(d) {
     <td class="${r.resultado === 'GANA' ? 'pos' : 'neg'}">${r.resultado === 'GANA' ? 'ganada' : 'perdida'}</td>
     <td class="num ${clase(+r.pnl_usd)}">${usd(+r.pnl_usd)}</td></tr>`).join('')
     : '<tr><td colspan="9" class="vacio">Todavía no hay operaciones. Aparecerán aquí en cuanto el bot cierre la primera.</td></tr>';
+  $('opsCuenta').textContent = d.operaciones.length
+    ? (d.total.ops > d.operaciones.length ? `últimas ${d.operaciones.length} de ${d.total.ops}` : `${d.total.ops} en total`) : '';
 
   const ke = $('keyEstado');
   ke.className = 'aviso ' + (d.conectado ? 'on' : 'warn');
@@ -753,6 +764,27 @@ $('guardar').onclick = async () => {
   }
 };
 $('deshacer').onclick = () => { llenarForm(ajustesGuardados); $('msgAjustes').textContent = ''; $('msgAjustes').className = 'msg'; };
+
+// reiniciar borra la cuenta de resultados: se confirma, y el historial se archiva, no se pierde
+let confReinicio = null;
+$('reiniciar').onclick = async () => {
+  const b = $('reiniciar');
+  if (!confReinicio) {
+    b.textContent = 'Confirmar reinicio'; b.className = 'b-danger chico';
+    confReinicio = setTimeout(() => {
+      confReinicio = null; b.textContent = 'Reiniciar resultados'; b.className = 'b-ghost chico';
+    }, 6000);
+    return;
+  }
+  clearTimeout(confReinicio); confReinicio = null;
+  b.textContent = 'Reiniciar resultados'; b.className = 'b-ghost chico'; b.disabled = true;
+  msg($('msgReiniciar'), 'reiniciando…', 'yendo');
+  const r = await api('/api/reiniciar', {});
+  b.disabled = false;
+  if (!r) return;
+  msg($('msgReiniciar'), r.msg, r.ok);
+  refrescar();
+};
 
 $('guardarKey').onclick = async () => {
   $('guardarKey').disabled = true; msg($('msgKey'), 'probando…', 'yendo');
