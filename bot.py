@@ -595,7 +595,8 @@ def servidor(bot: Bot):
                 return self._json(bot.resumen_json())
             if url.path == "/operaciones.csv":
                 ruta = bot.registro.ruta
-                return self._send(200, ruta.read_bytes() if ruta.exists() else b"", "text/csv; charset=utf-8",
+                vacio = (",".join(operador.COLUMNAS) + "\n").encode()
+                return self._send(200, ruta.read_bytes() if ruta.exists() else vacio, "text/csv; charset=utf-8",
                                   {"Content-Disposition": 'attachment; filename="operaciones.csv"'})
             return self._send(404, "No encontrado", "text/plain; charset=utf-8")
 
@@ -627,6 +628,13 @@ def servidor(bot: Bot):
                 abiertas = len(bot.estado.abiertas)
                 extra = f" Hay {abiertas} operación abierta: se sigue cuidando hasta el TP, el stop o el cierre." if abiertas else ""
                 return self._json({"ok": True, "msg": "Bot apagado." + extra})
+            if url.path == "/api/reiniciar":
+                n, copia = bot.registro.archivar()
+                extra = f" Historial guardado en {copia}." if copia else ""
+                if bot.estado.abiertas:
+                    extra += " La operación abierta contará en la cuenta nueva."
+                log(f"estadísticas reiniciadas desde el panel: {n} operaciones archivadas")
+                return self._json({"ok": True, "msg": f"Reiniciado: {n} operaciones archivadas.{extra}"})
             if url.path == "/api/ajustes":
                 v, err = validar(datos)
                 if err:
