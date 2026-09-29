@@ -149,16 +149,30 @@ class EjecutorReal:
         except requests.RequestException as e:
             return self._entrada_dudosa(activo, f, lado, ask, cfg, m, e)
 
-        llenos, py, comision = r["llenos"], r["precio_yes"], r["comision_media"] * r["llenos"]
+        llenos, comision = r["llenos"], r["comision_media"] * r["llenos"]
+        # OJO con los dos sistemas de precio:
+        #   crear_orden -> average_fill_price, que SIEMPRE es del libro YES (hay que invertirlo para NO)
+        #   llenados()  -> precio del LADO comprado (ya viene en los términos de la operación)
+        # Mezclarlos hizo que una compra de NO a 0.86 se anotara como 0.14, con el TP en 0.27: la orden
+        # del TP salía por debajo del mercado y vendía la posición al instante (-$0.06 en vez de +$0.11).
+        py = r["precio_yes"]                                  # del libro YES, o None
+        entrada = (py if lado == "yes" else 1 - py) if py is not None else None
         if tif == "good_till_canceled" and r["order_id"]:
-            llenos, py, comision = self._descansar_y_cerrar(activo, f, r["order_id"], lado, m, n)
+            llenos, entrada, comision = self._descansar_y_cerrar(activo, f, r["order_id"], lado, m, n)
             if llenos is None:                  # no se pudo dejar la orden en un estado seguro
                 return self._entrada_dudosa(activo, f, lado, ask, cfg, m, "no pude cerrar la orden de entrada")
 
         if llenos <= 0:
             log_cada(f"nolleno{f.ticker}", f"{activo} {lado.upper()} a {ask:.3f}: la orden no se llenó, reintento", 10)
             return None
-        entrada = (py if lado == "yes" else 1 - py) if py is not None else ask
+        if entrada is None:
+            entrada = ask
+        # Red de seguridad: un precio de entrada fuera del EntryRange significa que algo se contabilizó mal.
+        # Antes que abrir con un TP disparatado, se avisa y se revisa la posición a mano.
+        if not (cfg.entrada_min - 0.05 <= entrada <= cfg.entrada_max + self.desliz + 1e-9):
+            log(f"{activo} ATENCIÓN: el precio de entrada que devolvió Kalshi ({entrada:.3f}) está fuera de "
+                f"{cfg.entrada_min:.2f}-{cfg.entrada_max:.2f}. No abro la operación; revisa la posición a mano.")
+            return None
         # average_fee_paid es por contrato (NightShark lo multiplica por la cantidad)
         op = nueva_operacion(activo, f, lado, entrada, llenos, cfg, comision, m["exchange_index"])
         if llenos < n:
@@ -169,8 +183,10 @@ class EjecutorReal:
     def _descansar_y_cerrar(self, activo, f, oid, lado, m, n):
         """Deja la orden puesta hasta `self.espera` s, la cancela y devuelve lo REALMENTE ejecutado.
 
-        Devuelve (contratos, precio medio del lado, comisiones $), o (None, None, None) si no se puede
-        confirmar que la orden dejó de estar abierta: ahí no se acepta la posición a ciegas.
+        Devuelve (contratos, precio medio DEL LADO COMPRADO, comisiones $) — el precio ya viene en los
+        términos de la operación, NO del libro YES, así que quien lo use no debe invertirlo.
+        Devuelve (None, None, None) si no se puede confirmar que la orden dejó de estar abierta:
+        ahí no se acepta la posición a ciegas.
         """
         shard = m["exchange_index"]
         fin = time.time() + self.espera
