@@ -133,7 +133,7 @@ button.chico{padding:5px 10px;font-size:12px}
 .consola .msg{max-width:min(34ch,24vw)}
 
 /* ---------------------------------------------------------------- lienzo */
-main{margin-left:var(--lateral);padding:calc(var(--cabeza) + 22px) 22px 44px;max-width:1520px}
+main{margin-left:var(--lateral);padding:calc(var(--cabeza) + 22px) 26px 44px;max-width:2100px}
 .seccion,#s-bloque{scroll-margin-top:calc(var(--cabeza) + 18px)}
 .seccion{margin-top:26px}
 html{scroll-behavior:smooth}
@@ -186,7 +186,17 @@ html{scroll-behavior:smooth}
   background:var(--n0);border:1px solid var(--linea);transition:border-color var(--t),background var(--t)}
 .lado.dentro{background:var(--n2);border-color:var(--gris)}
 .lado b{font-weight:500;font-size:11px;letter-spacing:.04em}
-#grafico{margin:2px -4px 0}
+#grafico{margin:2px -4px 0;min-width:0}
+.cuerpo{min-width:0}
+/* en pantalla ancha el gráfico no tiene por qué ocuparlo todo: la lectura del
+   delta se pone a su lado y la tarjeta baja de alto */
+@media(min-width:1500px){
+  .cuerpo{display:grid;grid-template-columns:minmax(0,1.85fr) minmax(0,1fr);gap:26px;align-items:start}
+  .cuerpo > *{min-width:0}
+  .aparte{padding-left:26px;border-left:1px solid var(--linea);align-self:stretch}
+  .aparte #gPie{margin-top:14px;padding-top:14px}
+  .aparte .medidor{margin-top:0;padding-top:0;border-top:0}
+}
 #gPie{margin-top:11px;padding-top:11px;border-top:1px solid var(--linea)}
 /* Delta contra su umbral */
 .dcab{display:flex;align-items:baseline;gap:10px;margin-bottom:9px}
@@ -303,6 +313,18 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 .pie{margin-top:26px;padding-top:14px;border-top:1px solid var(--linea);font-size:11px;color:var(--tenue)}
 
 /* ---------------------------------------------------------------- responsive */
+@media(min-width:1600px){
+  .tablero{grid-template-columns:minmax(0,1fr) 360px;gap:22px}
+  .principal,.rail{gap:22px}
+  .bloque,.marcador,.panel,.noticias,.grid2>div{padding:20px 22px 22px}
+  .total .v{font-size:40px}
+  .lista .v{font-size:18px}
+  .lista > div{padding:12px 0}
+  table{font-size:13.5px}
+  th,td{padding:10px 14px 10px 0}
+  .lecturas .v{font-size:22px}
+  .grid2{gap:22px}
+}
 @media(max-width:1280px){
   :root{--lateral:64px}
   .lateral{padding:0 10px 14px;align-items:stretch}
@@ -398,9 +420,13 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
       <span id="gLados" class="lados"></span>
       <span class="k solo-pc">Queda</span><span id="gQueda" class="num solo-pc" style="font-weight:600;font-size:13px;color:var(--claro)"></span>
     </div>
-    <div id="grafico"></div>
-    <div id="medidor"></div>
-    <div id="gPie"></div>
+    <div class="cuerpo">
+      <div id="grafico"></div>
+      <div class="aparte">
+        <div id="medidor"></div>
+        <div id="gPie"></div>
+      </div>
+    </div>
     <div class="wrap lectura"><table>
       <thead><tr><th scope="col">Queda</th><th scope="col">Referencia</th><th scope="col">Precio</th><th scope="col">Índice</th><th scope="col">Delta</th><th scope="col">YES ask/bid</th><th scope="col">NO ask/bid</th><th scope="col">Estado</th></tr></thead>
       <tbody id="vivo"></tbody>
@@ -522,7 +548,14 @@ const BLOQUE_S = 900;
 const angosto = () => window.innerWidth < 640;
 // el lienzo se adapta: si fuera siempre de 880 de ancho, en el movil las etiquetas
 // quedarian a media escala y no se leerian
-const geo = () => angosto() ? { W: 440, X0: 44, X1: 378, H: 262 } : { W: 880, X0: 62, X1: 806, H: 176 };
+// el lienzo mide lo mismo que la caja: una unidad del SVG es un píxel de pantalla.
+// Con un lienzo fijo, en una pantalla ancha todo el gráfico se ampliaba (1.7x en 2048 px).
+const geo = () => {
+  const c = document.getElementById('grafico');
+  const W = Math.max(300, Math.min(Math.round((c && c.clientWidth) || 880), 2000));
+  const ang = W < 500;      // solo el móvil necesita el lienzo más alto
+  return { W, X0: ang ? 40 : 62, X1: W - (ang ? 58 : 76), H: ang ? 225 : 186 };
+};
 let GX1 = 806;   // borde derecho vigente, para las capsulas de precio
 
 // curva monótona: suaviza sin inventar subidas ni bajadas que no están en los datos
@@ -588,7 +621,6 @@ function grafico(v) {
     + `<stop offset="100%" stop-color="${ROJO}" stop-opacity="0.26"></stop></linearGradient>`
     + `<clipPath id="cArr"><rect x="0" y="${Y0 - 4}" width="${W}" height="${(yRef - Y0 + 4).toFixed(1)}"></rect></clipPath>`
     + `<clipPath id="cAba"><rect x="0" y="${yRef.toFixed(1)}" width="${W}" height="${(Y1 - yRef + 4).toFixed(1)}"></rect></clipPath>`
-    + `<filter id="glow" x="-5%" y="-25%" width="110%" height="150%"><feGaussianBlur stdDeviation="2.6"></feGaussianBlur></filter>`
     + `<pattern id="rayas" width="6" height="6" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">`
     + `<line x1="0" y1="0" x2="0" y2="6" stroke="${TENUE}" stroke-width="1" opacity="0.28"></line></pattern>`
     + `</defs>`);
@@ -616,8 +648,7 @@ function grafico(v) {
   [['cArr', 'gArr', VERDE], ['cAba', 'gAba', ROJO]].forEach(([clip, grad, c]) => {
     o.push(`<g clip-path="url(#${clip})">`
       + `<path d="${dArea}" fill="url(#${grad})"></path>`
-      + `<path d="${dLinea}" fill="none" stroke="${c}" stroke-width="3" opacity="0.3" filter="url(#glow)"></path>`
-      + `<path d="${dLinea}" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>`
+      + `<path d="${dLinea}" fill="none" stroke="${c}" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="round" shape-rendering="geometricPrecision" vector-effect="non-scaling-stroke"></path>`
       + `</g>`);
   });
 
