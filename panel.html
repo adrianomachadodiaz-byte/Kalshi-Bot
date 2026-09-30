@@ -125,8 +125,26 @@ main{max-width:1320px;margin:0 auto;padding:0 22px 8px}
   transition:border-color var(--t),background var(--t)}
 .lado.dentro{background:var(--verde-f);border-color:rgba(53,208,127,.55)}
 .lado b{font-weight:600}
-#gPie{display:flex;flex-wrap:wrap;gap:8px 30px;margin-top:12px;padding-top:11px;border-top:1px solid var(--linea)}
-#gPie .v{font-family:var(--mono);font-size:17px;font-weight:600;letter-spacing:-.025em;margin-top:3px;display:block}
+#gPie{margin-top:12px;padding-top:11px;border-top:1px solid var(--linea)}
+/* Delta contra su umbral: la pregunta que el bot se hace cada segundo */
+.dcab{display:flex;align-items:baseline;gap:10px;margin-bottom:9px}
+.dcab .v{font-family:var(--mono);font-size:20px;font-weight:600;letter-spacing:-.025em;line-height:1}
+.dcab .der{margin-left:auto}
+.dpista{position:relative;height:8px;background:var(--hondo);border:1px solid var(--linea);border-radius:2px}
+.dzona{position:absolute;top:0;bottom:0;background:var(--z);opacity:.16}
+.dzona.izq{left:0;border-right:1px solid var(--red)}
+.dzona.der{right:0;border-left:1px solid var(--green)}
+.dcero{position:absolute;top:-2px;bottom:-2px;left:50%;width:1px;background:var(--linea-2)}
+.dtick{position:absolute;top:1px;bottom:1px;width:1px;background:var(--gris);opacity:.5;transform:translateX(-.5px)}
+.dmarca{position:absolute;top:-3px;bottom:-3px;width:3px;border-radius:2px;background:var(--hueso);
+  box-shadow:0 0 0 2px var(--base);transform:translateX(-1.5px);transition:left 160ms var(--sal)}
+.dmarca.pos{background:var(--green)}.dmarca.neg{background:var(--red)}
+.dpies{display:flex;justify-content:space-between;margin-top:5px;font-size:10.5px;color:var(--tenue)}
+/* por qué no entra ahora mismo */
+.razon{margin-top:11px;font-size:13px;color:var(--gris);display:flex;align-items:center;gap:8px}
+.razon::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor;flex:none;opacity:.8}
+.razon.ok{color:var(--green)}
+.razon.warn{color:var(--amber)}
 
 /* medidor de la posición abierta: dónde va el bid entre el stop y el objetivo */
 .medidor{margin-top:14px}
@@ -449,13 +467,11 @@ function grafico(v) {
   const ps = g.activo.map(p => p[1]).concat(g.referencia != null ? [g.referencia] : []);
   let lo = Math.min(...ps), hi = Math.max(...ps);
   const ref = g.referencia, dm = g.delta_min;
-  if (dm > 0 && ref != null) {                     // los umbrales entran, pero sin aplastar la línea
-    const tope = Math.max(hi - ref, ref - lo, 1) * 2.4;
-    const d = Math.min(dm, tope);
-    lo = Math.min(lo, ref - d); hi = Math.max(hi, ref + d);
-  }
-  const pad = Math.max((hi - lo) * 0.14, 8);
-  lo -= pad; hi += pad;
+  // la escala sigue al precio, no a los umbrales: la línea se lee. El suelo (un tercio
+  // del umbral) evita que una racha plana se vea como una montaña rusa.
+  const centro = (hi + lo) / 2;
+  const semi = Math.max((hi - lo) / 2 * 1.16, 8, (dm || 0) * 0.35);
+  lo = centro - semi; hi = centro + semi;
   const ya = p => Y1 - (p - lo) / (hi - lo) * (Y1 - Y0);
   const corta = y => Math.max(Y0, Math.min(Y1, y));
 
@@ -488,17 +504,6 @@ function grafico(v) {
   }
 
   if (g.ventana) o.push(`<rect x="${x(BLOQUE - g.ventana).toFixed(1)}" y="${Y0}" width="${(X1 - x(BLOQUE - g.ventana)).toFixed(1)}" height="${Y1 - Y0}" fill="#e8e6e1" opacity="0.045"></rect>`);
-
-  // umbrales del Delta: se encienden al cumplirse
-  if (dm > 0 && ref != null) {
-    const yUlt = corta(ya(ult[1]));
-    [[ref + dm, VERDE, '+', -5, ult[1] - ref >= dm], [ref - dm, ROJO, '−', 12, ref - ult[1] >= dm]].forEach(([val, c, sig, dy, activo]) => {
-      const y = ya(val), fuera = y < Y0 || y > Y1, yv = corta(y);
-      const tapado = Math.abs(yv - yUlt) < 13;              // la capsula del precio manda
-      o.push(`<line x1="${X0}" y1="${yv.toFixed(1)}" x2="${X1}" y2="${yv.toFixed(1)}" stroke="${c}" stroke-width="${activo ? 1.5 : 1}" stroke-dasharray="${fuera ? '2 5' : '5 4'}" opacity="${activo ? 0.85 : 0.28}"></line>`);
-      if (!tapado) o.push(`<text x="${X1 - 4}" y="${(yv + dy).toFixed(1)}" text-anchor="end" fill="${activo ? c : TENUE}" font-size="11" font-weight="${activo ? 600 : 400}">${sig}${n(dm, 0)}${fuera ? ' ↕' : ''}${activo ? '  ✓' : ''}</text>`);
-    });
-  }
 
   // BTC en dos mitades, con brillo
   const pa = g.activo.map(p => [x(p[0]), ya(p[1])]);
@@ -544,7 +549,8 @@ function grafico(v) {
 
   o.push(`<text x="${X0 - 7}" y="${Y0 + 10}" text-anchor="end" fill="${TENUE}" font-size="10.5">${Math.round(hi).toLocaleString('es')}</text>`);
   o.push(`<text x="${X0 - 7}" y="${Y1 + 3}" text-anchor="end" fill="${TENUE}" font-size="10.5">${Math.round(lo).toLocaleString('es')}</text>`);
-  if (g.ventana) o.push(`<text x="${Math.min(x(BLOQUE - g.ventana) + 7, X1 - 80).toFixed(1)}" y="${Y1 - 6}" fill="${TENUE}" font-size="10.5">últimos ${Math.round(g.ventana / 60)} min</text>`);
+  // la etiqueta de la ventana baja al pie: dentro del gráfico chocaba con el mínimo del bloque
+  if (g.ventana) o.push(`<text x="${Math.min(x(BLOQUE - g.ventana) + 5, X1 - 82).toFixed(1)}" y="${Y1 + 17}" fill="${TENUE}" font-size="10.5">últimos ${Math.round(g.ventana / 60)} min</text>`);
 
   // avance del bloque
   const frac = Math.max(0, Math.min(1, ult[0] / BLOQUE));
@@ -556,6 +562,55 @@ function grafico(v) {
 
   o.push('<g id="cruz"></g>');
   return `<svg id="svgG" viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-family:'Geist Mono',ui-monospace,monospace" role="img" aria-label="Índice de BTC durante el bloque: verde por encima de la referencia de ${ref != null ? Math.round(ref) : '–'} y rojo por debajo.">${o.join('')}</svg>`;
+}
+
+const reloj = s => Math.floor(Math.max(0, s) / 60) + ':' + String(Math.floor(Math.max(0, s) % 60)).padStart(2, '0');
+
+// Delta contra su umbral. El gráfico dice a dónde va el precio; esta barra dice
+// cuánto falta para que el bot pueda entrar, que es otra pregunta.
+function barraDelta(v, d) {
+  const g = v.grafico, dm = g.delta_min, dl = v.delta;
+  if (!dm || dl == null) return '';
+  const tope = dm * 1.25, pct = z => 50 + Math.max(-50, Math.min(50, (z / tope) * 50));
+  const borde = (50 - 50 * dm / tope).toFixed(1);
+  let mx = null, mn = null;
+  if (g.referencia != null) for (const q of g.activo) {
+    const z = q[1] - g.referencia;
+    if (mx == null || z > mx) mx = z;
+    if (mn == null || z < mn) mn = z;
+  }
+  const ok = Math.abs(dl) >= dm, c = dl >= 0 ? 'pos' : 'neg';
+  const tick = z => z == null ? '' : `<i class="dtick" style="left:${pct(z).toFixed(1)}%"></i>`;
+  return `<div class="dcab"><span class="k">Delta</span>
+      <span class="v num ${ok ? c : ''}">${dl >= 0 ? '+' : '−'}${n(Math.abs(dl), 1)}</span>
+      <span class="k der">${ok ? 'umbral cumplido' : 'umbral ' + n(dm, 0) + ' $'}</span></div>
+    <div class="dpista" role="img" aria-label="Delta ${n(dl, 1)} sobre un umbral de ${n(dm, 0)} dólares">
+      <div class="dzona izq" style="width:${borde}%;--z:var(--red)"></div>
+      <div class="dzona der" style="width:${borde}%;--z:var(--green)"></div>
+      <div class="dcero"></div>${tick(mn)}${tick(mx)}
+      <b class="dmarca ${ok ? c : ''}" style="left:${pct(dl).toFixed(1)}%"></b>
+    </div>
+    <div class="dpies"><span class="num">−${n(dm, 0)}</span><span>referencia</span><span class="num">+${n(dm, 0)}</span></div>`;
+}
+
+// una línea que dice por qué no está entrando ahora mismo
+function razon(v, d) {
+  const g = v.grafico, dm = g.delta_min;
+  const emin = +d.ajustes.entrada_min, emax = +d.ajustes.entrada_max;
+  const dentro = a => a != null && a >= emin - 1e-9 && a <= emax + 1e-9;
+  let t, cl = '';
+  if (!d.conectado) { t = 'Falta conectar la API key de Kalshi.'; cl = 'warn'; }
+  else if (!d.encendido) { t = 'El bot está apagado: no abre operaciones.'; cl = 'warn'; }
+  else if (d.abiertas.some(o => o.activo === v.activo)) { t = 'Operación abierta: ahora cuida el TP y el stop.'; cl = 'ok'; }
+  else if (d.limite_diario) { t = 'Límite del día alcanzado.'; cl = 'warn'; }
+  else if (v.indice_s != null && v.indice_s > 15) { t = 'El índice viene atrasado: no opera.'; cl = 'warn'; }
+  else if (g.ventana && v.quedan > g.ventana) t = `La ventana de entrada abre en ${reloj(v.quedan - g.ventana)}.`;
+  else if (v.delta == null) t = 'Sin precio del índice.';
+  else if (dm && Math.abs(v.delta) < dm) t = `Delta corto: faltan ${n(dm - Math.abs(v.delta), 0)} $.`;
+  else if (!dentro(v.yes_ask) && !dentro(v.no_ask))
+    t = `Precio fuera de ${n(emin, 2)}–${n(emax, 2)}: YES ${n(v.yes_ask, 2)}, NO ${n(v.no_ask, 2)}.`;
+  else { t = 'Todo en regla: entra en el próximo vistazo.'; cl = 'ok'; }
+  return `<div class="razon ${cl}">${esc(t)}</div>`;
 }
 
 // medidor de la posición: dónde está el bid entre el stop y el objetivo
@@ -603,7 +658,8 @@ function dibujarCruz() {
   const mm = String(Math.floor(pa[0] / 60)).padStart(2, '0') + ':' + String(pa[0] % 60).padStart(2, '0');
   const ancho = 132, alto = 22 + filas.length * 15;
   const cx = xx > (X0 + X1) / 2 ? xx - ancho - 10 : xx + 10;
-  const cy = Y0 + 4;
+  const yRef = g.referencia != null ? ya(g.referencia) : Y1;
+  const cy = yRef > (Y0 + Y1) / 2 ? Y0 + 4 : Y1 - alto - 4;   // nunca encima de la referencia
   const o = [`<line x1="${xx.toFixed(1)}" y1="${Y0}" x2="${xx.toFixed(1)}" y2="${Y1}" stroke="${NEUTRO}" stroke-width="1" stroke-dasharray="3 3" opacity="0.65"></line>`,
     `<circle cx="${xx.toFixed(1)}" cy="${ya(pa[1]).toFixed(1)}" r="4" fill="#0b0b0c" stroke="${col}" stroke-width="2"></circle>`,
     `<rect x="${cx.toFixed(1)}" y="${cy}" width="${ancho}" height="${alto}" rx="6" fill="#08080a" stroke="#2b2b2e"></rect>`,
@@ -702,21 +758,9 @@ function render(d) {
     armarHover();
     dibujarCruz();
     const g = v0.grafico;
-    let mx = null, mn = null;
-    if (g.referencia != null) for (const p of g.activo) {
-      const dd = p[1] - g.referencia;
-      if (mx == null || dd > mx) mx = dd;
-      if (mn == null || dd < mn) mn = dd;
-    }
-    const sig = z => z == null ? '–' : (z >= 0 ? '+' : '−') + n(Math.abs(z), 0);
-    const pie = [['Máx. Delta', sig(mx), ''], ['Mín. Delta', sig(mn), '']];
     const contratos = d.abiertas[0] ? d.abiertas[0].contratos : 1;
-    if (g.tp != null) {
-      const pnl = (g.bid != null && g.entrada != null) ? (g.bid - g.entrada) : null;
-      pie.push(['Ganancia', pnl == null ? '–' : usd(pnl * contratos), clase(pnl)]);
-    }
     $('medidor').innerHTML = medidor(g, contratos);
-    $('gPie').innerHTML = pie.map(([k, val, c]) => `<div><div class="k">${esc(k)}</div><div class="v num ${c}">${esc(val)}</div></div>`).join('');
+    $('gPie').innerHTML = barraDelta(v0, d) + razon(v0, d);
   }
 
   const box = $('logs'), abajo = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
