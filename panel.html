@@ -3,243 +3,283 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="description" content="Panel del bot de Kalshi: bloque en vivo, operaciones y ajustes.">
+<meta name="description" content="Consola del bot de Kalshi: bloque en vivo, resultado, operaciones y ajustes.">
 <meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#0d0f14">
+<meta name="theme-color" content="#0b0b0c">
 <title>Kalshi Bot</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230d0f14'/%3E%3Cpath d='M5 21 L12 13 L17 18 L27 7' fill='none' stroke='%232ed673' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%230b0b0c'/%3E%3Cpath d='M5 21 L12 13 L17 18 L27 7' fill='none' stroke='%2335d07f' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap">
 <style>
+/* ============================================================
+   Consola. Una sola superficie, dividida por líneas de 1 px.
+   El color se reserva para el dato: verde arriba de la referencia,
+   rojo debajo, ámbar cuando algo pide atención. Nada más tiene color.
+   ============================================================ */
 :root{
-  --bg:#0d0f14; --bg-2:#0a0c10; --card:#14171e; --card-2:#181c24; --line:#232834; --line-2:#2d3341;
-  --text:#e9ebf0; --muted:#8d94a3; --muted-2:#646b7a;
-  --blue:#4c8dff; --green:#2ed673; --red:#ff6b6b; --amber:#e0a63a;
-  --greenbg:#0e2a1b; --redbg:#2e1616; --amberbg:#2b220c;
-  --estado:var(--muted-2);
-  --sombra:0 1px 2px rgba(5,7,12,.6), 0 10px 30px -18px rgba(5,7,12,.9);
-  --r-card:14px; --r-int:9px;
-  --sal:cubic-bezier(.16,1,.3,1);       /* llegada confiada */
-  --t:180ms var(--sal); --t-rapido:140ms var(--sal);
+  --base:#0b0b0c; --sup:#101012; --hondo:#08080a;
+  --linea:#1f1f21; --linea-2:#2b2b2e;
+  --hueso:#e8e6e1; --gris:#90908c; --tenue:#7a7a76;
+  --green:#35d07f; --red:#ff5d55; --amber:#ffb224;
+  --muted-2:var(--tenue);
+  --verde-f:rgba(53,208,127,.10); --rojo-f:rgba(255,93,85,.10); --ambar-f:rgba(255,178,36,.10);
+  --estado:var(--tenue);
+  --r:4px;
+  --sal:cubic-bezier(.16,1,.3,1);
+  --t:150ms var(--sal); --t-rapido:120ms var(--sal);
+  --mono:"Geist Mono",ui-monospace,Menlo,Consolas,monospace;
 }
 *{box-sizing:border-box}
-html{scroll-behavior:smooth}
-body{margin:0;background:var(--bg);color:var(--text);
-  font:15px/1.55 Geist,system-ui,-apple-system,"Segoe UI",sans-serif;
+body{margin:0;background:var(--base);color:var(--hueso);
+  font:15px/1.5 Geist,system-ui,-apple-system,"Segoe UI",sans-serif;
   -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
-body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E")}
-/* el estado del bot se lee con visión periférica */
-.barra-estado{position:fixed;top:0;left:0;right:0;height:2px;z-index:12;background:var(--estado);
-  transition:background 260ms var(--sal)}
-main{max-width:1180px;margin:0 auto;padding:12px 18px 56px;position:relative;z-index:2}
-::selection{background:rgba(76,141,255,.3)}
-*{scrollbar-color:var(--line-2) transparent;scrollbar-width:thin}
-::-webkit-scrollbar{width:10px;height:10px}
-::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:6px;border:3px solid var(--bg)}
+::selection{background:rgba(232,230,225,.18)}
+*{scrollbar-color:var(--linea-2) transparent;scrollbar-width:thin}
+::-webkit-scrollbar{width:11px;height:11px}
+::-webkit-scrollbar-thumb{background:var(--linea-2);border-radius:99px;border:3px solid var(--base)}
+::-webkit-scrollbar-thumb:hover{background:#3a3a3e}
 ::-webkit-scrollbar-track{background:transparent}
-
-.salta{position:absolute;left:-9999px;top:0;background:var(--blue);color:#fff;padding:10px 16px;border-radius:0 0 10px 0;z-index:20}
+:focus-visible{outline:2px solid var(--hueso);outline-offset:2px;border-radius:2px}
+/* el estado del bot se lee con visión periférica, sin leer una palabra */
+.barra-estado{position:fixed;top:0;left:0;right:0;height:2px;z-index:12;background:var(--estado);
+  transition:background 300ms var(--sal)}
+.salta{position:absolute;left:-9999px;top:0;background:var(--hueso);color:var(--base);padding:10px 16px;z-index:20}
 .salta:focus{left:0}
-
-/* ---------------- cabecera: el instrumento ---------------- */
-.top{position:sticky;top:0;z-index:10;display:flex;flex-wrap:wrap;align-items:center;gap:10px;
-  padding:14px 0 12px;margin-bottom:12px;background:linear-gradient(var(--bg) 74%,rgba(13,15,20,0))}
-.marca{display:flex;align-items:center;gap:9px}
-h1{font-size:16px;margin:0;font-weight:600;letter-spacing:-.015em}
-h2{font-size:14.5px;margin:0;font-weight:600;letter-spacing:-.01em}
 .sp{flex:1}
-.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 11px;border-radius:999px;font-size:12.5px;
-  font-weight:500;border:1px solid transparent}
-.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
-.on{background:var(--greenbg);color:var(--green);border-color:rgba(46,214,115,.22)}
-.off{background:#1a1e26;color:var(--muted);border-color:var(--line)}
-.warn{background:var(--amberbg);color:var(--amber);border-color:rgba(224,166,58,.22)}
 
-/* Delta y tiempo restante: lo que se mira cada segundo */
-.instr{display:flex;align-items:baseline;gap:18px;padding:0 16px;border-left:1px solid var(--line);
-  border-right:1px solid var(--line)}
-.instr > div{display:flex;flex-direction:column;gap:1px}
-.instr .k{font-size:10.5px;color:var(--muted-2);letter-spacing:.06em;text-transform:uppercase}
-.instr .v{font-size:23px;font-weight:600;line-height:1;letter-spacing:-.025em}
-.instr .v.chico{font-size:19px}
-
-button{font:inherit;font-weight:550;border:1px solid transparent;border-radius:var(--r-int);padding:8px 15px;
-  cursor:pointer;transition:background var(--t),border-color var(--t),color var(--t),transform var(--t-rapido),box-shadow var(--t)}
-button:active:not(:disabled){transform:scale(.97)}
-button:disabled{opacity:.45;cursor:default}
-:focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-radius:6px}
-.b-main{background:var(--blue);color:#fff}
-.b-ghost{background:transparent;color:var(--muted);border-color:var(--line-2)}
-.b-danger{background:var(--red);color:#2b0808;border-color:transparent}
-@media (hover:hover) and (pointer:fine){
-  .b-main:hover:not(:disabled){background:#649dff;box-shadow:0 6px 18px -8px rgba(76,141,255,.75)}
-  .b-ghost:hover:not(:disabled){color:var(--text);border-color:var(--muted-2);background:var(--card-2)}
-  .b-danger:hover:not(:disabled){background:#ff8080}
-  .b-encender:hover:not(:disabled){background:rgba(46,214,115,.14);border-color:var(--green);color:#7ee8ad}
-  .b-apagar:hover:not(:disabled){color:var(--red);border-color:rgba(255,107,107,.5);background:rgba(255,107,107,.07)}
-}
-/* encender es la acción principal; apagar no compite con los datos */
-.b-encender{background:rgba(46,214,115,.1);border-color:rgba(46,214,115,.45);color:var(--green)}
-.b-apagar{background:transparent;border-color:var(--line-2);color:var(--muted)}
-button.chico{padding:5px 11px;font-size:13px}
-.msg{font-size:13px}
-.top .msg{max-width:min(40ch,26vw);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-
-/* ---------------- avisos ---------------- */
-.aviso{padding:10px 14px;border-radius:var(--r-int);margin-bottom:9px;font-size:13.5px;border:1px solid transparent}
-.aviso.on{background:var(--greenbg);color:#8ff0bb;border-color:rgba(46,214,115,.2)}
-.aviso.warn{background:var(--amberbg);color:#f0cf8a;border-color:rgba(224,166,58,.25)}
-.aviso.off{background:var(--card);color:var(--muted);border-color:var(--line)}
-.aviso.grande{font-size:14.5px;font-weight:550;padding:13px 15px}
-
-/* ---------------- números ---------------- */
-.num{font-family:"Geist Mono",ui-monospace,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums;
-  font-feature-settings:"tnum" 1;letter-spacing:-.01em}
+/* ---------- tipografía del instrumento ---------- */
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;letter-spacing:-.015em}
+.k{font-family:var(--mono);font-size:10px;line-height:1.3;letter-spacing:.13em;text-transform:uppercase;color:var(--gris)}
+h1{font-size:14px;margin:0;font-weight:600;letter-spacing:-.01em}
+h2{font-family:var(--mono);font-size:11px;margin:0;font-weight:500;letter-spacing:.13em;text-transform:uppercase;color:var(--hueso)}
+.tic{font-size:11px;color:var(--tenue);letter-spacing:.02em}
+.ayuda{font-size:11.5px;color:var(--tenue)}
 .pos{color:var(--green)}.neg{color:var(--red)}
 /* solo destellan los números que cambian pocas veces al día */
-@keyframes destello{from{color:var(--blue)}to{color:inherit}}
-.destello{animation:destello 700ms var(--sal)}
+@keyframes destello{from{background:rgba(232,230,225,.22)}to{background:transparent}}
+.destello{animation:destello 620ms var(--sal);border-radius:3px}
 
-/* ---------------- tarjetas ---------------- */
-.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-card);padding:14px 16px 16px;
-  margin-bottom:12px;box-shadow:var(--sombra)}
-.cab{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin-bottom:11px}
-.wrap{overflow-x:auto;margin:0 -16px;padding:0 16px}
-/* la lista de operaciones no crece sin fin: techo y barra propia, con el encabezado fijo */
-.alto-tope{max-height:320px;overflow-y:auto;overscroll-behavior:contain}
-.alto-tope table{border-collapse:separate;border-spacing:0}
-.alto-tope th{box-shadow:inset 0 -1px 0 var(--line)}
-.alto-tope td{border-bottom:1px solid var(--line)}
-table{border-collapse:collapse;width:100%;font-size:13.5px}
-th,td{padding:7px 10px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--line)}
-th{color:var(--muted-2);font-weight:500;font-size:11px;letter-spacing:.05em;text-transform:uppercase;
-  position:sticky;top:0;background:var(--card)}
-tbody tr{transition:background var(--t)}
-tbody tr:hover{background:var(--card-2)}
-tbody tr:last-child td{border-bottom:0}
-.vacio{color:var(--muted-2);font-style:italic}
+/* ---------- cabecera fija ---------- */
+.consola{position:sticky;top:0;z-index:10;display:flex;flex-wrap:wrap;align-items:center;gap:12px;
+  padding:11px 22px;background:var(--base);border-bottom:1px solid var(--linea)}
+.marca{display:flex;align-items:center;gap:9px}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:var(--r);
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;border:1px solid transparent}
+.pill::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
+.on{background:var(--verde-f);color:var(--green);border-color:rgba(53,208,127,.28)}
+.off{background:var(--sup);color:var(--gris);border-color:var(--linea-2)}
+.warn{background:var(--ambar-f);color:var(--amber);border-color:rgba(255,178,36,.28)}
+/* Delta y tiempo: lo que se mira cada segundo, siempre a la vista */
+.lecturas{display:flex;align-items:flex-end;gap:22px;padding:0 20px;
+  border-left:1px solid var(--linea);border-right:1px solid var(--linea)}
+.lecturas > div{display:flex;flex-direction:column;gap:3px}
+.lecturas .v{font-family:var(--mono);font-size:25px;font-weight:600;line-height:.9;letter-spacing:-.035em}
+.lecturas .v.chico{font-size:21px;color:var(--gris)}
 
-/* ---------------- resumen ---------------- */
-.resumen{display:grid;gap:12px;grid-template-columns:minmax(0,1fr);margin-bottom:12px}
-@media(min-width:880px){.resumen{grid-template-columns:276px minmax(0,1fr)}}
-.hero{background:linear-gradient(158deg,var(--card-2),var(--card) 62%);border:1px solid var(--line);
-  border-radius:var(--r-card);padding:16px 18px 18px;box-shadow:var(--sombra);
-  display:flex;flex-direction:column;justify-content:center}
-.hero .k{color:var(--muted);font-size:12.5px}
-.hero .v{font-size:36px;font-weight:600;line-height:1.04;margin:6px 0 5px;letter-spacing:-.03em}
-.hero .s{color:var(--muted);font-size:13px}
-.minis{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(148px,1fr))}
-@media(min-width:880px){.minis{grid-template-columns:repeat(3,minmax(0,1fr))}}
-.stat{background:var(--card);border:1px solid var(--line);border-radius:var(--r-card);padding:11px 13px 12px;
-  box-shadow:var(--sombra);transition:border-color var(--t)}
-.stat:hover{border-color:var(--line-2)}
-.stat .k{color:var(--muted);font-size:12.5px}
-.stat .v{font-size:20px;font-weight:600;margin-top:2px;letter-spacing:-.02em}
-.stat .s{color:var(--muted-2);font-size:11.5px;margin-top:1px}
-.skel{color:transparent!important;background:linear-gradient(90deg,var(--line) 25%,var(--line-2) 50%,var(--line) 75%);
-  background-size:200% 100%;border-radius:5px;animation:sk 1.4s ease-in-out infinite}
-@keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
+/* ---------- controles ---------- */
+button{font:inherit;font-size:13.5px;font-weight:500;border:1px solid transparent;border-radius:var(--r);
+  padding:7px 14px;cursor:pointer;color:var(--hueso);background:transparent;
+  transition:background var(--t),border-color var(--t),color var(--t),transform var(--t-rapido)}
+button:active:not(:disabled){transform:scale(.97)}
+button:disabled{opacity:.4;cursor:default}
+.b-main{background:var(--hueso);color:var(--base);font-weight:600}
+.b-ghost{border-color:var(--linea-2);color:var(--gris)}
+.b-danger{background:var(--red);color:#2b0b09;font-weight:600}
+.b-encender{background:var(--verde-f);border-color:rgba(53,208,127,.45);color:var(--green)}
+.b-apagar{border-color:var(--linea-2);color:var(--gris)}
+button.chico{padding:5px 10px;font-size:12.5px}
+@media (hover:hover) and (pointer:fine){
+  .b-main:hover:not(:disabled){background:#fff}
+  .b-ghost:hover:not(:disabled),.b-apagar:hover:not(:disabled){color:var(--hueso);border-color:var(--gris)}
+  .b-apagar:hover:not(:disabled){color:var(--red);border-color:rgba(255,93,85,.5)}
+  .b-danger:hover:not(:disabled){background:#ff7a73}
+  .b-encender:hover:not(:disabled){background:rgba(53,208,127,.18);border-color:var(--green)}
+}
+.msg{font-size:12.5px}
+.consola .msg{max-width:min(36ch,24vw)}
 
-/* ---------------- bloque en vivo ---------------- */
-.lado{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:12.5px;
-  background:var(--bg-2);border:1px solid var(--line);transition:border-color var(--t),background var(--t)}
-.lado.dentro{background:rgba(46,214,115,.1);border-color:rgba(46,214,115,.55)}
+/* ---------- el lienzo ---------- */
+main{max-width:1320px;margin:0 auto;padding:0 22px 8px}
+.seccion{border-top:1px solid var(--linea);padding:18px 0 22px}
+.titulo{display:flex;flex-wrap:wrap;align-items:center;gap:11px;margin-bottom:14px}
+
+/* avisos: sin caja, una línea de 2 px a la izquierda y el fondo justo */
+#avisos:not(:empty){padding-top:14px}
+.aviso{padding:9px 13px;border-radius:var(--r);margin-bottom:8px;font-size:13px;border-left:2px solid}
+.aviso.on{background:var(--verde-f);color:#9aeec2;border-color:var(--green)}
+.aviso.warn{background:var(--ambar-f);color:#f5d295;border-color:var(--amber)}
+.aviso.off{background:var(--sup);color:var(--gris);border-color:var(--linea-2)}
+.aviso.grande{font-size:14px;font-weight:500;padding:12px 14px}
+
+/* ---------- tablero: bloque en vivo + marcador, de un vistazo ---------- */
+.tablero{display:grid;gap:0;grid-template-columns:minmax(0,1fr);padding-top:18px}
+@media(min-width:1000px){
+  .tablero{grid-template-columns:minmax(0,1fr) 300px}
+  .marcador{border-left:1px solid var(--linea);padding-left:24px;margin-left:24px}
+}
+.bloque{min-width:0}
+.lados{display:flex;gap:7px}
+.lado{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:var(--r);
+  font-family:var(--mono);font-size:11.5px;background:var(--sup);border:1px solid var(--linea);
+  transition:border-color var(--t),background var(--t)}
+.lado.dentro{background:var(--verde-f);border-color:rgba(53,208,127,.55)}
 .lado b{font-weight:600}
-#gPie{display:flex;flex-wrap:wrap;gap:24px;margin-top:11px;padding-top:10px;border-top:1px solid var(--line)}
-#gPie .k{font-size:11px;color:var(--muted-2);letter-spacing:.04em;text-transform:uppercase}
-#gPie .v{font-size:18px;font-weight:600;letter-spacing:-.02em;margin-top:2px}
-/* medidor de la posición abierta */
-.medidor{margin-top:12px;padding-top:11px;border-top:1px solid var(--line)}
-.pista{position:relative;height:6px;border-radius:3px;background:linear-gradient(90deg,var(--redbg),var(--line),var(--greenbg))}
-.tramo{position:absolute;top:0;height:6px;border-radius:3px;transition:left var(--t),width var(--t)}
+#gPie{display:flex;flex-wrap:wrap;gap:8px 30px;margin-top:12px;padding-top:11px;border-top:1px solid var(--linea)}
+#gPie .v{font-family:var(--mono);font-size:17px;font-weight:600;letter-spacing:-.025em;margin-top:3px;display:block}
+
+/* medidor de la posición abierta: dónde va el bid entre el stop y el objetivo */
+.medidor{margin-top:14px}
+.pista{position:relative;height:5px;border-radius:99px;background:var(--linea)}
+.tramo{position:absolute;top:0;height:5px;border-radius:99px;transition:left var(--t),width var(--t)}
 .tramo.gana{background:var(--green)}.tramo.pierde{background:var(--red)}
-.marca-ent{position:absolute;top:-3px;width:1px;height:12px;background:var(--muted);transform:translateX(-.5px)}
-.marca-bid{position:absolute;top:-4px;width:3px;height:14px;border-radius:2px;background:var(--text);
-  box-shadow:0 0 0 2px var(--card);transform:translateX(-1.5px);transition:left var(--t)}
-.pista-pies{position:relative;height:16px;margin-top:6px;font-size:11px}
+.marca-ent{position:absolute;top:-3px;width:1px;height:11px;background:var(--gris);transform:translateX(-.5px)}
+.marca-bid{position:absolute;top:-4px;width:3px;height:13px;border-radius:99px;background:var(--hueso);
+  box-shadow:0 0 0 2px var(--base);transform:translateX(-1.5px);transition:left var(--t)}
+.pista-pies{position:relative;height:15px;margin-top:7px;font-size:10.5px;font-family:var(--mono)}
 .pista-pies > span:first-child{position:absolute;left:0}
 .pista-pies > span:last-child{position:absolute;right:0}
-.pista-pies > span:nth-child(2){position:absolute;transform:translateX(-50%);white-space:nowrap}
+.pista-pies > span:nth-child(2){position:absolute;transform:translateX(-50%);white-space:nowrap;color:var(--tenue)}
 
-/* ---------------- registro ---------------- */
-#logs{background:var(--bg-2);border:1px solid var(--line);border-radius:var(--r-int);
-  min-height:64px;max-height:280px;overflow:auto;padding:10px 12px;
-  font:12px/1.6 "Geist Mono",ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-word;color:#b9c0cd}
-a{color:var(--blue);text-decoration:none;border-bottom:1px solid transparent;transition:border-color var(--t)}
-a:hover{border-bottom-color:var(--blue)}
+/* marcador */
+.total{padding-bottom:14px;border-bottom:1px solid var(--linea)}
+.total .v{font-family:var(--mono);font-size:40px;font-weight:600;line-height:1;letter-spacing:-.04em;
+  display:block;margin:7px 0 5px}
+.total .sub{font-size:12.5px;color:var(--gris)}
+.lista{margin:0;display:grid}
+.lista > div{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+  padding:9px 0;border-bottom:1px solid var(--linea)}
+.lista > div:last-child{border-bottom:0}
+.lista dt{font-size:12.5px;color:var(--gris)}
+.lista dd{margin:0;text-align:right;min-width:0}
+.lista .v{font-family:var(--mono);font-size:16.5px;font-weight:600;letter-spacing:-.02em;display:block}
+.lista .sub{font-size:10.5px;color:var(--tenue);display:block;margin-top:2px}
+.skel{color:transparent!important;background:linear-gradient(90deg,var(--linea) 25%,var(--linea-2) 50%,var(--linea) 75%);
+  background-size:200% 100%;border-radius:3px;animation:sk 1.4s ease-in-out infinite}
+@keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
 
-/* ---------------- formularios ---------------- */
-.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:10px}
-label{display:block;font-size:12px;color:var(--muted)}
+/* ---------- tablas ---------- */
+.wrap{overflow-x:auto;margin:0 -22px;padding:0 22px}
+.alto-tope{max-height:300px;overflow-y:auto;overscroll-behavior:contain}
+.lectura{margin-top:13px;padding-top:2px;border-top:1px solid var(--linea)}
+.lectura th{padding-top:9px}
+.lectura td{border-bottom:0;padding-bottom:0}
+table{border-collapse:separate;border-spacing:0;width:100%;font-size:12.5px}
+th,td{padding:7px 12px 7px 0;text-align:left;white-space:nowrap}
+td{border-bottom:1px solid var(--linea)}
+th{font-family:var(--mono);font-size:10px;font-weight:500;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--tenue);position:sticky;top:0;background:var(--base);box-shadow:inset 0 -1px 0 var(--linea);z-index:1}
+tbody tr{transition:background var(--t)}
+tbody tr:hover{background:var(--sup)}
+tbody tr:last-child td{border-bottom:0}
+.vacio{color:var(--tenue)}
+
+/* ---------- registro ---------- */
+#logs{background:var(--hondo);border:1px solid var(--linea);border-radius:var(--r);
+  min-height:60px;max-height:270px;overflow:auto;padding:11px 13px;
+  font:11.5px/1.65 var(--mono);white-space:pre-wrap;word-break:break-word;color:#b4b3ae}
+a{color:var(--hueso);text-decoration:none;border-bottom:1px solid var(--linea-2);transition:border-color var(--t)}
+a:hover{border-bottom-color:var(--hueso)}
+
+/* ---------- formularios ---------- */
+.grid2{display:grid;grid-template-columns:minmax(0,1fr);gap:0}
+.grid2 > *{min-width:0}
+@media(min-width:900px){
+  .grid2{grid-template-columns:minmax(0,1fr) 380px}
+  .grid2 > *:last-child{border-left:1px solid var(--linea);padding-left:26px;margin-left:26px}
+}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:11px}
+label{display:block;font-size:11.5px;color:var(--gris)}
 .form .et{display:block;min-height:2.3em;line-height:1.3}
-input,textarea{width:100%;margin-top:4px;padding:7px 9px;border-radius:var(--r-int);border:1px solid var(--line-2);
-  background:var(--bg-2);color:var(--text);font:inherit;font-size:14px;transition:border-color var(--t),background var(--t)}
-input:hover,textarea:hover{border-color:var(--muted-2)}
-input:focus,textarea:focus{outline:none;border-color:var(--blue);background:var(--bg)}
+input,textarea{width:100%;margin-top:4px;padding:7px 9px;border-radius:var(--r);border:1px solid var(--linea-2);
+  background:var(--hondo);color:var(--hueso);font:inherit;font-size:13.5px;
+  transition:border-color var(--t),background var(--t)}
+input::placeholder,textarea::placeholder{color:var(--tenue)}
+input:hover,textarea:hover{border-color:var(--gris)}
+input:focus,textarea:focus{outline:none;border-color:var(--hueso);background:var(--base)}
 input.malo,input.malo:focus{border-color:var(--red)}
-.form input{font-family:"Geist Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
-textarea{font:11.5px/1.6 "Geist Mono",ui-monospace,Consolas,monospace;height:94px;resize:vertical}
-.ayuda{font-size:11px;color:var(--muted-2);margin-top:3px}
-.err{font-size:11px;color:var(--red);margin-top:3px}
-.row{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin-top:11px}
-.grid2{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start}.grid2>*{min-width:0}
-@media(min-width:900px){.grid2{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
-.compacto{padding:13px 15px 15px}
-.compacto .cab{margin-bottom:9px}
-.compacto .aviso{padding:9px 12px;margin-bottom:11px;font-size:13px}
-.avanzado{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
-.avanzado summary{cursor:pointer;font-size:12.5px;color:var(--muted);list-style:none;display:flex;align-items:center;
-  gap:7px;width:fit-content;transition:color var(--t)}
-.avanzado summary:hover{color:var(--text)}
+.form input{font-family:var(--mono);font-variant-numeric:tabular-nums}
+textarea{font:11px/1.6 var(--mono);height:88px;resize:vertical}
+.err{font-size:10.5px;color:var(--red);margin-top:3px}
+.form .ayuda{font-size:10.5px;margin-top:3px}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin-top:14px}
+.avanzado{margin-top:14px;border-top:1px solid var(--linea);padding-top:11px}
+.avanzado summary{cursor:pointer;font-family:var(--mono);font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--gris);list-style:none;display:flex;align-items:center;gap:8px;width:fit-content;transition:color var(--t)}
+.avanzado summary:hover{color:var(--hueso)}
 .avanzado summary::-webkit-details-marker{display:none}
-.avanzado summary::before{content:"";width:6px;height:6px;border-right:1.5px solid currentColor;
+.avanzado summary::before{content:"";width:5px;height:5px;border-right:1.5px solid currentColor;
   border-bottom:1.5px solid currentColor;transform:rotate(-45deg);transition:transform var(--t)}
 .avanzado[open] summary::before{transform:rotate(45deg)}
 /* estados de guardado */
-.estado-guardado{display:inline-flex;align-items:center;gap:6px;font-size:13px}
-.estado-guardado::before{content:"";width:13px;height:13px;border-radius:50%;flex:none}
+.estado-guardado{display:inline-flex;align-items:center;gap:6px}
+.estado-guardado::before{content:"";width:12px;height:12px;flex:none}
 .estado-guardado.ok{color:var(--green)}
 .estado-guardado.ok::before{background:var(--green);
-  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;
-  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat}
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.5l3.2 3.2L13 4.5' fill='none' stroke='%23000' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.5l3.2 3.2L13 4.5' fill='none' stroke='%23000' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat}
 .estado-guardado.mal{color:var(--red)}
 .estado-guardado.mal::before{background:var(--red);
-  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 4v5M8 11.6v.2' stroke='%23000' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat;
-  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 4v5M8 11.6v.2' stroke='%23000' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat}
-.estado-guardado.yendo{color:var(--muted)}
-.estado-guardado.yendo::before{border:2px solid var(--line-2);border-top-color:var(--muted);
-  border-radius:50%;animation:gira 700ms linear infinite;background:none}
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 3.6v5.2M8 11.7v.2' stroke='%23000' stroke-width='1.9' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 3.6v5.2M8 11.7v.2' stroke='%23000' stroke-width='1.9' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat}
+.estado-guardado.yendo{color:var(--gris)}
+.estado-guardado.yendo::before{border:2px solid var(--linea-2);border-top-color:var(--gris);border-radius:50%;
+  animation:gira 700ms linear infinite;background:none}
 @keyframes gira{to{transform:rotate(360deg)}}
 
-@media(max-width:640px){
-  main{padding:10px 12px 40px}
-  .solo-pc,#uptime{display:none}
-  #logs{max-height:200px}
-  #gPie{gap:14px 20px}
-  .instr{padding:0;border:0;gap:14px}
-  .instr .v{font-size:20px}
-  .top{gap:8px;padding:10px 0}
-  .top .msg{max-width:100%;white-space:normal}
-  .card{padding:12px 13px 14px}
-  .wrap{margin:0 -13px;padding:0 13px}
+.pie{border-top:1px solid var(--linea);padding:14px 0 26px;font-size:11px;color:var(--tenue);
+  display:flex;flex-wrap:wrap;gap:6px 18px}
+
+/* ---------- un solo momento de movimiento: la primera pintada ---------- */
+@keyframes entra{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+body.nueva .consola,body.nueva .tablero,body.nueva .seccion,body.nueva .pie{
+  animation:entra 340ms var(--sal) backwards}
+body.nueva .tablero{animation-delay:50ms}
+body.nueva .seccion:nth-of-type(1){animation-delay:95ms}
+body.nueva .seccion:nth-of-type(2){animation-delay:125ms}
+body.nueva .seccion:nth-of-type(3){animation-delay:150ms}
+body.nueva .seccion:nth-of-type(4){animation-delay:170ms}
+body.nueva .pie{animation-delay:190ms}
+
+@media(max-width:999px){
+  .tablero{display:flex;flex-direction:column;gap:0}
+  .marcador{display:contents}
+  .total{order:-1;padding-bottom:15px;margin-bottom:17px}
+  .bloque{order:0}
+  .lista{order:1;grid-template-columns:1fr 1fr;column-gap:24px;
+    border-top:1px solid var(--linea);margin-top:20px;padding-top:4px}
+  .lista > div:nth-last-child(2){border-bottom:0}
 }
-@media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+@media(max-width:640px){
+  main{padding:0 14px 8px}
+  .consola{padding:9px 14px 10px;gap:8px 10px}
+  .consola button{padding:6px 12px}
+  .wrap{margin:0 -14px;padding:0 14px}
+  .solo-pc,#uptime{display:none}
+  .lecturas{padding:0;border:0;gap:16px}
+  .lecturas .v{font-size:21px}.lecturas .v.chico{font-size:18px}
+  .total .v{font-size:34px}
+  #logs{max-height:200px}
+  #gPie{gap:8px 22px}
+  .consola .msg{max-width:100%}
+}
+@media(prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms!important;animation-delay:0ms!important;transition-duration:.01ms!important}
+}
 </style>
 </head>
-<body>
+<body class="nueva">
 <div class="barra-estado" aria-hidden="true"></div>
 <a class="salta" href="#contenido">Saltar al contenido</a>
-<main>
-<header class="top">
+
+<header class="consola">
   <span class="marca">
-    <svg width="21" height="21" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#14171e"></rect><path d="M5 21 L12 13 L17 18 L27 7" fill="none" stroke="#2ed673" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+    <svg width="19" height="19" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="4" fill="#161618"></rect><path d="M5 21 L12 13 L17 18 L27 7" fill="none" stroke="#35d07f" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path></svg>
     <h1>Kalshi Bot</h1>
   </span>
-  <span id="pill" class="pill off">cargando…</span>
+  <span id="pill" class="pill off">cargando</span>
   <span class="sp"></span>
-  <div class="instr" id="instr" hidden>
+  <div class="lecturas" id="instr" hidden>
     <div><span class="k">Delta</span><span class="v num" id="hDelta">–</span></div>
     <div><span class="k">Queda</span><span class="v num chico" id="hQueda">–</span></div>
   </div>
@@ -248,46 +288,47 @@ textarea{font:11.5px/1.6 "Geist Mono",ui-monospace,Consolas,monospace;height:94p
   <button id="cancelar" class="b-ghost" hidden>Cancelar</button>
   <button id="power" class="b-encender" disabled>Encender</button>
   <form method="post" action="/logout" style="margin:0"><button class="b-ghost">Salir</button></form>
-  <span id="uptime" class="ayuda" style="margin:0;width:100%"></span>
 </header>
 
+<main id="contenido">
 <div id="avisos"></div>
 
-<section class="card" id="cardGrafico" style="display:none" aria-label="Bloque en vivo">
-  <div class="cab"><h2>Bloque en vivo</h2><span id="gTicker" class="ayuda num" style="margin:0"></span>
-    <span class="sp"></span><span class="ayuda" style="margin:0">ask/bid</span><span id="gLados" style="display:flex;gap:8px"></span>
-    <span class="solo-pc ayuda" style="margin:0 0 0 6px">quedan</span><span id="gQueda" class="solo-pc num" style="font-weight:600"></span></div>
-  <div id="grafico"></div>
-  <div id="medidor"></div>
-  <div id="gPie"></div>
-</section>
+<div class="tablero">
+  <section class="bloque" id="cardGrafico" style="display:none" aria-label="Bloque en vivo">
+    <div class="titulo">
+      <h2>Bloque en vivo</h2><span id="gTicker" class="num tic"></span>
+      <span class="sp"></span>
+      <span id="gLados" class="lados"></span>
+      <span class="k solo-pc">Queda</span><span id="gQueda" class="num solo-pc" style="font-weight:600;font-size:13px"></span>
+    </div>
+    <div id="grafico"></div>
+    <div id="medidor"></div>
+    <div id="gPie"></div>
+    <div class="wrap lectura"><table>
+      <thead><tr><th scope="col">Queda</th><th scope="col">Referencia</th><th scope="col">Precio</th><th scope="col">Índice</th><th scope="col">Delta</th><th scope="col">YES ask/bid</th><th scope="col">NO ask/bid</th><th scope="col">Estado</th></tr></thead>
+      <tbody id="vivo"></tbody>
+    </table></div>
+  </section>
 
-<section class="resumen" id="contenido" aria-label="Resumen">
-  <div class="hero">
-    <div class="k">Resultado total</div>
-    <div class="v num skel" id="sProfit">–</div>
-    <div class="s" id="sProfitHoy"></div>
-  </div>
-  <div class="minis">
-    <div class="stat"><div class="k">Operaciones</div><div class="v num skel" id="sOps">–</div><div class="s" id="sOpsHoy"></div></div>
-    <div class="stat"><div class="k">Ganadas</div><div class="v num pos skel" id="sWin">–</div><div class="s" id="sWinMedia"></div></div>
-    <div class="stat"><div class="k">Perdidas</div><div class="v num neg skel" id="sLoss">–</div><div class="s" id="sLossMedia"></div></div>
-    <div class="stat"><div class="k">% de acierto</div><div class="v num skel" id="sWr">–</div><div class="s">hace falta ~78% para no perder</div></div>
-    <div class="stat"><div class="k">Encendido</div><div class="v num skel" id="sOn">–</div><div class="s" id="sServer"></div></div>
-    <div class="stat"><div class="k">Saldo Kalshi</div><div class="v num skel" id="sSaldo">–</div><div class="s" id="sKey"></div></div>
-  </div>
-</section>
+  <aside class="marcador" aria-label="Resultado">
+    <div class="total">
+      <span class="k">Resultado total</span>
+      <span class="v num skel" id="sProfit">–</span>
+      <span class="sub" id="sProfitHoy"></span>
+    </div>
+    <dl class="lista">
+      <div><dt>Operaciones</dt><dd><span class="v num skel" id="sOps">–</span><span class="sub" id="sOpsHoy"></span></dd></div>
+      <div><dt>Ganadas</dt><dd><span class="v num pos skel" id="sWin">–</span><span class="sub" id="sWinMedia"></span></dd></div>
+      <div><dt>Perdidas</dt><dd><span class="v num neg skel" id="sLoss">–</span><span class="sub" id="sLossMedia"></span></dd></div>
+      <div><dt>Acierto</dt><dd><span class="v num skel" id="sWr">–</span><span class="sub">~78% para no perder</span></dd></div>
+      <div><dt>Saldo Kalshi</dt><dd><span class="v num skel" id="sSaldo">–</span><span class="sub" id="sKey"></span></dd></div>
+      <div><dt>Encendido</dt><dd><span class="v num skel" id="sOn" style="font-size:14px">–</span><span class="sub" id="sServer"></span></dd></div>
+    </dl>
+  </aside>
+</div>
 
-<section class="card" aria-label="En vivo">
-  <div class="cab"><h2>En vivo</h2></div>
-  <div class="wrap"><table>
-    <thead><tr><th scope="col">Activo</th><th scope="col">Mercado</th><th scope="col">Queda</th><th scope="col">Referencia</th><th scope="col">Precio</th><th scope="col">Índice</th><th scope="col">Delta</th><th scope="col">YES ask/bid</th><th scope="col">NO ask/bid</th><th scope="col">Estado</th></tr></thead>
-    <tbody id="vivo"></tbody>
-  </table></div>
-</section>
-
-<section class="card" aria-label="Operaciones">
-  <div class="cab"><h2>Operaciones</h2><span id="opsCuenta" class="ayuda" style="margin:0"></span>
+<section class="seccion" aria-label="Operaciones">
+  <div class="titulo"><h2>Operaciones</h2><span id="opsCuenta" class="ayuda"></span>
     <span class="sp"></span><a href="/operaciones.csv">bajar todas (CSV)</a>
     <button id="reiniciar" class="b-ghost chico">Reiniciar resultados</button>
     <span id="msgReiniciar" class="msg" role="status" aria-live="polite"></span></div>
@@ -297,32 +338,35 @@ textarea{font:11.5px/1.6 "Geist Mono",ui-monospace,Consolas,monospace;height:94p
   </table></div>
 </section>
 
-<section class="card" aria-label="Registro">
-  <div class="cab"><h2>Registro</h2><span class="sp"></span>
-    <label style="display:flex;align-items:center;gap:7px;margin:0;cursor:pointer"><input type="checkbox" id="auto" checked style="width:auto;margin:0;accent-color:var(--blue)">seguir los nuevos</label></div>
+<section class="seccion" aria-label="Registro">
+  <div class="titulo"><h2>Registro</h2><span class="sp"></span>
+    <label style="display:flex;align-items:center;gap:7px;margin:0;cursor:pointer"><input type="checkbox" id="auto" checked style="width:auto;margin:0;accent-color:var(--hueso)">seguir los nuevos</label></div>
   <div id="logs" tabindex="0"></div>
 </section>
 
-<div class="grid2">
-  <section class="card compacto" aria-label="Ajustes">
-    <div class="cab"><h2>Ajustes</h2></div>
-    <p class="ayuda" style="margin:-4px 0 11px">Se aplican al instante al guardar. Una operación ya abierta mantiene su TP.</p>
-    <div class="form" id="form"></div>
-    <details id="bloqueAv" class="avanzado" hidden>
-      <summary>Avanzado</summary>
-      <div class="form" id="formAv" style="margin-top:11px"></div>
-    </details>
-    <div class="row"><button class="b-main" id="guardar">Guardar ajustes</button><button class="b-ghost" id="deshacer">Deshacer</button><span id="msgAjustes" class="msg" role="status" aria-live="polite"></span></div>
-  </section>
-  <section class="card compacto" aria-label="API de Kalshi">
-    <div class="cab"><h2>API de Kalshi</h2></div>
-    <p class="ayuda" style="margin:-4px 0 11px">Se crean en kalshi.com → Account → API Keys. La private key no se vuelve a mostrar después de guardarla.</p>
-    <div id="keyEstado" class="aviso off">cargando…</div>
-    <label>API key ID<input id="keyId" autocomplete="off" spellcheck="false" placeholder="a1b2c3d4-…"></label>
-    <label style="margin-top:11px">Private key (.pem completo)<textarea id="pem" spellcheck="false" placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;…&#10;-----END RSA PRIVATE KEY-----"></textarea></label>
-    <div class="row"><button class="b-main" id="guardarKey">Guardar y probar</button><span id="msgKey" class="msg" role="status" aria-live="polite"></span></div>
-  </section>
-</div>
+<section class="seccion" aria-label="Ajustes y API">
+  <div class="grid2">
+    <div>
+      <div class="titulo"><h2>Ajustes</h2><span class="ayuda">se aplican al guardar, sin reiniciar</span></div>
+      <div class="form" id="form"></div>
+      <details id="bloqueAv" class="avanzado" hidden>
+        <summary>Avanzado</summary>
+        <div class="form" id="formAv" style="margin-top:12px"></div>
+      </details>
+      <div class="row"><button class="b-main" id="guardar">Guardar ajustes</button><button class="b-ghost" id="deshacer">Deshacer</button><span id="msgAjustes" class="msg" role="status" aria-live="polite"></span></div>
+    </div>
+    <div>
+      <div class="titulo"><h2>API de Kalshi</h2></div>
+      <div id="keyEstado" class="aviso off">cargando</div>
+      <label>API key ID<input id="keyId" autocomplete="off" spellcheck="false" placeholder="a1b2c3d4-…"></label>
+      <label style="margin-top:11px">Private key (.pem completo)<textarea id="pem" spellcheck="false" placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;…&#10;-----END RSA PRIVATE KEY-----"></textarea></label>
+      <p class="ayuda" style="margin:9px 0 0">Se crean en kalshi.com → Account → API Keys. La private key no se vuelve a mostrar después de guardarla.</p>
+      <div class="row"><button class="b-main" id="guardarKey">Guardar y probar</button><span id="msgKey" class="msg" role="status" aria-live="polite"></span></div>
+    </div>
+  </div>
+</section>
+
+<footer class="pie"><span id="uptime"></span></footer>
 </main>
 
 <script>
@@ -358,7 +402,7 @@ function destellar(el, texto, cls) {
 
 let G = null, hoverX = null;   // estado del gráfico para la cruz
 
-const VERDE = '#2ed673', ROJO = '#ff6b6b', NEUTRO = '#8d94a3', TENUE = '#646b7a';
+const VERDE = '#35d07f', ROJO = '#ff5d55', NEUTRO = '#90908c', TENUE = '#7a7a76';
 const BLOQUE_S = 900;
 const angosto = () => window.innerWidth < 640;
 // el lienzo se adapta: si fuera siempre de 880 de ancho, en el movil las etiquetas
@@ -440,17 +484,19 @@ function grafico(v) {
   const xIni = x(g.activo[0][0]);
   if (xIni > X0 + 3) {
     o.push(`<rect x="${X0}" y="${Y0}" width="${(xIni - X0).toFixed(1)}" height="${Y1 - Y0}" fill="url(#rayas)"></rect>`);
-    if (xIni - X0 > (X1 - X0) * 0.12) o.push(`<text x="${((X0 + xIni) / 2).toFixed(1)}" y="${(Y0 + (Y1 - Y0) / 2).toFixed(1)}" text-anchor="middle" fill="${TENUE}" font-size="10.5">sin datos</text>`);
+    if (xIni - X0 > 58) o.push(`<text x="${((X0 + xIni) / 2).toFixed(1)}" y="${(Y0 + (Y1 - Y0) / 2).toFixed(1)}" text-anchor="middle" fill="${TENUE}" font-size="10.5">sin datos</text>`);
   }
 
-  if (g.ventana) o.push(`<rect x="${x(BLOQUE - g.ventana).toFixed(1)}" y="${Y0}" width="${(X1 - x(BLOQUE - g.ventana)).toFixed(1)}" height="${Y1 - Y0}" fill="#4c8dff" opacity="0.05"></rect>`);
+  if (g.ventana) o.push(`<rect x="${x(BLOQUE - g.ventana).toFixed(1)}" y="${Y0}" width="${(X1 - x(BLOQUE - g.ventana)).toFixed(1)}" height="${Y1 - Y0}" fill="#e8e6e1" opacity="0.045"></rect>`);
 
   // umbrales del Delta: se encienden al cumplirse
   if (dm > 0 && ref != null) {
+    const yUlt = corta(ya(ult[1]));
     [[ref + dm, VERDE, '+', -5, ult[1] - ref >= dm], [ref - dm, ROJO, '−', 12, ref - ult[1] >= dm]].forEach(([val, c, sig, dy, activo]) => {
       const y = ya(val), fuera = y < Y0 || y > Y1, yv = corta(y);
+      const tapado = Math.abs(yv - yUlt) < 13;              // la capsula del precio manda
       o.push(`<line x1="${X0}" y1="${yv.toFixed(1)}" x2="${X1}" y2="${yv.toFixed(1)}" stroke="${c}" stroke-width="${activo ? 1.5 : 1}" stroke-dasharray="${fuera ? '2 5' : '5 4'}" opacity="${activo ? 0.85 : 0.28}"></line>`);
-      o.push(`<text x="${X1 - 4}" y="${(yv + dy).toFixed(1)}" text-anchor="end" fill="${activo ? c : TENUE}" font-size="11" font-weight="${activo ? 600 : 400}">${sig}${n(dm, 0)}${fuera ? ' ↕' : ''}${activo ? '  ✓' : ''}</text>`);
+      if (!tapado) o.push(`<text x="${X1 - 4}" y="${(yv + dy).toFixed(1)}" text-anchor="end" fill="${activo ? c : TENUE}" font-size="11" font-weight="${activo ? 600 : 400}">${sig}${n(dm, 0)}${fuera ? ' ↕' : ''}${activo ? '  ✓' : ''}</text>`);
     });
   }
 
@@ -469,7 +515,8 @@ function grafico(v) {
   // la referencia parte el gráfico: neutra, sólida y por encima de todo
   if (ref != null) {
     o.push(`<line x1="${X0}" y1="${yRef.toFixed(1)}" x2="${X1}" y2="${yRef.toFixed(1)}" stroke="${NEUTRO}" stroke-width="1" opacity="0.5"></line>`);
-    o.push(`<text x="${X0 + 4}" y="${(yRef - 5).toFixed(1)}" fill="${NEUTRO}" font-size="11">referencia ${Math.round(ref).toLocaleString('es')}</text>`);
+    const xRef = Math.max(X0 + 4, x(g.activo[0][0]) + 6);   // no se monta sobre la zona rayada
+    o.push(`<text x="${xRef.toFixed(1)}" y="${(yRef - 5).toFixed(1)}" fill="${NEUTRO}" font-size="11">referencia ${Math.round(ref).toLocaleString('es')}</text>`);
   }
 
   // extremos del bloque
@@ -486,12 +533,12 @@ function grafico(v) {
 
   o.push(`<circle cx="${pa[pa.length - 1][0].toFixed(1)}" cy="${pa[pa.length - 1][1].toFixed(1)}" r="6.5" fill="${col}" opacity="0.2"></circle>`);
   o.push(`<circle cx="${pa[pa.length - 1][0].toFixed(1)}" cy="${pa[pa.length - 1][1].toFixed(1)}" r="3.2" fill="${col}"></circle>`);
-  o.push(capsula(ya(ult[1]), Math.round(ult[1]).toLocaleString('es'), col, arriba ? '#03240f' : '#2b0808'));
+  o.push(capsula(ya(ult[1]), Math.round(ult[1]).toLocaleString('es'), col, arriba ? '#062a15' : '#2b0b09'));
 
   // marca de la entrada
   if (g.contrato && g.contrato.length) {
     const xe = x(g.contrato[0][0]);
-    o.push(`<line x1="${xe.toFixed(1)}" y1="${Y0}" x2="${xe.toFixed(1)}" y2="${Y1}" stroke="#e9ebf0" stroke-width="1" opacity="0.28"></line>`);
+    o.push(`<line x1="${xe.toFixed(1)}" y1="${Y0}" x2="${xe.toFixed(1)}" y2="${Y1}" stroke="#e8e6e1" stroke-width="1" opacity="0.3"></line>`);
     o.push(`<text x="${(xe + 5).toFixed(1)}" y="${Y0 + 10}" fill="${NEUTRO}" font-size="10.5">entra</text>`);
   }
 
@@ -504,8 +551,8 @@ function grafico(v) {
   const enVentana = g.ventana ? ult[0] >= BLOQUE - g.ventana : false;
   o.push(`<text x="${X0}" y="${Y1 + 17}" fill="${TENUE}" font-size="10.5">inicio</text>`);
   o.push(`<text x="${X1}" y="${Y1 + 17}" text-anchor="end" fill="${TENUE}" font-size="10.5">cierre</text>`);
-  o.push(`<rect x="${X0}" y="${Y1 + 24}" width="${X1 - X0}" height="3" rx="1.5" fill="#232834"></rect>`);
-  o.push(`<rect x="${X0}" y="${Y1 + 24}" width="${((X1 - X0) * frac).toFixed(1)}" height="3" rx="1.5" fill="${enVentana ? '#4c8dff' : TENUE}" opacity="${enVentana ? 0.9 : 0.5}"></rect>`);
+  o.push(`<rect x="${X0}" y="${Y1 + 24}" width="${X1 - X0}" height="3" rx="1.5" fill="#1f1f21"></rect>`);
+  o.push(`<rect x="${X0}" y="${Y1 + 24}" width="${((X1 - X0) * frac).toFixed(1)}" height="3" rx="1.5" fill="${enVentana ? '#e8e6e1' : TENUE}" opacity="${enVentana ? 0.8 : 0.5}"></rect>`);
 
   o.push('<g id="cruz"></g>');
   return `<svg id="svgG" viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-family:'Geist Mono',ui-monospace,monospace" role="img" aria-label="Índice de BTC durante el bloque: verde por encima de la referencia de ${ref != null ? Math.round(ref) : '–'} y rojo por debajo.">${o.join('')}</svg>`;
@@ -558,14 +605,14 @@ function dibujarCruz() {
   const cx = xx > (X0 + X1) / 2 ? xx - ancho - 10 : xx + 10;
   const cy = Y0 + 4;
   const o = [`<line x1="${xx.toFixed(1)}" y1="${Y0}" x2="${xx.toFixed(1)}" y2="${Y1}" stroke="${NEUTRO}" stroke-width="1" stroke-dasharray="3 3" opacity="0.65"></line>`,
-    `<circle cx="${xx.toFixed(1)}" cy="${ya(pa[1]).toFixed(1)}" r="4" fill="#0d0f14" stroke="${col}" stroke-width="2"></circle>`,
-    `<rect x="${cx.toFixed(1)}" y="${cy}" width="${ancho}" height="${alto}" rx="6" fill="#0a0c10" stroke="#232834"></rect>`,
+    `<circle cx="${xx.toFixed(1)}" cy="${ya(pa[1]).toFixed(1)}" r="4" fill="#0b0b0c" stroke="${col}" stroke-width="2"></circle>`,
+    `<rect x="${cx.toFixed(1)}" y="${cy}" width="${ancho}" height="${alto}" rx="6" fill="#08080a" stroke="#2b2b2e"></rect>`,
     `<text x="${cx + 10}" y="${cy + 15}" fill="${TENUE}" font-size="10.5">minuto ${mm}</text>`];
   filas.forEach(([k, val, c], i) => {
     const y = cy + 30 + i * 15;
     o.push(`<line x1="${cx + 10}" y1="${y - 3.5}" x2="${cx + 21}" y2="${y - 3.5}" stroke="${c}" stroke-width="2"></line>`);
     o.push(`<text x="${cx + 27}" y="${y}" fill="${NEUTRO}" font-size="10.5">${k}</text>`);
-    o.push(`<text x="${cx + ancho - 10}" y="${y}" text-anchor="end" fill="#e9ebf0" font-size="11.5" font-weight="600">${val}</text>`);
+    o.push(`<text x="${cx + ancho - 10}" y="${y}" text-anchor="end" fill="#e8e6e1" font-size="11.5" font-weight="600">${val}</text>`);
   });
   el.innerHTML = o.join('');
 }
@@ -621,10 +668,10 @@ function render(d) {
   destellar($('sSaldo'), d.saldo == null ? '–' : '$' + d.saldo.toFixed(2), 'v num');
   $('sKey').textContent = d.conectado ? 'key ' + d.key_id : 'sin API key';
 
-  $('vivo').innerHTML = d.vivo.map(v => v.mercado ? `<tr><td>${v.activo}</td><td class="num">${esc(v.mercado)}</td>
+  $('vivo').innerHTML = d.vivo.map(v => v.mercado ? `<tr>
     <td class="num">${Math.floor(v.quedan / 60)}:${String(Math.floor(v.quedan % 60)).padStart(2, '0')}</td><td class="num">${n(v.referencia, 2)}</td><td class="num">${n(v.precio, 2)}</td><td class="ayuda num">${v.indice_s == null ? '–' : Math.max(0, v.indice_s).toFixed(0) + ' s'}</td>
-    <td class="num ${v.delta_ok ? 'pos' : ''}">${n(v.delta, 1)}</td><td class="num">${n(v.yes_ask)} / ${n(v.yes_bid)}</td><td class="num">${n(v.no_ask)} / ${n(v.no_bid)}</td>
-    <td>${esc(v.estado)}</td></tr>` : `<tr><td>${v.activo}</td><td colspan="9" class="vacio">esperando datos…</td></tr>`).join('');
+    <td class="num ${clase(v.delta)}">${n(v.delta, 1)}</td><td class="num">${n(v.yes_ask)} / ${n(v.yes_bid)}</td><td class="num">${n(v.no_ask)} / ${n(v.no_bid)}</td>
+    <td>${esc(v.estado)}</td></tr>` : `<tr><td colspan="8" class="vacio">esperando datos…</td></tr>`).join('');
 
   // cabecera-instrumento: lo que se mira cada segundo
   const vc = d.vivo.find(v => v.mercado);
