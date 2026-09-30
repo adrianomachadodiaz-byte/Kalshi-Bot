@@ -938,6 +938,7 @@ function render(d) {
 
   const ra = $('resumenAjustes'), a = d.ajustes;
   if (ra) ra.textContent = [a.activos, 'Delta ' + n(a.delta, 0), 'Delay ' + a.delay,
+    'ritmo ' + n(d.ritmo, 2) + ' s',
     n(a.entrada_min, 2) + '\u2013' + n(a.entrada_max, 2), 'TP +' + n(a.tp, 2),
     a.exit == null || a.exit === '' ? 'sin Exit' : 'Exit ' + n(a.exit, 2)].join(' \u00b7 ');
 

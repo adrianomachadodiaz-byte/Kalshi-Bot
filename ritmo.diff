@@ -1,0 +1,271 @@
+diff --git a/bot.py b/bot.py
+index c965e46..4dec10b 100644
+--- a/bot.py
++++ b/bot.py
+@@ -37,7 +37,8 @@ DATA_DIR = Path(env("DATA_DIR", "/data" if os.environ.get("RAILWAY_ENVIRONMENT")
+ REST_URL = env("KALSHI_REST_URL", "https://api.elections.kalshi.com/trade-api/v2")
+ INDICE_URL = env("KALSHI_INDICE_URL", INDICE_URL_DEF)    # feed público del índice ({activo} = btc/eth)
+ ACTIVOS_VALIDOS = ("BTC", "ETH")
+-CICLO = float(env("CICLO_S", "0.5"))     # segundos entre fotos: con qué rapidez reacciona el stop y la entrada
++CICLO = float(env("CICLO_S", "0.25"))    # valor inicial; manda el del panel (campo "ritmo")
++CICLO_INDICE = float(env("CICLO_INDICE_S", "1.0"))   # el índice avanza cada 2-3 s: pedirlo más rápido es tirar peticiones
+ PASO_GRAFICO = 1                         # segundos entre puntos de la serie que dibuja el panel
+ 
+ # ---------------------------------------------------------------- ajustes (panel > variables de Railway > defecto)
+@@ -56,6 +57,8 @@ CAMPOS = [
+     ("meta_ganancia_dia", "num", 0.0, "Meta ($)", "0 = sin meta", "av"),
+     ("desliz_entrada", "num", 0.02, "Deslizamiento", "sobre el ask", "av"),
+     ("espera_entrada", "num", 2.0, "Espera al entrar (s)", "0 = IOC; 2 = deja la orden puesta", "av"),
++    ("ritmo", "num", 0.25, "Ritmo (s)", "cada cuánto mira el ask", "av"),
++    ("ritmo_indice", "num", 1.0, "Ritmo índice (s)", "el feed avanza cada 2-3 s", "av"),
+ ]
+ 
+ 
+@@ -101,6 +104,12 @@ def validar(crudo):
+         err["tp"] = f"entrada máxima + TP pasa de 0.99 ({v['entrada_max'] + v['tp']:.2f})"
+     if v["exit"] is not None and not 0 < v["exit"] < v["entrada_min"]:
+         err["exit"] = "tiene que ser menor que la entrada mínima"
++    if not 0.1 <= v["ritmo"] <= 3:
++        err["ritmo"] = "entre 0.1 y 3 segundos"
++    if not 0.25 <= v["ritmo_indice"] <= 10:
++        err["ritmo_indice"] = "entre 0.25 y 10 segundos"
++    elif v["ritmo_indice"] > Precios.MAX_ATRASO - 1:
++        err["ritmo_indice"] = f"tiene que ser menor que {Precios.MAX_ATRASO - 1:g} s o el candado del índice salta solo"
+     if v["breakeven"] is not None and not 0 < v["breakeven"] < v["tp"]:
+         err["breakeven"] = "entre 0 y el TP"
+     for d in ("max_perdida_dia", "meta_ganancia_dia"):
+@@ -232,7 +241,7 @@ class Precios:
+         """Precio del índice, o None si no hay uno fresco (entonces el bot no opera)."""
+         ahora = time.time()
+         ts, p, atraso = self.cache.get(activo, (0.0, None, None))
+-        if ahora - ts < 0.5:                       # el feed cambia una vez por segundo
++        if ahora - ts < self.bot.ciclo_indice:     # el archivo solo avanza cada 2-3 s (medido el 30-sep-2026)
+             return p
+         try:
+             precio, edad, serie = precio_indice(self.s, activo, INDICE_URL)
+@@ -331,12 +340,15 @@ class Bot:
+         self.ej = None                       # EjecutorReal cuando hay API key
+         self.key_id = ""
+         self.mercados = Mercados(self.k)
++        self.ciclo = CICLO                  # los cambia aplicar() al guardar en el panel
++        self.ciclo_indice = CICLO_INDICE
+         self.precios = Precios(self)
+         self.noticias = Noticias()
+         self.op = Operador({}, None, self.estado, self.registro, 1)
+         self.activos, self.cfgs = [], {}
+         self.aplicar(self.ajustes.valores)
+         self.preparado, self.visto, self.vista, self.historia = {}, {}, {}, {}
++        self.ultima_vuelta = 0.0
+         self.ultimo_liquidar = 0.0
+         self.saldo_cache = (0.0, None)
+         key_id, pem = self.claves.leer()
+@@ -359,11 +371,14 @@ class Bot:
+             self.op.contratos = v["contratos"]
+             self.op.max_perdida_dia = v["max_perdida_dia"]
+             self.op.meta_dia = v["meta_ganancia_dia"]
++            self.ciclo = v["ritmo"]
++            self.ciclo_indice = v["ritmo_indice"]
+             if self.ej:
+                 self.ej.contratos, self.ej.desliz, self.ej.n_activos = v["contratos"], v["desliz_entrada"], len(activos)
+                 self.ej.espera = v["espera_entrada"]
+         for a, c in self.cfgs.items():
+-            log(f"ajustes {a}: {c.texto()} · {v['contratos']:g} contratos")
++            log(f"ajustes {a}: {c.texto()} · {v['contratos']:g} contratos · "
++                f"ritmo {v['ritmo']:g} s / índice {v['ritmo_indice']:g} s")
+ 
+     def conectar(self, key_id, pem):
+         """Prueba la API key pidiendo el saldo. (ok, mensaje)."""
+@@ -472,9 +487,10 @@ class Bot:
+ 
+     def correr(self):
+         log(f"BOT INICIADO | {'APAGADO' if self.estado.pausado else 'ENCENDIDO'} | datos en {DATA_DIR} | "
+-            f"una foto cada {CICLO:g} s")
++            f"una foto cada {self.ciclo:g} s | índice cada {self.ciclo_indice:g} s")
+         while True:
+             t0 = time.time()
++            ciclo = self.ciclo                      # se relee cada vuelta: el panel lo cambia en caliente
+             for a in list(dict.fromkeys(self.activos + list(self.estado.abiertas))):
+                 try:
+                     self.paso(a)
+@@ -484,7 +500,9 @@ class Bot:
+                 self.liquidar()
+             except Exception as e:  # noqa: BLE001
+                 log_cada("liquidar", f"error al liquidar: {e}")
+-            time.sleep(max(0.05, CICLO - (time.time() - t0)))
++            tardo = time.time() - t0
++            self.ultima_vuelta = tardo              # lo enseña el panel
++            time.sleep(max(0.02, ciclo - tardo))
+ 
+     # ------------------------------------------------------------------ para el panel
+     def resumen_json(self):
+@@ -538,6 +556,7 @@ class Bot:
+             key_id=(self.key_id[:4] + "…" + self.key_id[-4:]) if len(self.key_id) > 8 else ("configurada" if self.key_id else ""),
+             saldo=saldo, limite_diario=self.op.limite_diario(), aviso_precio=self.precios.nota,
+             servidor_s=ahora - self.inicio,
++            ritmo=self.ciclo, ritmo_indice=self.ciclo_indice, vuelta_s=round(self.ultima_vuelta, 3),
+             encendido_s=(ahora - self.estado.encendido_desde) if self.estado.encendido_desde and not self.estado.pausado else None,
+             total=self.registro.resumen(), hoy=self.registro.resumen(hoy), vivo=vivo,
+             abiertas=[dict(activo=o.activo, lado=o.lado.upper(), contratos=o.abiertos(), entrada=o.entrada,
+diff --git a/panel.html b/panel.html
+index a8e5429..f513a67 100644
+--- a/panel.html
++++ b/panel.html
+@@ -938,6 +938,7 @@ function render(d) {
+ 
+   const ra = $('resumenAjustes'), a = d.ajustes;
+   if (ra) ra.textContent = [a.activos, 'Delta ' + n(a.delta, 0), 'Delay ' + a.delay,
++    'ritmo ' + n(d.ritmo, 2) + ' s',
+     n(a.entrada_min, 2) + '\u2013' + n(a.entrada_max, 2), 'TP +' + n(a.tp, 2),
+     a.exit == null || a.exit === '' ? 'sin Exit' : 'Exit ' + n(a.exit, 2)].join(' \u00b7 ');
+ 
+diff --git a/probar_ritmo.py b/probar_ritmo.py
+new file mode 100644
+index 0000000..ab48f5c
+--- /dev/null
++++ b/probar_ritmo.py
+@@ -0,0 +1,145 @@
++"""Comprueba con reloj que el ciclo corre al ritmo configurado y cuenta las peticiones de verdad.
++
++No lee el código: levanta un Kalshi falso que duerme lo que tarda el de verdad (89 ms el libro,
++78 ms el índice; medido el 30-sep-2026), deja correr el bot y cronometra las vueltas.
++
++    python probar_ritmo.py            # prueba 0.25 y 1.0 (lo que trae de fábrica)
++    python probar_ritmo.py 0.5 2.0    # ritmo del libro y del índice a mano
++"""
++import json
++import math
++import os
++import shutil
++import statistics
++import sys
++import threading
++import time
++from datetime import datetime, timezone
++from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
++
++AQUI = os.path.dirname(os.path.abspath(__file__))
++sys.path.insert(0, AQUI)
++
++LAT_KALSHI = float(os.environ.get("LAT_KALSHI", "0.089"))
++LAT_INDICE = float(os.environ.get("LAT_INDICE", "0.078"))
++PUERTO = 8973
++CIERRE = (int(time.time()) // 900 + 1) * 900
++CUENTA, LOCK = {}, threading.Lock()
++
++
++def contar(que):
++    with LOCK:
++        CUENTA[que] = CUENTA.get(que, 0) + 1
++
++
++class Falso(BaseHTTPRequestHandler):
++    protocol_version = "HTTP/1.1"
++
++    def log_message(self, *a):
++        pass
++
++    def do_GET(self):
++        ruta = self.path.split("?")[0]
++        if ruta.endswith("_current.json"):
++            contar("indice")
++            time.sleep(LAT_INDICE)
++            ahora = time.time()
++            serie = [84450 + 40 * math.sin((ahora - 59 + i) / 90) for i in range(60)]
++            return self._json({"maturity_ts_ms": int(ahora * 1000),
++                               "candlesticks": {"1M": {"close": serie[-1]}},
++                               "timeseries": {"second": serie}})
++        if ruta.endswith("/markets"):
++            contar("markets")
++            time.sleep(LAT_KALSHI)
++            iso = lambda t: datetime.fromtimestamp(t, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
++            return self._json({"markets": [{"ticker": "KXBTC15M-PRUEBA", "close_time": iso(CIERRE),
++                                            "open_time": iso(CIERRE - 900), "floor_strike": 84450.0,
++                                            "exchange_index": 2,
++                                            "price_ranges": [{"start": 0, "end": 1, "step": 0.01}]}]})
++        if ruta.endswith("/orderbook"):
++            contar("orderbook")
++            time.sleep(LAT_KALSHI)
++            return self._json({"orderbook": {"yes": [[74, 100]], "no": [[21, 100]]}})
++        contar("otra:" + ruta)
++        return self._json({}, 404)
++
++    def _json(self, o, codigo=200):
++        b = json.dumps(o).encode()
++        self.send_response(codigo)
++        self.send_header("Content-Type", "application/json")
++        self.send_header("Content-Length", str(len(b)))
++        self.end_headers()
++        self.wfile.write(b)
++
++
++def medir(ritmo, ritmo_indice, segundos=20.0):
++    CUENTA.clear()
++    datos = "/tmp/probar_ritmo_datos"
++    shutil.rmtree(datos, ignore_errors=True)
++    os.makedirs(datos)
++    os.environ.update(ACCESS_TOKEN="x", PORT="8974", DATA_DIR=datos, NOTICIAS="0",
++                      KALSHI_REST_URL=f"http://127.0.0.1:{PUERTO}/trade-api/v2",
++                      KALSHI_INDICE_URL=f"http://127.0.0.1:{PUERTO}/crypto/{{activo}}_current.json")
++    import bot as B
++
++    b = B.Bot()
++    b.op.pausar(True)                       # solo lectura: la prueba nunca manda órdenes
++    b.ciclo, b.ciclo_indice = ritmo, ritmo_indice
++
++    marcas, original = [], b.paso
++
++    def cronometrado(activo):
++        marcas.append(time.monotonic())
++        return original(activo)
++
++    b.paso = cronometrado
++    threading.Thread(target=b.correr, daemon=True).start()
++    time.sleep(segundos)
++
++    per = sorted(round((marcas[i + 1] - marcas[i]) * 1000) for i in range(len(marcas) - 1))
++    kalshi = CUENTA.get("orderbook", 0) + CUENTA.get("markets", 0)
++    return {
++        "ritmo pedido (s)": ritmo,
++        "ritmo índice pedido (s)": ritmo_indice,
++        "vueltas": len(marcas),
++        "periodo real ms": {"p50": per[len(per) // 2], "p90": per[int(len(per) * 0.9)],
++                            "min": per[0], "max": per[-1], "media": round(statistics.mean(per))},
++        "peticiones": dict(CUENTA),
++        "peticiones Kalshi/s": round(kalshi / segundos, 2),
++        "peticiones índice/s": round(CUENTA.get("indice", 0) / segundos, 2),
++    }
++
++
++def main():
++    srv = ThreadingHTTPServer(("127.0.0.1", PUERTO), Falso)
++    threading.Thread(target=srv.serve_forever, daemon=True).start()
++    time.sleep(0.3)
++
++    ritmo = float(sys.argv[1]) if len(sys.argv) > 1 else 0.25
++    ritmo_indice = float(sys.argv[2]) if len(sys.argv) > 2 else 1.0
++    segundos = float(sys.argv[3]) if len(sys.argv) > 3 else 20.0
++
++    r = medir(ritmo, ritmo_indice, segundos)
++    print(json.dumps(r, indent=1, ensure_ascii=False))
++
++    fallos = []
++    p = r["periodo real ms"]
++    objetivo = ritmo * 1000
++    # el reloj real manda: el periodo medido tiene que caer a menos de un 20% del pedido
++    if abs(p["p50"] - objetivo) > objetivo * 0.2:
++        fallos.append(f"el periodo mediano ({p['p50']} ms) no se parece al pedido ({objetivo:.0f} ms)")
++    if p["p90"] > objetivo * 1.5:
++        fallos.append(f"el p90 ({p['p90']} ms) se pasa un 50% del pedido")
++    # el índice no se pide más rápido que su propio ritmo
++    tope_indice = segundos / ritmo_indice * 1.15 + 1
++    if CUENTA.get("indice", 0) > tope_indice:
++        fallos.append(f"el índice se pidió {CUENTA.get('indice')} veces, más de las {tope_indice:.0f} que tocan")
++
++    print("\nRESULTADO:", "BIEN" if not fallos else "MAL")
++    for f in fallos:
++        print(" -", f)
++    return 1 if fallos else 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())

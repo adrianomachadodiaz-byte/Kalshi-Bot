@@ -37,7 +37,8 @@ DATA_DIR = Path(env("DATA_DIR", "/data" if os.environ.get("RAILWAY_ENVIRONMENT")
 REST_URL = env("KALSHI_REST_URL", "https://api.elections.kalshi.com/trade-api/v2")
 INDICE_URL = env("KALSHI_INDICE_URL", INDICE_URL_DEF)    # feed público del índice ({activo} = btc/eth)
 ACTIVOS_VALIDOS = ("BTC", "ETH")
-CICLO = float(env("CICLO_S", "0.5"))     # segundos entre fotos: con qué rapidez reacciona el stop y la entrada
+CICLO = float(env("CICLO_S", "0.25"))    # valor inicial; manda el del panel (campo "ritmo")
+CICLO_INDICE = float(env("CICLO_INDICE_S", "1.0"))   # el índice avanza cada 2-3 s: pedirlo más rápido es tirar peticiones
 PASO_GRAFICO = 1                         # segundos entre puntos de la serie que dibuja el panel
 
 # ---------------------------------------------------------------- ajustes (panel > variables de Railway > defecto)
@@ -56,6 +57,8 @@ CAMPOS = [
     ("meta_ganancia_dia", "num", 0.0, "Meta ($)", "0 = sin meta", "av"),
     ("desliz_entrada", "num", 0.02, "Deslizamiento", "sobre el ask", "av"),
     ("espera_entrada", "num", 2.0, "Espera al entrar (s)", "0 = IOC; 2 = deja la orden puesta", "av"),
+    ("ritmo", "num", 0.25, "Ritmo (s)", "cada cuánto mira el ask", "av"),
+    ("ritmo_indice", "num", 1.0, "Ritmo índice (s)", "el feed avanza cada 2-3 s", "av"),
 ]
 
 
@@ -101,6 +104,12 @@ def validar(crudo):
         err["tp"] = f"entrada máxima + TP pasa de 0.99 ({v['entrada_max'] + v['tp']:.2f})"
     if v["exit"] is not None and not 0 < v["exit"] < v["entrada_min"]:
         err["exit"] = "tiene que ser menor que la entrada mínima"
+    if not 0.1 <= v["ritmo"] <= 3:
+        err["ritmo"] = "entre 0.1 y 3 segundos"
+    if not 0.25 <= v["ritmo_indice"] <= 10:
+        err["ritmo_indice"] = "entre 0.25 y 10 segundos"
+    elif v["ritmo_indice"] > Precios.MAX_ATRASO - 1:
+        err["ritmo_indice"] = f"tiene que ser menor que {Precios.MAX_ATRASO - 1:g} s o el candado del índice salta solo"
     if v["breakeven"] is not None and not 0 < v["breakeven"] < v["tp"]:
         err["breakeven"] = "entre 0 y el TP"
     for d in ("max_perdida_dia", "meta_ganancia_dia"):
@@ -232,7 +241,7 @@ class Precios:
         """Precio del índice, o None si no hay uno fresco (entonces el bot no opera)."""
         ahora = time.time()
         ts, p, atraso = self.cache.get(activo, (0.0, None, None))
-        if ahora - ts < 0.5:                       # el feed cambia una vez por segundo
+        if ahora - ts < self.bot.ciclo_indice:     # el archivo solo avanza cada 2-3 s (medido el 30-sep-2026)
             return p
         try:
             precio, edad, serie = precio_indice(self.s, activo, INDICE_URL)
@@ -331,12 +340,15 @@ class Bot:
         self.ej = None                       # EjecutorReal cuando hay API key
         self.key_id = ""
         self.mercados = Mercados(self.k)
+        self.ciclo = CICLO                  # los cambia aplicar() al guardar en el panel
+        self.ciclo_indice = CICLO_INDICE
         self.precios = Precios(self)
         self.noticias = Noticias()
         self.op = Operador({}, None, self.estado, self.registro, 1)
         self.activos, self.cfgs = [], {}
         self.aplicar(self.ajustes.valores)
         self.preparado, self.visto, self.vista, self.historia = {}, {}, {}, {}
+        self.ultima_vuelta = 0.0
         self.ultimo_liquidar = 0.0
         self.saldo_cache = (0.0, None)
         key_id, pem = self.claves.leer()
@@ -359,11 +371,14 @@ class Bot:
             self.op.contratos = v["contratos"]
             self.op.max_perdida_dia = v["max_perdida_dia"]
             self.op.meta_dia = v["meta_ganancia_dia"]
+            self.ciclo = v["ritmo"]
+            self.ciclo_indice = v["ritmo_indice"]
             if self.ej:
                 self.ej.contratos, self.ej.desliz, self.ej.n_activos = v["contratos"], v["desliz_entrada"], len(activos)
                 self.ej.espera = v["espera_entrada"]
         for a, c in self.cfgs.items():
-            log(f"ajustes {a}: {c.texto()} · {v['contratos']:g} contratos")
+            log(f"ajustes {a}: {c.texto()} · {v['contratos']:g} contratos · "
+                f"ritmo {v['ritmo']:g} s / índice {v['ritmo_indice']:g} s")
 
     def conectar(self, key_id, pem):
         """Prueba la API key pidiendo el saldo. (ok, mensaje)."""
@@ -472,9 +487,10 @@ class Bot:
 
     def correr(self):
         log(f"BOT INICIADO | {'APAGADO' if self.estado.pausado else 'ENCENDIDO'} | datos en {DATA_DIR} | "
-            f"una foto cada {CICLO:g} s")
+            f"una foto cada {self.ciclo:g} s | índice cada {self.ciclo_indice:g} s")
         while True:
             t0 = time.time()
+            ciclo = self.ciclo                      # se relee cada vuelta: el panel lo cambia en caliente
             for a in list(dict.fromkeys(self.activos + list(self.estado.abiertas))):
                 try:
                     self.paso(a)
@@ -484,7 +500,9 @@ class Bot:
                 self.liquidar()
             except Exception as e:  # noqa: BLE001
                 log_cada("liquidar", f"error al liquidar: {e}")
-            time.sleep(max(0.05, CICLO - (time.time() - t0)))
+            tardo = time.time() - t0
+            self.ultima_vuelta = tardo              # lo enseña el panel
+            time.sleep(max(0.02, ciclo - tardo))
 
     # ------------------------------------------------------------------ para el panel
     def resumen_json(self):
@@ -538,6 +556,7 @@ class Bot:
             key_id=(self.key_id[:4] + "…" + self.key_id[-4:]) if len(self.key_id) > 8 else ("configurada" if self.key_id else ""),
             saldo=saldo, limite_diario=self.op.limite_diario(), aviso_precio=self.precios.nota,
             servidor_s=ahora - self.inicio,
+            ritmo=self.ciclo, ritmo_indice=self.ciclo_indice, vuelta_s=round(self.ultima_vuelta, 3),
             encendido_s=(ahora - self.estado.encendido_desde) if self.estado.encendido_desde and not self.estado.pausado else None,
             total=self.registro.resumen(), hoy=self.registro.resumen(hoy), vivo=vivo,
             abiertas=[dict(activo=o.activo, lado=o.lado.upper(), contratos=o.abiertos(), entrada=o.entrada,
