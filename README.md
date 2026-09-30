@@ -39,6 +39,10 @@ Todo se maneja desde el panel (el dominio de Railway, con tu clave `ACCESS_TOKEN
   con las líneas de ±Delta que se encienden al cumplirse, la ventana de entrada sombreada, el máximo y el mínimo
   del bloque y, si hay una operación abierta, una barra que muestra dónde está el bid entre el stop y el TP.
   Pasando el ratón sale la cruz con el precio y el Delta de ese segundo.
+- **Próximas noticias**: el calendario económico de ForexFactory (feed público semanal, sin clave). Muestra los
+  próximos eventos de impacto alto y medio del USD, con cuánto falta, la hora, el pronóstico y el dato anterior.
+  Se pide cada 20 minutos en un hilo aparte: si falla, el panel lo dice y el bot sigue igual. Se apaga con
+  `NOTICIAS=0`; con `NOTICIAS_MONEDAS` cambias las divisas (por defecto `USD`).
 - **Registro**: los últimos mensajes del bot (entradas, TP, stops, errores), se actualizan cada segundo.
 - **Operaciones**: las últimas 50 y un botón para bajarlas todas en CSV.
 - **Ajustes**: contratos, Delta, Delay, rango de entrada, TP, Exit, BreakEven, límites del día y deslizamiento.
@@ -77,6 +81,9 @@ El panel manda: lo que guardes ahí gana sobre estas variables. Sirven solo como
 | `CICLO_S` | Segundos entre fotos (por defecto `0.5`): con qué rapidez reaccionan la entrada y el stop |
 | `KALSHI_INDICE_URL` | URL del feed del índice (por defecto el público de Kalshi; `{activo}` se cambia por btc/eth) |
 | `ACTIVOS`, `DELTA`, `DELAY`, `ENTRADA_MIN`, `ENTRADA_MAX`, `TP`, `EXIT`, `CONTRATOS`, `BREAKEVEN`, `MAX_PERDIDA_DIA`, `META_GANANCIA_DIA`, `DESLIZ_ENTRADA` | Ajustes iniciales (los mismos del panel) |
+| `NOTICIAS` | `0` apaga el calendario de ForexFactory |
+| `NOTICIAS_MONEDAS` | Divisas del calendario, separadas por coma (por defecto `USD`) |
+| `NOTICIAS_URL` | Feed del calendario (por defecto el público semanal de ForexFactory) |
 | `DATA_DIR` | Carpeta del Volume (por defecto `/data`) |
 
 ## Cosas a saber

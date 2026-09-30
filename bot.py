@@ -266,6 +266,59 @@ class Precios:
         return precio
 
 # ---------------------------------------------------------------- bot
+class Noticias:
+    """Calendario económico de ForexFactory (feed público semanal, sin clave).
+
+    Se pide en un hilo aparte cada 20 minutos: si falla, el panel simplemente no
+    muestra noticias. Nunca bloquea ni detiene el bot.
+    """
+
+    URL = env("NOTICIAS_URL", "https://nfs.faireconomy.media/ff_calendar_thisweek.json")
+    MONEDAS = {m.strip().upper() for m in env("NOTICIAS_MONEDAS", "USD").split(",") if m.strip()}
+    CADA = 1200
+
+    def __init__(self):
+        self.eventos = []          # todos los de la semana, ya ordenados
+        self.error = ""
+        self.cuando = 0.0
+        self.s = requests.Session()
+        if env("NOTICIAS", "1") != "0":
+            threading.Thread(target=self._bucle, daemon=True).start()
+
+    def _bucle(self):
+        while True:
+            try:
+                self._bajar()
+            except Exception as e:                       # una noticia no tumba el bot
+                self.error = str(e)[:120]
+                log_cada("noticias", 900, f"no pude leer el calendario de ForexFactory: {self.error}")
+            time.sleep(self.CADA)
+
+    def _bajar(self):
+        r = self.s.get(self.URL, timeout=10, headers={"User-Agent": "kalshi-bot/1.0"})
+        r.raise_for_status()
+        fuera = []
+        for e in r.json():
+            imp = str(e.get("impact") or "").capitalize()
+            mon = str(e.get("country") or e.get("currency") or "").upper()
+            if self.MONEDAS and mon not in self.MONEDAS:
+                continue
+            if imp not in ("High", "Medium"):
+                continue
+            try:
+                ts = datetime.fromisoformat(str(e.get("date")).replace("Z", "+00:00")).timestamp()
+            except Exception:
+                continue
+            fuera.append(dict(titulo=str(e.get("title") or "")[:80], moneda=mon, impacto=imp, ts=ts,
+                              previsto=str(e.get("forecast") or ""), anterior=str(e.get("previous") or "")))
+        fuera.sort(key=lambda x: x["ts"])
+        self.eventos, self.error, self.cuando = fuera, "", time.time()
+
+    def proximas(self, cuantas=4):
+        ahora = time.time()
+        return [dict(e, faltan=e["ts"] - ahora) for e in self.eventos if e["ts"] > ahora - 900][:cuantas]
+
+
 class Bot:
     def __init__(self):
         DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -279,6 +332,7 @@ class Bot:
         self.key_id = ""
         self.mercados = Mercados(self.k)
         self.precios = Precios(self)
+        self.noticias = Noticias()
         self.op = Operador({}, None, self.estado, self.registro, 1)
         self.activos, self.cfgs = [], {}
         self.aplicar(self.ajustes.valores)
@@ -491,6 +545,7 @@ class Bot:
             pendientes=len(self.estado.pendientes),
             operaciones=filas[-50:][::-1], logs=list(operador.LOGS)[-250:],
             ajustes=self.ajustes.valores,
+            noticias=self.noticias.proximas(), noticias_error=self.noticias.error,
             campos=[dict(clave=c, tipo=t, etiqueta=e, ayuda=h, seccion=sec) for c, t, _, e, h, sec in CAMPOS])
 
 

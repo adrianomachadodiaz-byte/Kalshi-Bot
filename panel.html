@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="description" content="Terminal del bot de Kalshi: bloque en vivo, resultado, operaciones y ajustes.">
 <meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#021024">
+<meta name="theme-color" content="#0a0b0a">
 <title>Kalshi Bot</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23021024'/%3E%3Cpath d='M6 21 L13 13 L18 18 L26 8' fill='none' stroke='%237DA0CA' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a0b0a'/%3E%3Cpath d='M6 21 L13 13 L18 18 L26 8' fill='none' stroke='%232fe07a' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;450;500;600&family=Geist+Mono:wght@400;450;500;600&display=swap">
@@ -17,40 +17,41 @@
    significado. Sin sombras fuertes, sin degradados llamativos, bordes de 1 px.
    ========================================================================== */
 :root{
-  --n0:#021024;            /* fondo */
-  --n1:#04182f;            /* superficie */
-  --n2:#062a55;            /* superficie elevada */
-  --linea:#0b2f5e;         /* borde sutil */
-  --linea-2:#134277;       /* borde visible */
-  --azul:#5483B3;          /* primario */
-  --azul-c:#7DA0CA;        /* primario claro */
-  --claro:#C1E8FF;         /* cifras y títulos */
-  --texto:#dbeaf8;
-  --gris:#93b0cc;          /* secundario */
-  --tenue:#6f8dab;         /* terciario */
-  --sube:#3fbf9a;          /* a favor, apagado a propósito */
-  --baja:#e2707f;          /* en contra */
-  --avisa:#d6a45a;         /* pide atención */
-  --sube-f:rgba(63,191,154,.12); --baja-f:rgba(226,112,127,.12); --avisa-f:rgba(214,164,90,.10);
-  --azul-f:rgba(84,131,179,.14);
+  --n0:#0a0b0a;            /* fondo, negro */
+  --n1:#121412;            /* superficie de tarjeta */
+  --n2:#1a1d1a;            /* superficie elevada */
+  --linea:#232722;         /* borde sutil */
+  --linea-2:#32372f;       /* borde visible */
+  --azul:#31362e;          /* controles: gris, no verde */
+  --azul-c:#434a3f;        /* controles, al pasar el ratón */
+  --azul-t:#e6e9e5;        /* texto sobre control */
+  --claro:#ffffff;         /* cifras y títulos */
+  --texto:#e6e9e5;
+  --gris:#9aa197;          /* secundario */
+  --tenue:#6f776c;         /* terciario */
+  --sube:#2fe07a;          /* a favor */
+  --baja:#ff5f5f;          /* en contra */
+  --avisa:#f0b429;         /* pide atención */
+  --sube-f:rgba(47,224,122,.12); --baja-f:rgba(255,95,95,.12); --avisa-f:rgba(240,180,41,.12);
+  --azul-f:rgba(230,233,229,.07);
   --estado:var(--tenue);
-  --r:10px; --r-s:7px;
+  --r:15px; --r-s:9px;
   --sal:cubic-bezier(.16,1,.3,1);
   --t:160ms var(--sal); --t-rapido:120ms var(--sal);
   --mono:"Geist Mono",ui-monospace,Menlo,Consolas,monospace;
-  --lateral:212px; --cabeza:58px;
+  --lateral:68px; --cabeza:58px;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--n0);color:var(--texto);
   font:14.5px/1.5 Geist,system-ui,-apple-system,"Segoe UI",sans-serif;
   -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
-::selection{background:rgba(84,131,179,.35);color:#fff}
+::selection{background:rgba(230,233,229,.22);color:#fff}
 *{scrollbar-color:var(--linea-2) transparent;scrollbar-width:thin}
 ::-webkit-scrollbar{width:9px;height:9px}
 ::-webkit-scrollbar-thumb{background:var(--linea-2);border-radius:5px;border:2.5px solid var(--n0)}
 ::-webkit-scrollbar-track{background:transparent}
-:focus-visible{outline:1.5px solid var(--azul-c);outline-offset:2px;border-radius:4px}
-.salta{position:absolute;left:-9999px;top:0;background:var(--azul);color:#021024;padding:9px 15px;border-radius:0 0 8px 0;z-index:40}
+:focus-visible{outline:1.5px solid var(--gris);outline-offset:2px;border-radius:4px}
+.salta{position:absolute;left:-9999px;top:0;background:var(--gris);color:#0a0b0a;padding:9px 15px;border-radius:0 0 8px 0;z-index:40}
 .salta:focus{left:0}
 .barra-estado{position:fixed;top:0;left:0;right:0;height:2px;z-index:30;background:var(--estado);
   transition:background 280ms var(--sal)}
@@ -63,42 +64,40 @@ body{margin:0;background:var(--n0);color:var(--texto);
 .pos{color:var(--sube)}.neg{color:var(--baja)}
 @keyframes destello{from{color:var(--azul-c)}to{color:inherit}}
 .destello{animation:destello 620ms var(--sal)}
-a{color:var(--azul-c);text-decoration:none;border-bottom:1px solid transparent;transition:border-color var(--t)}
-a:hover{border-bottom-color:var(--azul-c)}
+a{color:var(--texto);text-decoration:none;border-bottom:1px solid var(--linea-2);transition:border-color var(--t),color var(--t)}
+a:hover{color:var(--claro);border-bottom-color:var(--gris)}
 h1{font-size:14.5px;margin:0;font-weight:600;letter-spacing:-.01em;color:var(--claro)}
 h2{font-size:13px;margin:0;font-weight:500;letter-spacing:.02em;color:var(--texto)}
 
 /* ---------------------------------------------------------------- lateral */
 .lateral{position:fixed;left:0;top:0;bottom:0;width:var(--lateral);z-index:20;
   background:var(--n0);border-right:1px solid var(--linea);
-  display:flex;flex-direction:column;padding:0 12px 14px}
-.logo{display:flex;align-items:center;gap:9px;height:var(--cabeza);padding-left:6px;flex:none}
+  display:flex;flex-direction:column;align-items:center;padding:0 0 14px}
+.logo{display:flex;align-items:center;justify-content:center;height:var(--cabeza);flex:none}
+.oculto{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .logo svg{flex:none}
-.nav{display:flex;flex-direction:column;gap:2px;margin-top:22px}
-.nav .rot{padding:0 8px 8px;font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--tenue);opacity:.75}
-.nav a{display:flex;align-items:center;gap:11px;padding:8px 9px;border-radius:var(--r-s);
-  font-size:13px;color:var(--gris);border:0;position:relative;transition:color var(--t),background var(--t)}
-.nav a svg{flex:none;opacity:.8;transition:opacity var(--t)}
-.nav a:hover{color:var(--claro);background:rgba(84,131,179,.07)}
-.nav a:hover svg{opacity:1}
-.nav a[aria-current="true"]{color:var(--claro);background:var(--azul-f)}
-.nav a[aria-current="true"] svg{opacity:1;color:var(--azul-c)}
-.nav a[aria-current="true"]::before{content:"";position:absolute;left:-12px;top:9px;bottom:9px;width:2px;
-  border-radius:0 2px 2px 0;background:var(--azul-c)}
-.nav + .nav{margin-top:26px}
-.lat-pie{margin-top:auto;padding:12px 9px 0;border-top:1px solid var(--linea);font-size:11px;color:var(--tenue)}
-.lat-pie .num{color:var(--gris)}
-.abrir-nav{display:none}
+.nav{display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:18px}
+.nav .rot{display:none}
+.nav a{display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:12px;
+  color:var(--gris);border:0;position:relative;transition:color var(--t),background var(--t),box-shadow var(--t)}
+.nav a span{position:absolute;left:calc(100% + 10px);white-space:nowrap;padding:5px 9px;border-radius:7px;
+  background:var(--n2);border:1px solid var(--linea);color:var(--texto);font-size:12px;
+  opacity:0;pointer-events:none;transform:translateX(-4px);transition:opacity var(--t),transform var(--t);z-index:5}
+.nav a:hover{color:var(--claro);background:var(--n1)}
+.nav a:hover span,.nav a:focus-visible span{opacity:1;transform:none}
+.nav a[aria-current="true"]{background:var(--azul-c);color:var(--claro)}
+.nav + .nav{margin-top:14px;padding-top:14px;border-top:1px solid var(--linea);width:40px}
+.lat-pie{display:none}
 
 /* ---------------------------------------------------------------- cabecera */
 .consola{position:fixed;top:0;left:var(--lateral);right:0;height:var(--cabeza);z-index:19;
   display:flex;align-items:center;gap:12px;padding:0 22px;
-  background:rgba(2,16,36,.86);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  background:rgba(10,11,10,.82);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
   border-bottom:1px solid var(--linea)}
 .pill{display:inline-flex;align-items:center;gap:6px;padding:3.5px 10px;border-radius:999px;
   font-size:11.5px;font-weight:450;letter-spacing:.02em;border:1px solid transparent}
 .pill::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
-.pill.on{color:var(--sube);background:var(--sube-f);border-color:rgba(63,191,154,.28)}
+.pill.on{color:var(--sube);background:var(--sube-f);border-color:rgba(47,224,122,.28)}
 .pill.off{color:var(--gris);background:rgba(147,176,204,.07);border-color:var(--linea)}
 .pill.warn{color:var(--avisa);background:var(--avisa-f);border-color:rgba(214,164,90,.28)}
 /* lecturas del instrumento: lo que se mira cada segundo */
@@ -115,18 +114,18 @@ button{font:inherit;font-size:13px;font-weight:450;border:1px solid transparent;
   transition:background var(--t),border-color var(--t),color var(--t),transform var(--t-rapido)}
 button:active:not(:disabled){transform:scale(.975)}
 button:disabled{opacity:.4;cursor:default}
-.b-main{background:var(--azul);color:#021024;font-weight:500}
+.b-main{background:var(--azul);color:var(--azul-t);border-color:var(--linea-2);font-weight:500}
 .b-ghost{border-color:var(--linea-2);color:var(--gris)}
-.b-encender{border-color:rgba(63,191,154,.4);color:var(--sube);background:var(--sube-f)}
+.b-encender{border-color:var(--linea-2);color:var(--texto);background:var(--azul)}
 .b-apagar{border-color:var(--linea-2);color:var(--gris)}
-.b-danger{background:var(--baja);color:#2a0910;font-weight:500}
+.b-danger{background:var(--baja);color:#2a0808;font-weight:550}
 button.chico{padding:5px 10px;font-size:12px}
 .icono{padding:7px;line-height:0;border-color:var(--linea-2);color:var(--gris)}
 @media (hover:hover) and (pointer:fine){
-  .b-main:hover:not(:disabled){background:var(--azul-c)}
-  .b-ghost:hover:not(:disabled),.icono:hover:not(:disabled){color:var(--claro);border-color:var(--azul);background:var(--azul-f)}
-  .b-encender:hover:not(:disabled){background:rgba(63,191,154,.2);border-color:var(--sube)}
-  .b-apagar:hover:not(:disabled){color:var(--baja);border-color:rgba(226,112,127,.5);background:var(--baja-f)}
+  .b-main:hover:not(:disabled){background:var(--azul-c);border-color:#4d554a;color:var(--claro)}
+  .b-ghost:hover:not(:disabled),.icono:hover:not(:disabled){color:var(--claro);border-color:var(--linea-2);background:var(--azul)}
+  .b-encender:hover:not(:disabled){background:var(--azul-c);border-color:#4d554a;color:var(--claro)}
+  .b-apagar:hover:not(:disabled){color:var(--baja);border-color:rgba(255,95,95,.5);background:var(--baja-f)}
   .b-danger:hover:not(:disabled){background:#ec8592}
 }
 .msg{font-size:12.5px;color:var(--gris)}
@@ -145,16 +144,24 @@ html{scroll-behavior:smooth}
 .aviso{padding:9px 13px;border-radius:var(--r-s);margin-bottom:8px;font-size:13px;border:1px solid transparent;
   display:flex;align-items:center;gap:9px}
 .aviso::before{content:"";width:4px;height:4px;border-radius:50%;background:currentColor;flex:none}
-.aviso.on{background:var(--sube-f);color:#8fdcc4;border-color:rgba(63,191,154,.22)}
+.aviso.on{background:var(--sube-f);color:#8fdcc4;border-color:rgba(47,224,122,.22)}
 .aviso.warn{background:var(--avisa-f);color:#e6c391;border-color:rgba(214,164,90,.26)}
 .aviso.off{background:var(--n1);color:var(--gris);border-color:var(--linea)}
 .aviso.grande{font-size:13.5px;font-weight:500}
 
 /* ---------------------------------------------------------------- tablero */
 .tablero{display:grid;gap:18px;grid-template-columns:minmax(0,1fr);align-items:start}
-@media(min-width:1080px){.tablero{grid-template-columns:minmax(0,1fr) 288px}}
-.bloque,.marcador,.panel{background:var(--n1);border:1px solid var(--linea);border-radius:var(--r);padding:16px 18px 18px}
+@media(min-width:1080px){.tablero{grid-template-columns:minmax(0,1fr) 300px}}
+.bloque,.marcador,.panel,.noticias{background:var(--n1);border:1px solid var(--linea);border-radius:var(--r);padding:16px 18px 18px}
 .marcador{padding:18px 18px 8px}
+/* la tarjeta del bloque se distingue por el borde algo más claro, sin color */
+.bloque{border-color:var(--linea-2)}
+.rail{display:grid;gap:18px;align-content:start}
+.principal{display:grid;gap:18px;align-content:start;min-width:0}
+/* sin esto las tablas anchas estiran la columna del grid y rompen el móvil */
+.principal > *,.rail > *,.tablero > *{min-width:0}
+.principal > .seccion{margin-top:0}
+@media(min-width:1080px){.rail{position:sticky;top:calc(var(--cabeza) + 22px)}}
 .total .k{display:block}
 .total .v{display:block;font-family:var(--mono);font-size:33px;font-weight:600;letter-spacing:-.035em;
   line-height:1.05;margin:7px 0 4px;color:var(--claro)}
@@ -175,7 +182,7 @@ html{scroll-behavior:smooth}
 .lados{display:flex;gap:7px}
 .lado{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:var(--r-s);font-size:12px;
   background:var(--n0);border:1px solid var(--linea);transition:border-color var(--t),background var(--t)}
-.lado.dentro{background:var(--sube-f);border-color:rgba(63,191,154,.5)}
+.lado.dentro{background:var(--sube-f);border-color:rgba(47,224,122,.5)}
 .lado b{font-weight:500;font-size:11px;letter-spacing:.04em}
 #grafico{margin:4px -4px 0}
 #gPie{margin-top:14px;padding-top:13px;border-top:1px solid var(--linea)}
@@ -186,8 +193,8 @@ html{scroll-behavior:smooth}
 .dcab .der{margin-left:auto}
 .dpista{position:relative;height:6px;background:var(--n0);border:1px solid var(--linea);border-radius:3px}
 .dzona{position:absolute;top:0;bottom:0;background:var(--z);opacity:.22}
-.dzona.izq{left:0;border-right:1px solid rgba(226,112,127,.55);border-radius:2px 0 0 2px}
-.dzona.der{right:0;border-left:1px solid rgba(63,191,154,.55);border-radius:0 2px 2px 0}
+.dzona.izq{left:0;border-right:1px solid rgba(255,95,95,.55);border-radius:2px 0 0 2px}
+.dzona.der{right:0;border-left:1px solid rgba(47,224,122,.55);border-radius:0 2px 2px 0}
 .dcero{position:absolute;top:-2px;bottom:-2px;left:50%;width:1px;background:var(--linea-2)}
 .dtick{position:absolute;top:1px;bottom:1px;width:1px;background:var(--azul-c);opacity:.45;transform:translateX(-.5px)}
 .dmarca{position:absolute;top:-3px;bottom:-3px;width:3px;border-radius:2px;background:var(--claro);
@@ -221,11 +228,22 @@ th{color:var(--tenue);font-weight:450;font-size:10px;letter-spacing:.1em;text-tr
   border-bottom:1px solid var(--linea);position:sticky;top:0;background:var(--n1);z-index:1}
 tbody tr:last-child td{border-bottom:0}
 tbody tr{transition:background var(--t)}
-tbody tr:hover{background:rgba(84,131,179,.06)}
+tbody tr:hover{background:rgba(230,233,229,.04)}
 .vacio{color:var(--tenue)}
 .alto-tope{max-height:300px;overflow-y:auto;overscroll-behavior:contain}
 
 /* ---------------------------------------------------------------- registro */
+/* calendario económico */
+.ev{display:flex;align-items:baseline;gap:10px;padding:9px 0;border-bottom:1px solid var(--linea)}
+.ev:last-child{border-bottom:0}
+.ev:first-child{padding-top:2px}
+.ev .cuando{font-family:var(--mono);font-size:12px;color:var(--claro);min-width:52px;flex:none}
+.ev .que{font-size:12.5px;color:var(--texto);line-height:1.35;flex:1;min-width:0}
+.ev .que small{display:block;color:var(--tenue);font-size:11px;margin-top:2px}
+.ev .imp{width:5px;height:5px;border-radius:50%;flex:none;background:var(--tenue);margin-top:5px}
+.ev .imp.alta{background:var(--baja)}
+.ev .imp.media{background:var(--avisa)}
+.ev.pronto .cuando{color:var(--claro)}
 #logs{background:var(--n0);border:1px solid var(--linea);border-radius:var(--r-s);
   min-height:60px;max-height:260px;overflow:auto;padding:11px 13px;
   font:11.5px/1.65 var(--mono);white-space:pre-wrap;word-break:break-word;color:var(--gris)}
@@ -243,7 +261,7 @@ input,textarea{width:100%;margin-top:5px;padding:7px 10px;border-radius:var(--r-
   transition:border-color var(--t),background var(--t)}
 input::placeholder,textarea::placeholder{color:var(--tenue)}
 input:hover,textarea:hover{border-color:var(--azul)}
-input:focus,textarea:focus{outline:none;border-color:var(--azul-c);background:#031a33}
+input:focus,textarea:focus{outline:none;border-color:var(--gris);background:#0e120e}
 input.malo,input.malo:focus{border-color:var(--baja)}
 .form input{font-family:var(--mono);font-variant-numeric:tabular-nums}
 textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
@@ -257,6 +275,15 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 .avanzado summary::before{content:"";width:5px;height:5px;border-right:1.4px solid currentColor;
   border-bottom:1.4px solid currentColor;transform:rotate(-45deg);transition:transform var(--t)}
 .avanzado[open] summary::before{transform:rotate(45deg)}
+/* bloque plegado: el resumen ya dice lo importante */
+.plegable > summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px}
+.plegable > summary::-webkit-details-marker{display:none}
+.plegable > summary::after{content:"";width:6px;height:6px;margin-left:auto;flex:none;
+  border-right:1.4px solid var(--tenue);border-bottom:1.4px solid var(--tenue);
+  transform:rotate(45deg) translate(-2px,-2px);transition:transform var(--t)}
+.plegable[open] > summary::after{transform:rotate(-135deg)}
+.plegable > summary:hover::after{border-color:var(--claro)}
+.plegable > summary .aviso{margin:0;padding:4px 10px;font-size:12px;flex:1;min-width:0}
 .estado-guardado{display:inline-flex;align-items:center;gap:6px;font-size:12.5px}
 .estado-guardado::before{content:"";width:12px;height:12px;border-radius:50%;flex:none}
 .estado-guardado.ok{color:var(--sube)}
@@ -292,12 +319,16 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
   :root{--lateral:0px;--cabeza:54px}
   .lateral{left:0;right:0;bottom:0;top:auto;width:auto;height:56px;flex-direction:row;align-items:center;
     border-right:0;border-top:1px solid var(--linea);padding:0 6px;
-    background:rgba(2,16,36,.93);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+    background:rgba(10,11,10,.94);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
   .logo,.lat-pie{display:none}
   .nav{flex-direction:row;flex:1;margin:0;gap:0;justify-content:space-around}
   .nav + .nav{margin:0;padding:0;border:0}
   .nav a{flex-direction:column;gap:3px;padding:8px 6px;font-size:9.5px;letter-spacing:.02em;border-radius:var(--r-s)}
-  .nav a span{display:block;text-transform:uppercase;font-size:9px;letter-spacing:.06em;white-space:nowrap}
+  /* en el móvil la etiqueta va debajo del icono, no es un globo flotante */
+  .nav a span{position:static;display:block;opacity:1;transform:none;padding:0;border:0;background:none;
+    color:inherit;text-transform:uppercase;font-size:9px;letter-spacing:.06em;white-space:nowrap}
+  .nav a{width:auto;height:auto}
+  .nav a[aria-current="true"]{background:var(--azul-c);color:var(--claro);box-shadow:none}
   .nav a[aria-current="true"]::before{left:50%;top:auto;bottom:-0px;width:16px;height:2px;
     transform:translateX(-50%);border-radius:2px}
   main{margin-left:0;padding:calc(var(--cabeza) + 14px) 14px 78px}
@@ -320,8 +351,8 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 
 <nav class="lateral" aria-label="Secciones">
   <div class="logo">
-    <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="7" fill="none" stroke="#134277"></rect><path d="M7 21 L13 14 L18 18.5 L25 9" fill="none" stroke="#7DA0CA" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
-    <span><h1>Kalshi Bot</h1></span>
+    <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="7" fill="none" stroke="#232722"></rect><path d="M7 21 L13 14 L18 18.5 L25 9" fill="none" stroke="#2fe07a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+    <h1 class="oculto">Kalshi Bot</h1>
   </div>
   <div class="nav">
     <p class="rot">Operación</p>
@@ -355,7 +386,9 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 <main id="contenido">
 <div id="avisos"></div>
 
-<div class="tablero" id="s-bloque">
+<div class="tablero">
+  <div class="principal">
+  <div id="s-bloque">
   <section class="bloque" id="cardGrafico" style="display:none" aria-label="Bloque en vivo">
     <div class="titulo">
       <h2>Bloque en vivo</h2><span id="gTicker" class="num tic"></span>
@@ -371,7 +404,27 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
       <tbody id="vivo"></tbody>
     </table></div>
   </section>
+  </div>
 
+<section class="seccion panel" id="s-ops" aria-label="Operaciones">
+  <div class="titulo"><h2>Operaciones</h2><span id="opsCuenta" class="ayuda"></span>
+    <span class="sp"></span><a href="/operaciones.csv">bajar todas (CSV)</a>
+    <button id="reiniciar" class="b-ghost chico">Reiniciar resultados</button>
+    <span id="msgReiniciar" class="msg" role="status" aria-live="polite"></span></div>
+  <div class="wrap alto-tope"><table>
+    <thead><tr><th scope="col">Fecha (CDT)</th><th scope="col">Activo</th><th scope="col">Lado</th><th scope="col">Entrada</th><th scope="col">Salida</th><th scope="col">Precio salida</th><th scope="col">Contratos</th><th scope="col">Resultado</th><th scope="col">$</th></tr></thead>
+    <tbody id="ops"></tbody>
+  </table></div>
+</section>
+
+<section class="seccion panel" id="s-log" aria-label="Registro">
+  <div class="titulo"><h2>Registro</h2><span class="sp"></span>
+    <label style="display:flex;align-items:center;gap:7px;margin:0;cursor:pointer"><input type="checkbox" id="auto" checked style="width:auto;margin:0;accent-color:var(--gris)">seguir los nuevos</label></div>
+  <div id="logs" tabindex="0"></div>
+</section>
+  </div>
+
+  <div class="rail">
   <aside class="marcador" aria-label="Resultado">
     <div class="total">
       <span class="k">Resultado total</span>
@@ -387,24 +440,17 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
       <div><dt>Encendido</dt><dd><span class="v num skel" id="sOn" style="font-size:14px">–</span><span class="sub" id="sServer"></span></dd></div>
     </dl>
   </aside>
+
+  <section class="noticias" aria-label="Próximas noticias">
+    <div class="titulo"><h2>Próximas noticias</h2><span class="sp"></span><span class="ayuda">ForexFactory</span></div>
+    <div id="noticias"></div>
+  </section>
+  </div>
 </div>
 
-<section class="seccion panel" id="s-ops" aria-label="Operaciones">
-  <div class="titulo"><h2>Operaciones</h2><span id="opsCuenta" class="ayuda"></span>
-    <span class="sp"></span><a href="/operaciones.csv">bajar todas (CSV)</a>
-    <button id="reiniciar" class="b-ghost chico">Reiniciar resultados</button>
-    <span id="msgReiniciar" class="msg" role="status" aria-live="polite"></span></div>
-  <div class="wrap alto-tope"><table>
-    <thead><tr><th scope="col">Fecha (CDT)</th><th scope="col">Activo</th><th scope="col">Lado</th><th scope="col">Entrada</th><th scope="col">Salida</th><th scope="col">Precio salida</th><th scope="col">Contratos</th><th scope="col">Resultado</th><th scope="col">$</th></tr></thead>
-    <tbody id="ops"></tbody>
-  </table></div>
-</section>
 
-<section class="seccion panel" id="s-log" aria-label="Registro">
-  <div class="titulo"><h2>Registro</h2><span class="sp"></span>
-    <label style="display:flex;align-items:center;gap:7px;margin:0;cursor:pointer"><input type="checkbox" id="auto" checked style="width:auto;margin:0;accent-color:var(--azul)">seguir los nuevos</label></div>
-  <div id="logs" tabindex="0"></div>
-</section>
+
+
 
 <section class="seccion" id="s-ajustes" aria-label="Ajustes y API">
   <div class="grid2">
@@ -418,12 +464,13 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
       <div class="row"><button class="b-main" id="guardar">Guardar ajustes</button><button class="b-ghost" id="deshacer">Deshacer</button><span id="msgAjustes" class="msg" role="status" aria-live="polite"></span></div>
     </div>
     <div>
-      <div class="titulo"><h2>API de Kalshi</h2></div>
-      <div id="keyEstado" class="aviso off">cargando</div>
-      <label>API key ID<input id="keyId" autocomplete="off" spellcheck="false" placeholder="a1b2c3d4-…"></label>
+      <details class="plegable">
+      <summary><h2>API de Kalshi</h2><span id="keyEstado" class="aviso off">cargando</span></summary>
+      <label style="margin-top:14px;display:block">API key ID<input id="keyId" autocomplete="off" spellcheck="false" placeholder="a1b2c3d4-…"></label>
       <label style="margin-top:11px">Private key (.pem completo)<textarea id="pem" spellcheck="false" placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;…&#10;-----END RSA PRIVATE KEY-----"></textarea></label>
       <p class="ayuda" style="margin:9px 0 0">Se crean en kalshi.com → Account → API Keys. La private key no se vuelve a mostrar después de guardarla.</p>
       <div class="row"><button class="b-main" id="guardarKey">Guardar y probar</button><span id="msgKey" class="msg" role="status" aria-live="polite"></span></div>
+      </details>
     </div>
   </div>
 </section>
@@ -464,8 +511,8 @@ function destellar(el, texto, cls) {
 
 let G = null, hoverX = null;   // estado del gráfico para la cruz
 
-const VERDE = '#3fbf9a', ROJO = '#e2707f', NEUTRO = '#93b0cc', TENUE = '#6f8dab';
-const REJILLA = '#0b2f5e', LIENZO = '#04182f', FONDO = '#021024', CLARO = '#C1E8FF', AZUL = '#7DA0CA';
+const VERDE = '#2fe07a', ROJO = '#ff5f5f', NEUTRO = '#9aa197', TENUE = '#6f776c';
+const REJILLA = '#232722', LIENZO = '#121412', FONDO = '#0a0b0a', CLARO = '#ffffff', AZUL = '#9aa197';
 const BLOQUE_S = 900;
 const angosto = () => window.innerWidth < 640;
 // el lienzo se adapta: si fuera siempre de 880 de ancho, en el movil las etiquetas
@@ -590,7 +637,7 @@ function grafico(v) {
 
   o.push(`<circle cx="${pa[pa.length - 1][0].toFixed(1)}" cy="${pa[pa.length - 1][1].toFixed(1)}" r="6.5" fill="${col}" opacity="0.2"></circle>`);
   o.push(`<circle cx="${pa[pa.length - 1][0].toFixed(1)}" cy="${pa[pa.length - 1][1].toFixed(1)}" r="3.2" fill="${col}"></circle>`);
-  o.push(capsula(ya(ult[1]), Math.round(ult[1]).toLocaleString('es'), col, arriba ? '#04231b' : '#2c0f15'));
+  o.push(capsula(ya(ult[1]), Math.round(ult[1]).toLocaleString('es'), col, arriba ? '#06301a' : '#2e0b0b'));
 
   // marca de la entrada
   if (g.contrato && g.contrato.length) {
@@ -610,7 +657,7 @@ function grafico(v) {
   o.push(`<text x="${X0}" y="${Y1 + 17}" fill="${TENUE}" font-size="10.5">inicio</text>`);
   o.push(`<text x="${X1}" y="${Y1 + 17}" text-anchor="end" fill="${TENUE}" font-size="10.5">cierre</text>`);
   o.push(`<rect x="${X0}" y="${Y1 + 24}" width="${X1 - X0}" height="3" rx="1.5" fill="${REJILLA}"></rect>`);
-  o.push(`<rect x="${X0}" y="${Y1 + 24}" width="${((X1 - X0) * frac).toFixed(1)}" height="3" rx="1.5" fill="${enVentana ? AZUL : TENUE}" opacity="${enVentana ? 0.9 : 0.55}"></rect>`);
+  o.push(`<rect x="${X0}" y="${Y1 + 24}" width="${((X1 - X0) * frac).toFixed(1)}" height="3" rx="1.5" fill="${enVentana ? AZUL : TENUE}" opacity="${enVentana ? 0.55 : 0.45}"></rect>`);
 
   o.push('<g id="cruz"></g>');
   return `<svg id="svgG" viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-family:'Geist Mono',ui-monospace,monospace" role="img" aria-label="Índice de BTC durante el bloque: verde por encima de la referencia de ${ref != null ? Math.round(ref) : '–'} y rojo por debajo.">${o.join('')}</svg>`;
@@ -665,6 +712,29 @@ function razon(v, d) {
   return `<div class="razon ${cl}">${esc(t)}</div>`;
 }
 
+// calendario económico: solo lo que aún no ha pasado
+function pintarNoticias(d) {
+  const caja = document.getElementById('noticias');
+  if (!caja) return;
+  const ev = d.noticias || [];
+  if (!ev.length) {
+    caja.innerHTML = `<p class="ayuda" style="margin:0">${esc(d.noticias_error
+      ? 'No pude leer el calendario ahora mismo.' : 'Sin eventos de alto impacto por delante esta semana.')}</p>`;
+    return;
+  }
+  caja.innerHTML = ev.map(e => {
+    const f = e.faltan, dias = Math.floor(f / 86400), hs = Math.floor(f / 3600);
+    const cuando = f < 0 ? 'ahora' : dias >= 1 ? dias + ' d' : hs >= 1 ? hs + ' h' : Math.max(1, Math.round(f / 60)) + ' min';
+    const hora = new Date(e.ts * 1000).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
+    const det = [e.previsto && 'prev. ' + e.previsto, e.anterior && 'ant. ' + e.anterior].filter(Boolean).join(' · ');
+    return `<div class="ev${f < 3600 ? ' pronto' : ''}">
+      <span class="imp ${e.impacto === 'High' ? 'alta' : 'media'}" title="${e.impacto === 'High' ? 'alto impacto' : 'impacto medio'}"></span>
+      <span class="cuando num">${esc(cuando)}</span>
+      <span class="que">${esc(e.titulo)}<small>${esc(e.moneda)} · ${esc(hora)}${det ? ' · ' + esc(det) : ''}</small></span>
+    </div>`;
+  }).join('');
+}
+
 // medidor de la posición: dónde está el bid entre el stop y el objetivo
 function medidor(g, contratos) {
   if (g.tp == null || g.bid == null) return '';
@@ -714,7 +784,7 @@ function dibujarCruz() {
   const cy = yRef > (Y0 + Y1) / 2 ? Y0 + 4 : Y1 - alto - 4;   // nunca encima de la referencia
   const o = [`<line x1="${xx.toFixed(1)}" y1="${Y0}" x2="${xx.toFixed(1)}" y2="${Y1}" stroke="${NEUTRO}" stroke-width="1" stroke-dasharray="3 3" opacity="0.65"></line>`,
     `<circle cx="${xx.toFixed(1)}" cy="${ya(pa[1]).toFixed(1)}" r="4" fill="${FONDO}" stroke="${col}" stroke-width="2"></circle>`,
-    `<rect x="${cx.toFixed(1)}" y="${cy}" width="${ancho}" height="${alto}" rx="7" fill="${FONDO}" stroke="#134277"></rect>`,
+    `<rect x="${cx.toFixed(1)}" y="${cy}" width="${ancho}" height="${alto}" rx="7" fill="${FONDO}" stroke="#32372f"></rect>`,
     `<text x="${cx + 10}" y="${cy + 15}" fill="${TENUE}" font-size="10.5">minuto ${mm}</text>`];
   filas.forEach(([k, val, c], i) => {
     const y = cy + 30 + i * 15;
@@ -826,6 +896,8 @@ function render(d) {
     : '<tr><td colspan="9" class="vacio">Todavía no hay operaciones. Aparecerán aquí en cuanto el bot cierre la primera.</td></tr>';
   $('opsCuenta').textContent = d.operaciones.length
     ? (d.total.ops > d.operaciones.length ? `últimas ${d.operaciones.length} de ${d.total.ops}` : `${d.total.ops} en total`) : '';
+
+  pintarNoticias(d);
 
   const ke = $('keyEstado');
   ke.className = 'aviso ' + (d.conectado ? 'on' : 'warn');
