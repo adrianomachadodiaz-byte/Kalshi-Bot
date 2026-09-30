@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="description" content="Terminal del bot de Kalshi: bloque en vivo, resultado, operaciones y ajustes.">
 <meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#0a0b0a">
+<meta name="theme-color" content="#0a0a0a">
 <title>Kalshi Bot</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a0b0a'/%3E%3Cpath d='M6 21 L13 13 L18 18 L26 8' fill='none' stroke='%232fe07a' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a0a0a'/%3E%3Cpath d='M6 21 L13 13 L18 18 L26 8' fill='none' stroke='%232fe07a' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;450;500;600&family=Geist+Mono:wght@400;450;500;600&display=swap">
@@ -17,23 +17,23 @@
    significado. Sin sombras fuertes, sin degradados llamativos, bordes de 1 px.
    ========================================================================== */
 :root{
-  --n0:#0a0b0a;            /* fondo, negro */
-  --n1:#121412;            /* superficie de tarjeta */
-  --n2:#1a1d1a;            /* superficie elevada */
-  --linea:#232722;         /* borde sutil */
-  --linea-2:#32372f;       /* borde visible */
-  --azul:#31362e;          /* controles: gris, no verde */
-  --azul-c:#434a3f;        /* controles, al pasar el ratón */
-  --azul-t:#e6e9e5;        /* texto sobre control */
+  --n0:#0a0a0a;            /* fondo, negro */
+  --n1:#131313;            /* superficie de tarjeta */
+  --n2:#1c1c1c;            /* superficie elevada */
+  --linea:#242424;         /* borde sutil */
+  --linea-2:#333333;       /* borde visible */
+  --azul:#2c2c2c;          /* controles: gris, no verde */
+  --azul-c:#3d3d3d;        /* controles, al pasar el ratón */
+  --azul-t:#e8e8e8;        /* texto sobre control */
   --claro:#ffffff;         /* cifras y títulos */
-  --texto:#e6e9e5;
-  --gris:#9aa197;          /* secundario */
-  --tenue:#6f776c;         /* terciario */
+  --texto:#e8e8e8;
+  --gris:#9b9b9b;          /* secundario */
+  --tenue:#757575;         /* terciario */
   --sube:#2fe07a;          /* a favor */
   --baja:#ff5f5f;          /* en contra */
   --avisa:#f0b429;         /* pide atención */
   --sube-f:rgba(47,224,122,.12); --baja-f:rgba(255,95,95,.12); --avisa-f:rgba(240,180,41,.12);
-  --azul-f:rgba(230,233,229,.07);
+  --azul-f:rgba(255,255,255,.06);
   --estado:var(--tenue);
   --r:15px; --r-s:9px;
   --sal:cubic-bezier(.16,1,.3,1);
@@ -45,13 +45,13 @@
 body{margin:0;background:var(--n0);color:var(--texto);
   font:14.5px/1.5 Geist,system-ui,-apple-system,"Segoe UI",sans-serif;
   -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
-::selection{background:rgba(230,233,229,.22);color:#fff}
+::selection{background:rgba(255,255,255,.2);color:#fff}
 *{scrollbar-color:var(--linea-2) transparent;scrollbar-width:thin}
 ::-webkit-scrollbar{width:9px;height:9px}
 ::-webkit-scrollbar-thumb{background:var(--linea-2);border-radius:5px;border:2.5px solid var(--n0)}
 ::-webkit-scrollbar-track{background:transparent}
 :focus-visible{outline:1.5px solid var(--gris);outline-offset:2px;border-radius:4px}
-.salta{position:absolute;left:-9999px;top:0;background:var(--gris);color:#0a0b0a;padding:9px 15px;border-radius:0 0 8px 0;z-index:40}
+.salta{position:absolute;left:-9999px;top:0;background:var(--gris);color:#0a0a0a;padding:9px 15px;border-radius:0 0 8px 0;z-index:40}
 .salta:focus{left:0}
 .barra-estado{position:fixed;top:0;left:0;right:0;height:2px;z-index:30;background:var(--estado);
   transition:background 280ms var(--sal)}
@@ -92,14 +92,15 @@ h2{font-size:13px;margin:0;font-weight:500;letter-spacing:.02em;color:var(--text
 /* ---------------------------------------------------------------- cabecera */
 .consola{position:fixed;top:0;left:var(--lateral);right:0;height:var(--cabeza);z-index:19;
   display:flex;align-items:center;gap:12px;padding:0 22px;
-  background:rgba(10,11,10,.82);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  background:rgba(10,10,10,.82);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
   border-bottom:1px solid var(--linea)}
 .pill{display:inline-flex;align-items:center;gap:6px;padding:3.5px 10px;border-radius:999px;
   font-size:11.5px;font-weight:450;letter-spacing:.02em;border:1px solid transparent}
 .pill::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
-.pill.on{color:var(--sube);background:var(--sube-f);border-color:rgba(47,224,122,.28)}
-.pill.off{color:var(--gris);background:rgba(147,176,204,.07);border-color:var(--linea)}
-.pill.warn{color:var(--avisa);background:var(--avisa-f);border-color:rgba(214,164,90,.28)}
+.pill{color:var(--texto);background:var(--n1);border-color:var(--linea-2)}
+.pill::before{background:var(--tenue)}
+.pill.on::before{background:var(--sube)}
+.pill.warn::before{background:var(--avisa)}
 /* lecturas del instrumento: lo que se mira cada segundo */
 .lecturas{display:flex;align-items:baseline;gap:20px;padding:0 18px;
   border-left:1px solid var(--linea);border-right:1px solid var(--linea)}
@@ -122,9 +123,9 @@ button:disabled{opacity:.4;cursor:default}
 button.chico{padding:5px 10px;font-size:12px}
 .icono{padding:7px;line-height:0;border-color:var(--linea-2);color:var(--gris)}
 @media (hover:hover) and (pointer:fine){
-  .b-main:hover:not(:disabled){background:var(--azul-c);border-color:#4d554a;color:var(--claro)}
+  .b-main:hover:not(:disabled){background:var(--azul-c);border-color:#484848;color:var(--claro)}
   .b-ghost:hover:not(:disabled),.icono:hover:not(:disabled){color:var(--claro);border-color:var(--linea-2);background:var(--azul)}
-  .b-encender:hover:not(:disabled){background:var(--azul-c);border-color:#4d554a;color:var(--claro)}
+  .b-encender:hover:not(:disabled){background:var(--azul-c);border-color:#484848;color:var(--claro)}
   .b-apagar:hover:not(:disabled){color:var(--baja);border-color:rgba(255,95,95,.5);background:var(--baja-f)}
   .b-danger:hover:not(:disabled){background:#ec8592}
 }
@@ -144,9 +145,10 @@ html{scroll-behavior:smooth}
 .aviso{padding:9px 13px;border-radius:var(--r-s);margin-bottom:8px;font-size:13px;border:1px solid transparent;
   display:flex;align-items:center;gap:9px}
 .aviso::before{content:"";width:4px;height:4px;border-radius:50%;background:currentColor;flex:none}
-.aviso.on{background:var(--sube-f);color:#8fdcc4;border-color:rgba(47,224,122,.22)}
-.aviso.warn{background:var(--avisa-f);color:#e6c391;border-color:rgba(214,164,90,.26)}
-.aviso.off{background:var(--n1);color:var(--gris);border-color:var(--linea)}
+.aviso{background:var(--n1);color:var(--texto);border-color:var(--linea-2)}
+.aviso::before{background:var(--tenue)}
+.aviso.on::before{background:var(--sube)}
+.aviso.warn::before{background:var(--avisa)}
 .aviso.grande{font-size:13.5px;font-weight:500}
 
 /* ---------------------------------------------------------------- tablero */
@@ -182,10 +184,10 @@ html{scroll-behavior:smooth}
 .lados{display:flex;gap:7px}
 .lado{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:var(--r-s);font-size:12px;
   background:var(--n0);border:1px solid var(--linea);transition:border-color var(--t),background var(--t)}
-.lado.dentro{background:var(--sube-f);border-color:rgba(47,224,122,.5)}
+.lado.dentro{background:var(--n2);border-color:var(--gris)}
 .lado b{font-weight:500;font-size:11px;letter-spacing:.04em}
-#grafico{margin:4px -4px 0}
-#gPie{margin-top:14px;padding-top:13px;border-top:1px solid var(--linea)}
+#grafico{margin:2px -4px 0}
+#gPie{margin-top:11px;padding-top:11px;border-top:1px solid var(--linea)}
 /* Delta contra su umbral */
 .dcab{display:flex;align-items:baseline;gap:10px;margin-bottom:9px}
 .dcab .v{font-family:var(--mono);font-size:19px;font-weight:600;letter-spacing:-.03em;line-height:1;color:var(--claro)}
@@ -203,8 +205,8 @@ html{scroll-behavior:smooth}
 .dpies{display:flex;justify-content:space-between;margin-top:6px;font-size:10.5px;color:var(--tenue)}
 .razon{margin-top:12px;font-size:12.5px;color:var(--gris);display:flex;align-items:center;gap:8px}
 .razon::before{content:"";width:4px;height:4px;border-radius:50%;background:currentColor;flex:none}
-.razon.ok{color:var(--sube)}
-.razon.warn{color:var(--avisa)}
+.razon.ok::before{background:var(--sube)}
+.razon.warn::before{background:var(--avisa)}
 /* posición abierta */
 .medidor{margin-top:14px;padding-top:13px;border-top:1px solid var(--linea)}
 .pista{position:relative;height:6px;border-radius:3px;background:var(--n0);border:1px solid var(--linea)}
@@ -220,7 +222,7 @@ html{scroll-behavior:smooth}
 
 /* ---------------------------------------------------------------- tablas */
 .wrap{overflow-x:auto;margin:0 -18px;padding:0 18px}
-.lectura{margin-top:16px;padding-top:0;border-top:1px solid var(--linea)}
+.lectura{margin-top:12px;padding-top:0;border-top:1px solid var(--linea)}
 table{border-collapse:collapse;width:100%;font-size:12.5px}
 th,td{padding:8px 12px 8px 0;text-align:left;white-space:nowrap}
 td{border-bottom:1px solid var(--linea);color:var(--texto)}
@@ -228,7 +230,7 @@ th{color:var(--tenue);font-weight:450;font-size:10px;letter-spacing:.1em;text-tr
   border-bottom:1px solid var(--linea);position:sticky;top:0;background:var(--n1);z-index:1}
 tbody tr:last-child td{border-bottom:0}
 tbody tr{transition:background var(--t)}
-tbody tr:hover{background:rgba(230,233,229,.04)}
+tbody tr:hover{background:rgba(255,255,255,.04)}
 .vacio{color:var(--tenue)}
 .alto-tope{max-height:300px;overflow-y:auto;overscroll-behavior:contain}
 
@@ -261,7 +263,7 @@ input,textarea{width:100%;margin-top:5px;padding:7px 10px;border-radius:var(--r-
   transition:border-color var(--t),background var(--t)}
 input::placeholder,textarea::placeholder{color:var(--tenue)}
 input:hover,textarea:hover{border-color:var(--azul)}
-input:focus,textarea:focus{outline:none;border-color:var(--gris);background:#0e120e}
+input:focus,textarea:focus{outline:none;border-color:var(--gris);background:#141414}
 input.malo,input.malo:focus{border-color:var(--baja)}
 .form input{font-family:var(--mono);font-variant-numeric:tabular-nums}
 textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
@@ -319,7 +321,7 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
   :root{--lateral:0px;--cabeza:54px}
   .lateral{left:0;right:0;bottom:0;top:auto;width:auto;height:56px;flex-direction:row;align-items:center;
     border-right:0;border-top:1px solid var(--linea);padding:0 6px;
-    background:rgba(10,11,10,.94);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+    background:rgba(10,10,10,.94);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
   .logo,.lat-pie{display:none}
   .nav{flex-direction:row;flex:1;margin:0;gap:0;justify-content:space-around}
   .nav + .nav{margin:0;padding:0;border:0}
@@ -351,7 +353,7 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 
 <nav class="lateral" aria-label="Secciones">
   <div class="logo">
-    <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="7" fill="none" stroke="#232722"></rect><path d="M7 21 L13 14 L18 18.5 L25 9" fill="none" stroke="#2fe07a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+    <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="7" fill="none" stroke="#242424"></rect><path d="M7 21 L13 14 L18 18.5 L25 9" fill="none" stroke="#2fe07a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
     <h1 class="oculto">Kalshi Bot</h1>
   </div>
   <div class="nav">
@@ -455,13 +457,16 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 <section class="seccion" id="s-ajustes" aria-label="Ajustes y API">
   <div class="grid2">
     <div>
-      <div class="titulo"><h2>Ajustes</h2><span class="ayuda">se aplican al guardar, sin reiniciar</span></div>
+      <details class="plegable">
+      <summary><h2>Ajustes</h2><span id="resumenAjustes" class="aviso off">cargando</span></summary>
+      <p class="ayuda" style="margin:12px 0 10px">Se aplican al guardar, sin reiniciar.</p>
       <div class="form" id="form"></div>
       <details id="bloqueAv" class="avanzado" hidden>
         <summary>Avanzado</summary>
         <div class="form" id="formAv" style="margin-top:12px"></div>
       </details>
       <div class="row"><button class="b-main" id="guardar">Guardar ajustes</button><button class="b-ghost" id="deshacer">Deshacer</button><span id="msgAjustes" class="msg" role="status" aria-live="polite"></span></div>
+      </details>
     </div>
     <div>
       <details class="plegable">
@@ -511,13 +516,13 @@ function destellar(el, texto, cls) {
 
 let G = null, hoverX = null;   // estado del gráfico para la cruz
 
-const VERDE = '#2fe07a', ROJO = '#ff5f5f', NEUTRO = '#9aa197', TENUE = '#6f776c';
-const REJILLA = '#232722', LIENZO = '#121412', FONDO = '#0a0b0a', CLARO = '#ffffff', AZUL = '#9aa197';
+const VERDE = '#2fe07a', ROJO = '#ff5f5f', NEUTRO = '#9b9b9b', TENUE = '#757575';
+const REJILLA = '#242424', LIENZO = '#131313', FONDO = '#0a0a0a', CLARO = '#ffffff', AZUL = '#9b9b9b';
 const BLOQUE_S = 900;
 const angosto = () => window.innerWidth < 640;
 // el lienzo se adapta: si fuera siempre de 880 de ancho, en el movil las etiquetas
 // quedarian a media escala y no se leerian
-const geo = () => angosto() ? { W: 440, X0: 44, X1: 378, H: 300 } : { W: 880, X0: 62, X1: 806, H: 210 };
+const geo = () => angosto() ? { W: 440, X0: 44, X1: 378, H: 262 } : { W: 880, X0: 62, X1: 806, H: 176 };
 let GX1 = 806;   // borde derecho vigente, para las capsulas de precio
 
 // curva monótona: suaviza sin inventar subidas ni bajadas que no están en los datos
@@ -784,7 +789,7 @@ function dibujarCruz() {
   const cy = yRef > (Y0 + Y1) / 2 ? Y0 + 4 : Y1 - alto - 4;   // nunca encima de la referencia
   const o = [`<line x1="${xx.toFixed(1)}" y1="${Y0}" x2="${xx.toFixed(1)}" y2="${Y1}" stroke="${NEUTRO}" stroke-width="1" stroke-dasharray="3 3" opacity="0.65"></line>`,
     `<circle cx="${xx.toFixed(1)}" cy="${ya(pa[1]).toFixed(1)}" r="4" fill="${FONDO}" stroke="${col}" stroke-width="2"></circle>`,
-    `<rect x="${cx.toFixed(1)}" y="${cy}" width="${ancho}" height="${alto}" rx="7" fill="${FONDO}" stroke="#32372f"></rect>`,
+    `<rect x="${cx.toFixed(1)}" y="${cy}" width="${ancho}" height="${alto}" rx="7" fill="${FONDO}" stroke="#333333"></rect>`,
     `<text x="${cx + 10}" y="${cy + 15}" fill="${TENUE}" font-size="10.5">minuto ${mm}</text>`];
   filas.forEach(([k, val, c], i) => {
     const y = cy + 30 + i * 15;
@@ -816,8 +821,9 @@ function render(d) {
   else if (d.encendido) { pill.textContent = 'encendido'; pill.className = 'pill on'; }
   else { pill.textContent = 'apagado'; pill.className = 'pill off'; }
   // la banda de arriba repite el estado en color, para verlo de reojo
+  // la banda de arriba solo se enciende cuando algo pide atención; operando normal, gris
   document.documentElement.style.setProperty('--estado',
-    !d.conectado ? 'var(--avisa)' : d.encendido ? 'var(--sube)' : 'var(--tenue)');
+    (!d.conectado || !d.encendido) ? 'var(--avisa)' : 'var(--linea-2)');
   if (!confirmando) {
     btn.disabled = false;
     btn.textContent = d.encendido ? 'Apagar' : 'Encender';
@@ -898,6 +904,11 @@ function render(d) {
     ? (d.total.ops > d.operaciones.length ? `últimas ${d.operaciones.length} de ${d.total.ops}` : `${d.total.ops} en total`) : '';
 
   pintarNoticias(d);
+
+  const ra = $('resumenAjustes'), a = d.ajustes;
+  if (ra) ra.textContent = [a.activos, 'Delta ' + n(a.delta, 0), 'Delay ' + a.delay,
+    n(a.entrada_min, 2) + '\u2013' + n(a.entrada_max, 2), 'TP +' + n(a.tp, 2),
+    a.exit == null || a.exit === '' ? 'sin Exit' : 'Exit ' + n(a.exit, 2)].join(' \u00b7 ');
 
   const ke = $('keyEstado');
   ke.className = 'aviso ' + (d.conectado ? 'on' : 'warn');
