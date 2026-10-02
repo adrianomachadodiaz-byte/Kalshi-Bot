@@ -30,7 +30,8 @@ def log_cada(clave, msg, seg=30):
 
 def nueva_operacion(activo, f: Foto, lado, entrada, n, cfg: Config, comision_total, shard=None):
     return Operacion(activo=activo, ticker=f.ticker, lado=lado, entrada=round(entrada, 4), contratos=n, cierre=f.cierre,
-                     objetivo=round(min(entrada + cfg.tp, TOPE_TP), 4), ts_entrada=f.ts, delta=f.delta(),
+                     objetivo=round(min(entrada + cfg.tp, 1.0), 4),
+                     sin_tp=(entrada + cfg.tp) > TOPE_TP + 1e-9, ts_entrada=f.ts, delta=f.delta(),
                      atraso=f.atraso, comision_entrada=comision_total, shard=shard)
 
 
@@ -50,6 +51,8 @@ class EjecutorSim:
         return False
 
     def tp(self, op, f):
+        if op.sin_tp:
+            return False
         op.salir(op.abiertos(), op.objetivo, 0.0, "TP", f.ts)
         return True
 
@@ -112,26 +115,46 @@ class EjecutorReal:
                 return True
         return self.k.saldo(shard) >= contratos
 
+
+    # ------------------------------------------------------------------ precio límite de la entrada
+    def limite_entrada(self, ask, cfg):
+        """(límite de la orden, si cruzó el spread). Separado para poder probarlo sin tocar Kalshi."""
+        # Cuánto se puede pagar de más para asegurar el llenado (como NightShark, pero acotado).
+        #
+        # Solo se cruza el spread en UN caso: cuando el TP cae JUSTO en el tope de 0.99
+        # (entrada_max + TP == 0.99). Ahí el TP se queda en 0.99 pase lo que pase, así que pagar
+        # 1-2 c más no cambia si ganas, solo cuánto ganas, y conviene no quedarse fuera.
+        #
+        # NO se cruza cuando entrada_max + TP PASA de 0.99, porque entonces la operación es `sin_tp`:
+        # no hay orden de venta y se cobra 1.00 al cerrar el bloque. Ahí cada centavo que pagas de más
+        # sale directo de una ganancia de 1-2 centavos. Medido sobre 38 días (entrada 0.98, Delta 140,
+        # últimos 5 min, 549 operaciones con 5 fallos):
+        #   pagar 0.98 (sin cruce) -> +0.95 c/op, margen +0.95 puntos de winrate
+        #   pagar 0.99 (cruce +1c) -> +0.02 c/op, margen +0.02   <- se come toda la ventaja
+        #   pagar 1.00 (cruce +2c) -> -0.91 c/op, margen -100     <- pérdida garantizada
+        #
+        # Por debajo del tope, pagar de más SUBE el TP y baja el acierto, así que tampoco se cruza.
+        # Medido en el backtest de 30 días (BTC, 100 contratos, TP topado en 0.99):
+        #   pagar +2 c siempre     -> +2.43 c/op (-$835); harían falta 2.3 llenados extra al día
+        #   pagar +2 c solo arriba -> +3.68 c/op (-$252); harían falta 0.7 llenados extra al día
+        #   no pagar de más        -> +4.22 c/op
+        sin_tp_cfg = (cfg.entrada_max + cfg.tp) > TOPE_TP + 1e-9      # no habrá orden de TP
+        tp_justo_en_el_tope = (not sin_tp_cfg) and (cfg.entrada_max + cfg.tp) >= TOPE_TP - 1e-9
+        cruza = tp_justo_en_el_tope and ask >= cfg.entrada_max - 1e-9
+        if cruza:
+            limite = ask + self.desliz                       # el TP ya está en el tope: cruzo para llenar
+        else:
+            limite = min(ask + self.desliz, cfg.entrada_max)  # nunca paga más que el máximo del EntryRange
+        limite = min(limite, TOPE_TP)                        # jamás una orden de entrada a 1.00
+        return limite, cruza
+
     # ------------------------------------------------------------------ entrada
     def entrar(self, activo, f, lado, ask, n, cfg):
         m = self.info[f.ticker]
         if not self.fondos.get(f.ticker):
             log_cada(f"fondos{f.ticker}", f"{activo} señal de entrada pero sin saldo en el shard: no entro")
             return None
-        # Cuánto se puede pagar de más para asegurar el llenado (como NightShark, pero acotado).
-        # El TP se topa en TOPE_TP (0.99). Si el ask ya está tan arriba que entrada + TP pasa de 0.99,
-        # el TP se queda en 0.99 pase lo que pase: pagar 1-2 c más NO cambia si ganas, solo cuánto ganas.
-        # Ahí sí conviene cruzar para no quedarse fuera. Por debajo de ese punto, pagar de más SUBE el TP
-        # y baja el acierto, así que se respeta el máximo del EntryRange.
-        # Medido en el backtest de 30 días (BTC, 100 contratos, TP topado):
-        #   pagar +2 c siempre     -> +2.43 c/op (-$835); harían falta 2.3 llenados extra al día
-        #   pagar +2 c solo arriba -> +3.68 c/op (-$252); harían falta 0.7 llenados extra al día
-        #   no pagar de más        -> +4.22 c/op
-        tp_ya_topado = (cfg.entrada_max + cfg.tp) >= TOPE_TP - 1e-9
-        if tp_ya_topado and ask >= cfg.entrada_max - 1e-9:
-            limite = ask + self.desliz                       # el TP ya está en el tope: cruzo para llenar
-        else:
-            limite = min(ask + self.desliz, cfg.entrada_max)  # nunca paga más que el máximo del EntryRange
+        limite, cruza = self.limite_entrada(ask, cfg)
         if lado == "yes":
             libro, precio_yes = "bid", ajustar_tick(limite, m["rangos"], "arriba")
         else:
@@ -169,9 +192,10 @@ class EjecutorReal:
             entrada = ask
         # Red de seguridad: un precio de entrada fuera del EntryRange significa que algo se contabilizó mal.
         # Antes que abrir con un TP disparatado, se avisa y se revisa la posición a mano.
-        if not (cfg.entrada_min - 0.05 <= entrada <= cfg.entrada_max + self.desliz + 1e-9):
+        tope_entrada = (cfg.entrada_max + self.desliz) if cruza else cfg.entrada_max
+        if not (cfg.entrada_min - 0.05 <= entrada <= tope_entrada + 1e-9):
             log(f"{activo} ATENCIÓN: el precio de entrada que devolvió Kalshi ({entrada:.3f}) está fuera de "
-                f"{cfg.entrada_min:.2f}-{cfg.entrada_max:.2f}. No abro la operación; revisa la posición a mano.")
+                f"{cfg.entrada_min - 0.05:.2f}-{tope_entrada:.2f}. No abro la operación; revisa la posición a mano.")
             return None
         # average_fee_paid es por contrato (NightShark lo multiplica por la cantidad)
         op = nueva_operacion(activo, f, lado, entrada, llenos, cfg, comision, m["exchange_index"])
@@ -249,6 +273,8 @@ class EjecutorReal:
 
     # ------------------------------------------------------------------ TP
     def _poner_tp(self, op: Operacion):
+        if op.sin_tp:          # entrada + TP pasa de 0.99: no hay orden, se cobra al cerrar el bloque
+            return
         m = self.info.get(op.ticker, {})
         self.ultimo_tp[op.ticker] = time.time()
         if op.lado == "yes":
@@ -283,7 +309,7 @@ class EjecutorReal:
                 op.tp_orden = None
                 cambio = True
             return cambio
-        if (op.abiertos() > 0 and not op.saliendo and time.time() < op.cierre
+        if (not op.sin_tp and op.abiertos() > 0 and not op.saliendo and time.time() < op.cierre
                 and time.time() - self.ultimo_tp.get(op.ticker, 0) > 5):
             self._poner_tp(op)
             return True
@@ -291,7 +317,7 @@ class EjecutorReal:
 
     def tp(self, op, f):
         """El bid llegó al objetivo. Con la orden del TP puesta, Kalshi la llena solo; sin ella, se vende ya."""
-        if op.tp_orden:
+        if op.tp_orden or op.sin_tp:
             return False
         return self._vender(op, op.objetivo, "TP", f.ts)
 

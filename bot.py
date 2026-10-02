@@ -100,8 +100,8 @@ def validar(crudo):
         err["entrada_max"] = "entre la mínima y 1"
     if not 0 < v["tp"] < 1:
         err["tp"] = "entre 0 y 1"
-    elif v["entrada_max"] + v["tp"] > 0.99 + 1e-9:
-        err["tp"] = f"entrada máxima + TP pasa de 0.99 ({v['entrada_max'] + v['tp']:.2f})"
+    # Si entrada + TP pasa de 0.99 ya no es un error: el bot no pone orden de TP y
+    # aguanta hasta que cierra el bloque, que paga 1.00. Ver Operacion.sin_tp.
     if v["exit"] is not None and not 0 < v["exit"] < v["entrada_min"]:
         err["exit"] = "tiene que ser menor que la entrada mínima"
     if not 0.1 <= v["ritmo"] <= 3:
@@ -521,7 +521,8 @@ class Bot:
             if f:
                 quedan = max(0, f.cierre - ahora)
                 if op:
-                    est = f"abierta {op.lado.upper()} {op.abiertos():g} a {op.entrada:.3f} → TP {op.objetivo:.3f}"
+                    est = (f"abierta {op.lado.upper()} {op.abiertos():g} a {op.entrada:.3f} → "
+                           + ("al cierre del bloque" if op.sin_tp else f"TP {op.objetivo:.3f}"))
                 elif not self.ej:
                     est = "sin API key"
                 elif self.estado.pausado:
@@ -543,6 +544,7 @@ class Bot:
                     referencia=f.referencia, ventana=(cfg.delay * 60) if cfg else None,
                     delta_min=cfg.delta if cfg else None,
                     entrada=op.entrada if op else None, tp=op.objetivo if op else None,
+                    sin_tp=bool(op.sin_tp) if op else None,
                     exit=cfg.exit if (op and cfg) else None, lado=op.lado if op else None,
                     bid=(f.bid(op.lado) if op else None))
                 fila.update(mercado=f.ticker, quedan=quedan, referencia=f.referencia, precio=f.precio,

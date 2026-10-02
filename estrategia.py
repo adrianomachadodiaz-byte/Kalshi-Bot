@@ -78,7 +78,7 @@ class Operacion:
     entrada: float             # precio pagado por contrato
     contratos: float
     cierre: float              # epoch del cierre del bloque
-    objetivo: float            # precio del TP
+    objetivo: float            # precio del TP (1.0 = sin TP: se cobra al cerrar el bloque)
     ts_entrada: float
     delta: Optional[float]
     comision_entrada: float    # en dólares, total
@@ -90,6 +90,7 @@ class Operacion:
     tp_comision: float = 0.0
     shard: Optional[int] = None  # exchange_index del mercado (modo real)
     atraso: Optional[float] = None   # antigüedad del precio con el que se decidió entrar
+    sin_tp: bool = False       # entrada + TP pasa de 0.99: no se pone orden, se cobra al cerrar el bloque
 
     def abiertos(self):
         return round(self.contratos - sum(s["n"] for s in self.salidas), 2)
@@ -143,8 +144,8 @@ class Estrategia:
             return "stop"
         if op.be_armado and bid <= op.entrada + TOL:
             return "stop"
-        if bid >= op.objetivo - TOL:
-            return "tp"
+        if not op.sin_tp and bid >= op.objetivo - TOL:
+            return "tp"                  # sin TP no hay salida por objetivo: se cobra al cerrar
         if c.breakeven is not None and bid >= op.entrada + c.breakeven - TOL:
             op.be_armado = True          # el stop en BE vale desde la foto siguiente
         return None

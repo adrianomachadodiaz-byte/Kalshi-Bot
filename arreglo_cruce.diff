@@ -1,0 +1,126 @@
+--- /tmp/ej_orig.py	2026-10-01 21:43:57.141670674 -0500
++++ ejecutores.py	2026-10-01 21:43:26.505098932 -0500
+@@ -115,26 +115,46 @@
+                 return True
+         return self.k.saldo(shard) >= contratos
+ 
+-    # ------------------------------------------------------------------ entrada
+-    def entrar(self, activo, f, lado, ask, n, cfg):
+-        m = self.info[f.ticker]
+-        if not self.fondos.get(f.ticker):
+-            log_cada(f"fondos{f.ticker}", f"{activo} señal de entrada pero sin saldo en el shard: no entro")
+-            return None
++
++    # ------------------------------------------------------------------ precio límite de la entrada
++    def limite_entrada(self, ask, cfg):
++        """(límite de la orden, si cruzó el spread). Separado para poder probarlo sin tocar Kalshi."""
+         # Cuánto se puede pagar de más para asegurar el llenado (como NightShark, pero acotado).
+-        # El TP se topa en TOPE_TP (0.99). Si el ask ya está tan arriba que entrada + TP pasa de 0.99,
+-        # el TP se queda en 0.99 pase lo que pase: pagar 1-2 c más NO cambia si ganas, solo cuánto ganas.
+-        # Ahí sí conviene cruzar para no quedarse fuera. Por debajo de ese punto, pagar de más SUBE el TP
+-        # y baja el acierto, así que se respeta el máximo del EntryRange.
+-        # Medido en el backtest de 30 días (BTC, 100 contratos, TP topado):
++        #
++        # Solo se cruza el spread en UN caso: cuando el TP cae JUSTO en el tope de 0.99
++        # (entrada_max + TP == 0.99). Ahí el TP se queda en 0.99 pase lo que pase, así que pagar
++        # 1-2 c más no cambia si ganas, solo cuánto ganas, y conviene no quedarse fuera.
++        #
++        # NO se cruza cuando entrada_max + TP PASA de 0.99, porque entonces la operación es `sin_tp`:
++        # no hay orden de venta y se cobra 1.00 al cerrar el bloque. Ahí cada centavo que pagas de más
++        # sale directo de una ganancia de 1-2 centavos. Medido sobre 38 días (entrada 0.98, Delta 140,
++        # últimos 5 min, 549 operaciones con 5 fallos):
++        #   pagar 0.98 (sin cruce) -> +0.95 c/op, margen +0.95 puntos de winrate
++        #   pagar 0.99 (cruce +1c) -> +0.02 c/op, margen +0.02   <- se come toda la ventaja
++        #   pagar 1.00 (cruce +2c) -> -0.91 c/op, margen -100     <- pérdida garantizada
++        #
++        # Por debajo del tope, pagar de más SUBE el TP y baja el acierto, así que tampoco se cruza.
++        # Medido en el backtest de 30 días (BTC, 100 contratos, TP topado en 0.99):
+         #   pagar +2 c siempre     -> +2.43 c/op (-$835); harían falta 2.3 llenados extra al día
+         #   pagar +2 c solo arriba -> +3.68 c/op (-$252); harían falta 0.7 llenados extra al día
+         #   no pagar de más        -> +4.22 c/op
+-        tp_ya_topado = (cfg.entrada_max + cfg.tp) >= TOPE_TP - 1e-9
+-        if tp_ya_topado and ask >= cfg.entrada_max - 1e-9:
++        sin_tp_cfg = (cfg.entrada_max + cfg.tp) > TOPE_TP + 1e-9      # no habrá orden de TP
++        tp_justo_en_el_tope = (not sin_tp_cfg) and (cfg.entrada_max + cfg.tp) >= TOPE_TP - 1e-9
++        cruza = tp_justo_en_el_tope and ask >= cfg.entrada_max - 1e-9
++        if cruza:
+             limite = ask + self.desliz                       # el TP ya está en el tope: cruzo para llenar
+         else:
+             limite = min(ask + self.desliz, cfg.entrada_max)  # nunca paga más que el máximo del EntryRange
++        limite = min(limite, TOPE_TP)                        # jamás una orden de entrada a 1.00
++        return limite, cruza
++
++    # ------------------------------------------------------------------ entrada
++    def entrar(self, activo, f, lado, ask, n, cfg):
++        m = self.info[f.ticker]
++        if not self.fondos.get(f.ticker):
++            log_cada(f"fondos{f.ticker}", f"{activo} señal de entrada pero sin saldo en el shard: no entro")
++            return None
++        limite, cruza = self.limite_entrada(ask, cfg)
+         if lado == "yes":
+             libro, precio_yes = "bid", ajustar_tick(limite, m["rangos"], "arriba")
+         else:
+@@ -172,9 +192,10 @@
+             entrada = ask
+         # Red de seguridad: un precio de entrada fuera del EntryRange significa que algo se contabilizó mal.
+         # Antes que abrir con un TP disparatado, se avisa y se revisa la posición a mano.
+-        if not (cfg.entrada_min - 0.05 <= entrada <= cfg.entrada_max + self.desliz + 1e-9):
++        tope_entrada = (cfg.entrada_max + self.desliz) if cruza else cfg.entrada_max
++        if not (cfg.entrada_min - 0.05 <= entrada <= tope_entrada + 1e-9):
+             log(f"{activo} ATENCIÓN: el precio de entrada que devolvió Kalshi ({entrada:.3f}) está fuera de "
+-                f"{cfg.entrada_min:.2f}-{cfg.entrada_max:.2f}. No abro la operación; revisa la posición a mano.")
++                f"{cfg.entrada_min - 0.05:.2f}-{tope_entrada:.2f}. No abro la operación; revisa la posición a mano.")
+             return None
+         # average_fee_paid es por contrato (NightShark lo multiplica por la cantidad)
+         op = nueva_operacion(activo, f, lado, entrada, llenos, cfg, comision, m["exchange_index"])
+--- /tmp/pst_orig.py	2026-10-01 21:43:57.151843590 -0500
++++ probar_sin_tp.py	2026-10-01 21:43:48.483430196 -0500
+@@ -11,7 +11,7 @@
+ os.environ.setdefault("NOTICIAS", "0")
+ 
+ import bot as B
+-from ejecutores import EjecutorSim, nueva_operacion
++from ejecutores import TOPE_TP, EjecutorReal, EjecutorSim, nueva_operacion
+ from estrategia import Config, Estrategia, Foto
+ 
+ fallos = []
+@@ -85,5 +85,39 @@
+     _, e = B.validar(c)
+     check(("tp" in e) == debe_fallar, f"tp={tp} -> {'rechazado' if 'tp' in e else 'aceptado'}")
+ 
++print("\n9) EL CRUCE DE SPREAD NO SE ACTIVA CUANDO NO HAY TP  (el bug de la v1)")
++ej = EjecutorReal.__new__(EjecutorReal)      # sin tocar Kalshi: solo se prueba el cálculo del límite
++ej.desliz = 0.02
++
++# (a) sin TP (entrada_max + TP pasa de 0.99): NUNCA puede pagar más que entrada_max
++sin_tp = Config(delta=140, delay=5, entrada_min=0.97, entrada_max=0.98, tp=0.03, exit=None, breakeven=None)
++for ask in (0.97, 0.98):
++    lim, cruzo = ej.limite_entrada(ask, sin_tp)
++    check(not cruzo, f"sin TP, ask {ask}: no cruza")
++    check(lim <= sin_tp.entrada_max + 1e-9, f"sin TP, ask {ask}: limite {lim:.4f} <= 0.98")
++check(ej.limite_entrada(0.97, sin_tp)[0] == 0.98, "sin TP, ask 0.97 -> limite 0.98 (ask+2c topado)")
++
++# (b) TP JUSTO en el tope (0.86 + 0.13 = 0.99): ahí sí se cruza, como estaba pensado
++justo = Config(delta=100, delay=7, entrada_min=0.81, entrada_max=0.86, tp=0.13, exit=0.46, breakeven=None)
++lim, cruzo = ej.limite_entrada(0.86, justo)
++check(cruzo, "TP justo en 0.99, ask en el máximo: sí cruza")
++check(abs(lim - 0.88) < 1e-9, f"TP justo en 0.99: limite {lim:.4f} = ask + 2c")
++lim, cruzo = ej.limite_entrada(0.84, justo)
++check(not cruzo, "TP justo en 0.99 pero ask por debajo del máximo: no cruza")
++check(abs(lim - 0.86) < 1e-9, f"limite {lim:.4f} topado en entrada_max")
++
++# (c) config normal (0.81-0.81 + 0.15 = 0.96): nunca cruza
++normal = Config(delta=100, delay=7, entrada_min=0.78, entrada_max=0.81, tp=0.15, exit=0.40, breakeven=None)
++for ask in (0.78, 0.80, 0.81):
++    lim, cruzo = ej.limite_entrada(ask, normal)
++    check(not cruzo, f"config normal, ask {ask}: no cruza")
++    check(lim <= 0.81 + 1e-9, f"config normal, ask {ask}: limite {lim:.4f} <= 0.81")
++
++# (d) jamás una orden de entrada a 1.00
++alto = Config(delta=140, delay=5, entrada_min=0.99, entrada_max=0.99, tp=0.05, exit=None, breakeven=None)
++lim, _ = ej.limite_entrada(0.99, alto)
++check(lim <= TOPE_TP + 1e-9, f"entrada a 0.99: limite {lim:.4f} nunca pasa de {TOPE_TP}")
++
++
+ print("\nRESULTADO:", "BIEN" if not fallos else f"MAL ({len(fallos)} fallos)")
+ sys.exit(1 if fallos else 0)

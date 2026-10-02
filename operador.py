@@ -162,7 +162,8 @@ class Operador:
             self.estado.operado[activo] = f.ticker
             self.estado.abiertas[activo] = op
             self.estado.guardar()
-            log(f"{activo} ENTRA {lado.upper()} {op.contratos:g} a {op.entrada:.3f} | TP {op.objetivo:.3f} | "
+            meta = "sin TP, al cierre" if op.sin_tp else f"TP {op.objetivo:.3f}"
+            log(f"{activo} ENTRA {lado.upper()} {op.contratos:g} a {op.entrada:.3f} | {meta} | "
                 f"delta {op.delta:.1f} | quedan {(op.cierre - f.ts) / 60:.1f} min | {f.ticker}")
 
     def _gestionar(self, op: Operacion, f: Foto):

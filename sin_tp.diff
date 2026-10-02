@@ -1,0 +1,224 @@
+diff --git a/bot.py b/bot.py
+index 4dec10b..1680b79 100644
+--- a/bot.py
++++ b/bot.py
+@@ -100,8 +100,8 @@ def validar(crudo):
+         err["entrada_max"] = "entre la mínima y 1"
+     if not 0 < v["tp"] < 1:
+         err["tp"] = "entre 0 y 1"
+-    elif v["entrada_max"] + v["tp"] > 0.99 + 1e-9:
+-        err["tp"] = f"entrada máxima + TP pasa de 0.99 ({v['entrada_max'] + v['tp']:.2f})"
++    # Si entrada + TP pasa de 0.99 ya no es un error: el bot no pone orden de TP y
++    # aguanta hasta que cierra el bloque, que paga 1.00. Ver Operacion.sin_tp.
+     if v["exit"] is not None and not 0 < v["exit"] < v["entrada_min"]:
+         err["exit"] = "tiene que ser menor que la entrada mínima"
+     if not 0.1 <= v["ritmo"] <= 3:
+@@ -521,7 +521,8 @@ class Bot:
+             if f:
+                 quedan = max(0, f.cierre - ahora)
+                 if op:
+-                    est = f"abierta {op.lado.upper()} {op.abiertos():g} a {op.entrada:.3f} → TP {op.objetivo:.3f}"
++                    est = (f"abierta {op.lado.upper()} {op.abiertos():g} a {op.entrada:.3f} → "
++                           + ("al cierre del bloque" if op.sin_tp else f"TP {op.objetivo:.3f}"))
+                 elif not self.ej:
+                     est = "sin API key"
+                 elif self.estado.pausado:
+@@ -543,6 +544,7 @@ class Bot:
+                     referencia=f.referencia, ventana=(cfg.delay * 60) if cfg else None,
+                     delta_min=cfg.delta if cfg else None,
+                     entrada=op.entrada if op else None, tp=op.objetivo if op else None,
++                    sin_tp=bool(op.sin_tp) if op else None,
+                     exit=cfg.exit if (op and cfg) else None, lado=op.lado if op else None,
+                     bid=(f.bid(op.lado) if op else None))
+                 fila.update(mercado=f.ticker, quedan=quedan, referencia=f.referencia, precio=f.precio,
+diff --git a/ejecutores.py b/ejecutores.py
+index 7dfdb19..82cca86 100644
+--- a/ejecutores.py
++++ b/ejecutores.py
+@@ -30,7 +30,8 @@ def log_cada(clave, msg, seg=30):
+ 
+ def nueva_operacion(activo, f: Foto, lado, entrada, n, cfg: Config, comision_total, shard=None):
+     return Operacion(activo=activo, ticker=f.ticker, lado=lado, entrada=round(entrada, 4), contratos=n, cierre=f.cierre,
+-                     objetivo=round(min(entrada + cfg.tp, TOPE_TP), 4), ts_entrada=f.ts, delta=f.delta(),
++                     objetivo=round(min(entrada + cfg.tp, 1.0), 4),
++                     sin_tp=(entrada + cfg.tp) > TOPE_TP + 1e-9, ts_entrada=f.ts, delta=f.delta(),
+                      atraso=f.atraso, comision_entrada=comision_total, shard=shard)
+ 
+ 
+@@ -50,6 +51,8 @@ class EjecutorSim:
+         return False
+ 
+     def tp(self, op, f):
++        if op.sin_tp:
++            return False
+         op.salir(op.abiertos(), op.objetivo, 0.0, "TP", f.ts)
+         return True
+ 
+@@ -249,6 +252,8 @@ class EjecutorReal:
+ 
+     # ------------------------------------------------------------------ TP
+     def _poner_tp(self, op: Operacion):
++        if op.sin_tp:          # entrada + TP pasa de 0.99: no hay orden, se cobra al cerrar el bloque
++            return
+         m = self.info.get(op.ticker, {})
+         self.ultimo_tp[op.ticker] = time.time()
+         if op.lado == "yes":
+@@ -283,7 +288,7 @@ class EjecutorReal:
+                 op.tp_orden = None
+                 cambio = True
+             return cambio
+-        if (op.abiertos() > 0 and not op.saliendo and time.time() < op.cierre
++        if (not op.sin_tp and op.abiertos() > 0 and not op.saliendo and time.time() < op.cierre
+                 and time.time() - self.ultimo_tp.get(op.ticker, 0) > 5):
+             self._poner_tp(op)
+             return True
+@@ -291,7 +296,7 @@ class EjecutorReal:
+ 
+     def tp(self, op, f):
+         """El bid llegó al objetivo. Con la orden del TP puesta, Kalshi la llena solo; sin ella, se vende ya."""
+-        if op.tp_orden:
++        if op.tp_orden or op.sin_tp:
+             return False
+         return self._vender(op, op.objetivo, "TP", f.ts)
+ 
+diff --git a/estrategia.py b/estrategia.py
+index f6c29e7..6dbeae5 100644
+--- a/estrategia.py
++++ b/estrategia.py
+@@ -78,7 +78,7 @@ class Operacion:
+     entrada: float             # precio pagado por contrato
+     contratos: float
+     cierre: float              # epoch del cierre del bloque
+-    objetivo: float            # precio del TP
++    objetivo: float            # precio del TP (1.0 = sin TP: se cobra al cerrar el bloque)
+     ts_entrada: float
+     delta: Optional[float]
+     comision_entrada: float    # en dólares, total
+@@ -90,6 +90,7 @@ class Operacion:
+     tp_comision: float = 0.0
+     shard: Optional[int] = None  # exchange_index del mercado (modo real)
+     atraso: Optional[float] = None   # antigüedad del precio con el que se decidió entrar
++    sin_tp: bool = False       # entrada + TP pasa de 0.99: no se pone orden, se cobra al cerrar el bloque
+ 
+     def abiertos(self):
+         return round(self.contratos - sum(s["n"] for s in self.salidas), 2)
+@@ -143,8 +144,8 @@ class Estrategia:
+             return "stop"
+         if op.be_armado and bid <= op.entrada + TOL:
+             return "stop"
+-        if bid >= op.objetivo - TOL:
+-            return "tp"
++        if not op.sin_tp and bid >= op.objetivo - TOL:
++            return "tp"                  # sin TP no hay salida por objetivo: se cobra al cerrar
+         if c.breakeven is not None and bid >= op.entrada + c.breakeven - TOL:
+             op.be_armado = True          # el stop en BE vale desde la foto siguiente
+         return None
+diff --git a/operador.py b/operador.py
+index a4c5b7b..7a35495 100644
+--- a/operador.py
++++ b/operador.py
+@@ -162,7 +162,8 @@ class Operador:
+             self.estado.operado[activo] = f.ticker
+             self.estado.abiertas[activo] = op
+             self.estado.guardar()
+-            log(f"{activo} ENTRA {lado.upper()} {op.contratos:g} a {op.entrada:.3f} | TP {op.objetivo:.3f} | "
++            meta = "sin TP, al cierre" if op.sin_tp else f"TP {op.objetivo:.3f}"
++            log(f"{activo} ENTRA {lado.upper()} {op.contratos:g} a {op.entrada:.3f} | {meta} | "
+                 f"delta {op.delta:.1f} | quedan {(op.cierre - f.ts) / 60:.1f} min | {f.ticker}")
+ 
+     def _gestionar(self, op: Operacion, f: Foto):
+diff --git a/probar_sin_tp.py b/probar_sin_tp.py
+new file mode 100644
+index 0000000..12714d8
+--- /dev/null
++++ b/probar_sin_tp.py
+@@ -0,0 +1,89 @@
++"""Comprueba el modo "sin TP": si entrada + TP pasa de 0.99, no se pone orden y se cobra al cierre.
++
++    python probar_sin_tp.py
++"""
++import os
++import sys
++
++sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
++os.environ.setdefault("ACCESS_TOKEN", "x")
++os.environ.setdefault("DATA_DIR", "/tmp/probar_sin_tp")
++os.environ.setdefault("NOTICIAS", "0")
++
++import bot as B
++from ejecutores import EjecutorSim, nueva_operacion
++from estrategia import Config, Estrategia, Foto
++
++fallos = []
++
++
++def check(ok, texto):
++    print(("  OK  " if ok else "  MAL ") + texto)
++    if not ok:
++        fallos.append(texto)
++
++
++def foto(bid, segundo=880):
++    """Una foto del bloque con ese bid del lado YES."""
++    cierre = 1_000_000.0
++    return Foto(ts=cierre - 900 + segundo, ticker="T", cierre=cierre, referencia=84000.0,
++                precio=84200.0, atraso=1.0, yes_bid=bid, no_bid=round(1 - bid - 0.01, 4),
++                yes_ask=round(bid + 0.01, 4), no_ask=round(1 - bid, 4))
++
++
++print("\n1) el panel acepta entrada 0.98 con TP 0.03")
++crudo = {c: ("" if d is None else str(d)) for c, t, d, *_ in B.CAMPOS}
++crudo.update(entrada_min="0.97", entrada_max="0.98", tp="0.03", exit="0.90", delta="100", delay="7")
++v, err = B.validar(crudo)
++check(not err, f"validar() no da error (dio: {err})")
++
++print("\n2) la operación nace sin TP y con objetivo 1.00")
++cfg = Config(delta=100, delay=7, entrada_min=0.97, entrada_max=0.98, tp=0.03, exit=0.90,
++             breakeven=None)
++f = foto(0.97)
++op = nueva_operacion("BTC", f, "yes", 0.98, 1.0, cfg, 0.0)
++check(op.sin_tp is True, f"sin_tp = {op.sin_tp}")
++check(abs(op.objetivo - 1.0) < 1e-9, f"objetivo = {op.objetivo} (debe ser 1.0, no 0.99)")
++
++print("\n3) con el bid en 0.99 NO sale: aguanta")
++est = Estrategia(cfg)
++check(est.salida(op, foto(0.99)) is None, "salida() con bid 0.99 devuelve None")
++check(est.salida(op, foto(0.995)) is None, "salida() con bid 0.995 devuelve None")
++
++print("\n4) el stop sigue funcionando")
++check(est.salida(op, foto(0.90)) == "stop", "salida() con bid 0.90 devuelve 'stop'")
++check(est.salida(op, foto(0.85)) == "stop", "salida() con bid 0.85 devuelve 'stop'")
++
++print("\n5) el ejecutor no intenta poner ni ejecutar el TP")
++sim = EjecutorSim()
++check(sim.tp(op, foto(0.99)) is False, "EjecutorSim.tp() no vende")
++check(op.abiertos() == 1.0, f"la posición sigue abierta ({op.abiertos():g} contratos)")
++
++print("\n6) un TP normal (0.85 + 0.13) sigue igual que antes")
++cfg2 = Config(delta=100, delay=7, entrada_min=0.81, entrada_max=0.86, tp=0.13, exit=0.46,
++              breakeven=None)
++op2 = nueva_operacion("BTC", foto(0.84), "yes", 0.85, 1.0, cfg2, 0.0)
++est2 = Estrategia(cfg2)
++check(op2.sin_tp is False, f"sin_tp = {op2.sin_tp}")
++check(abs(op2.objetivo - 0.98) < 1e-9, f"objetivo = {op2.objetivo} (0.85 + 0.13)")
++check(est2.salida(op2, foto(0.98)) == "tp", "salida() con bid 0.98 devuelve 'tp'")
++check(est2.salida(op2, foto(0.46)) == "stop", "salida() con bid 0.46 devuelve 'stop'")
++
++print("\n7) el BreakEven sigue armándose aunque no haya TP")
++cfg3 = Config(delta=100, delay=7, entrada_min=0.97, entrada_max=0.98, tp=0.03, exit=0.90,
++              breakeven=0.01)
++op3 = nueva_operacion("BTC", foto(0.97), "yes", 0.98, 1.0, cfg3, 0.0)
++est3 = Estrategia(cfg3)
++check(op3.sin_tp is True, "la operación es sin TP")
++est3.salida(op3, foto(0.99))                      # bid 0.99 >= 0.98 + 0.01 -> arma el BE
++check(op3.be_armado is True, f"be_armado = {op3.be_armado} tras tocar entrada + BE")
++check(est3.salida(op3, foto(0.975)) == "stop", "con el BE armado, bid 0.975 devuelve 'stop'")
++
++print("\n8) el tope viejo de 0.99 ya no veta nada, pero el TP sigue acotado a (0,1)")
++for tp, debe_fallar in [("0.03", False), ("0.5", False), ("0", True), ("1", True), ("1.5", True)]:
++    c = dict(crudo, tp=tp)
++    _, e = B.validar(c)
++    check(("tp" in e) == debe_fallar, f"tp={tp} -> {'rechazado' if 'tp' in e else 'aceptado'}")
++
++print("\nRESULTADO:", "BIEN" if not fallos else f"MAL ({len(fallos)} fallos)")
++sys.exit(1 if fallos else 0)
