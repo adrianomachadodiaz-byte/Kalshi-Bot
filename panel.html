@@ -704,7 +704,17 @@ function grafico(v, a) {
   o.push(`<text x="${X0 - 7}" y="${Y0 + 10}" text-anchor="end" fill="${TENUE}" font-size="10.5">${Math.round(hi).toLocaleString('es')}</text>`);
   o.push(`<text x="${X0 - 7}" y="${Y1 + 3}" text-anchor="end" fill="${TENUE}" font-size="10.5">${Math.round(lo).toLocaleString('es')}</text>`);
   // la etiqueta de la ventana baja al pie: dentro del gráfico chocaba con el mínimo del bloque
-  if (g.ventana) o.push(`<text x="${Math.min(x(BLOQUE - g.ventana) + 5, X1 - 82).toFixed(1)}" y="${Y1 + 17}" fill="${TENUE}" font-size="10.5">últimos ${g.ventana % 60 === 0 && g.ventana >= 60 ? g.ventana / 60 + ' min' : g.ventana + ' s'}</text>`);
+  if (g.ventana) {
+    // Con un Delay corto la banda queda pegada al borde y el texto se montaba encima de
+    // "cierre": si no cabe dentro, la etiqueta se pone a la izquierda de la banda.
+    const ini = x(BLOQUE - g.ventana);
+    const txt = g.ventana % 60 === 0 && g.ventana >= 60 ? g.ventana / 60 + ' min' : g.ventana + ' s';
+    const ancho = (txt.length + 8) * 5.6;
+    const dentro = X1 - ini > ancho + 40;                 // 40 = hueco que necesita "cierre"
+    const px = dentro ? ini + 5 : ini - 5;
+    if (dentro || px - ancho > X0 + 34)                   // 34 = hueco que necesita "inicio"
+      o.push(`<text x="${px.toFixed(1)}" y="${Y1 + 17}" text-anchor="${dentro ? 'start' : 'end'}" fill="${TENUE}" font-size="10.5">últimos ${txt}</text>`);
+  }
 
   // avance del bloque
   const frac = Math.max(0, Math.min(1, ult[0] / BLOQUE));
@@ -809,7 +819,7 @@ function medidor(g) {
     </div>
     <div class="pista-pies">
       <span class="neg num">stop ${n(ex, 2)}</span>
-      <span class="ayuda num" style="left:${pEnt}%">entrada ${n(g.entrada, 3)}</span>
+      <span class="ayuda num" style="left:${Math.min(Math.max(pEnt, 17), 76)}%">entrada ${n(g.entrada, 3)}</span>
       <span class="pos num">TP ${n(g.tp, 2)}</span>
     </div>
   </div>`;
@@ -968,8 +978,11 @@ function pintarFiltro(d) {
     return;
   }
   const h = f.hoy || {};
+  const sinCal = !!d.noticias_error;
   caja.innerHTML = `<p class="fnota">
-      <b>${f.rojos_hoy}</b> dato${f.rojos_hoy === 1 ? '' : 's'} de alto impacto hoy.<br>
+      ${sinCal
+        ? 'No tengo el calendario ahora mismo, así que <b>solo filtra por hora fija</b> (08:30 / 10:00 / 14:00 ET).<br>'
+        : `<b>${f.rojos_hoy}</b> dato${f.rojos_hoy === 1 ? '' : 's'} de alto impacto hoy.<br>`}
       Bloques saltados hoy: <b>${f.hoy_total}</b>
       (${h.hora || 0} por hora fija · ${h.evento || 0} por noticia · ${h.dia || 0} por día cargado).<br>
       Esta semana: <b>${f.semana_total}</b>.
