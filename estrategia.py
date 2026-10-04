@@ -18,18 +18,19 @@ def comision(p):
 @dataclass
 class Config:
     delta: float                       # entra solo si |precio - referencia| >= delta
-    delay: int                         # entra solo en los últimos `delay` minutos
+    delay: int                         # entra solo en los últimos `delay` SEGUNDOS del bloque
     entrada_min: float                 # EntryRange
     entrada_max: float
     tp: float                          # TP = entrada + tp (cuenta cuando el bid llega)
     exit: Optional[float]              # stop fijo: sale si el bid <= exit (None = sin Exit)
     breakeven: Optional[float] = None  # si el bid sube +X, el stop pasa al precio de entrada
+    contratos: float = 1.0             # contratos por operación de ESTE activo
 
     def texto(self):
         ex = f"{self.exit:.2f}" if self.exit is not None else "sin"
         be = f"+{self.breakeven:.2f}" if self.breakeven is not None else "sin"
-        return (f"Delta {self.delta:g} · Delay {self.delay} · Entrada {self.entrada_min:.2f}-{self.entrada_max:.2f} · "
-                f"TP +{self.tp:.2f} · Exit {ex} · BreakEven {be}")
+        return (f"Delta {self.delta:g} · Delay {self.delay} s · Entrada {self.entrada_min:.2f}-{self.entrada_max:.2f} · "
+                f"TP +{self.tp:.2f} · Exit {ex} · BreakEven {be} · {self.contratos:g} contratos")
 
 
 @dataclass
@@ -120,7 +121,7 @@ class Estrategia:
         c = self.cfg
         if not f.valida() or f.ts >= f.cierre:
             return None
-        if f.segundo() < BLOQUE - 60 * c.delay:
+        if f.segundo() < BLOQUE - c.delay:
             return None
         d = f.delta()
         if d is None or d < c.delta - 1e-9:

@@ -22,7 +22,7 @@ from ejecutores import EjecutorSim
 from estrategia import Config, Estrategia, Foto
 from operador import Estado, Operador, Registro
 
-CFG_BTC = Config(delta=100, delay=7, entrada_min=0.81, entrada_max=0.86, tp=0.13, exit=0.46, breakeven=None)
+CFG_BTC = Config(delta=100, delay=420, entrada_min=0.81, entrada_max=0.86, tp=0.13, exit=0.46, breakeven=None)
 
 
 def archivos(rutas):

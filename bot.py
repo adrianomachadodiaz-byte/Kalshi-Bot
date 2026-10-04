@@ -11,6 +11,7 @@ import os
 import threading
 import time
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -43,27 +44,45 @@ PASO_GRAFICO = 1                         # segundos entre puntos de la serie que
 
 # ---------------------------------------------------------------- ajustes (panel > variables de Railway > defecto)
 # clave, tipo, defecto, etiqueta, ayuda, sección ("" = básico, "av" = avanzado)
-CAMPOS = [
-    ("activos", "activos", "BTC", "Cripto", "BTC o ETH", ""),
+# Ajustes de CADA activo: BTC y ETH llevan los suyos, independientes.
+CAMPOS_ACTIVO = [
     ("delta", "num", 100.0, "Delta ($)", "mínimo para entrar", ""),
-    ("delay", "ent", 7, "Delay (min)", "ventana de entrada", ""),
+    ("delay", "ent", 420, "Delay (s)", "ventana de entrada, en segundos", ""),
     ("entrada_min", "num", 0.81, "Entrada mínima", "EntryRange desde", ""),
     ("entrada_max", "num", 0.86, "Entrada máxima", "EntryRange hasta", ""),
     ("tp", "num", 0.13, "Take profit (+)", "sobre la entrada", ""),
     ("exit", "opc", 0.46, "Exit (stop)", "vacío = sin Exit", ""),
     ("contratos", "num", 1.0, "Contratos", "por operación", "av"),
     ("breakeven", "opc", None, "BreakEven (+)", "vacío = sin BE", "av"),
+]
+# Ajustes de toda la cuenta: valen para los dos activos a la vez.
+CAMPOS_GLOBAL = [
+    ("activos", "activos", "BTC", "Cripto", "BTC, ETH o las dos", ""),
     ("max_perdida_dia", "num", 0.0, "Pérdida máx. ($)", "0 = sin límite", "av"),
     ("meta_ganancia_dia", "num", 0.0, "Meta ($)", "0 = sin meta", "av"),
     ("desliz_entrada", "num", 0.02, "Deslizamiento", "sobre el ask", "av"),
     ("espera_entrada", "num", 2.0, "Espera al entrar (s)", "0 = IOC; 2 = deja la orden puesta", "av"),
     ("ritmo", "num", 0.25, "Ritmo (s)", "cada cuánto mira el ask", "av"),
     ("ritmo_indice", "num", 1.0, "Ritmo índice (s)", "el feed avanza cada 2-3 s", "av"),
+    ("filtro_noticias", "sino", "si", "Filtro de noticias", "no entra si el bloque cierra sobre un dato", ""),
+    ("noticia_horas", "texto", "08:30,10:00,14:00", "Horas fijas (ET)", "bloques que cierran a esa hora", "av"),
+    ("noticia_margen", "num", 2.0, "Margen noticia (min)", "después del cierre del bloque", "av"),
+    ("noticia_dia_alto", "ent", 3, "Día cargado (eventos)", "desde cuántos rojos se recorta; 0 = nunca", "av"),
+    ("noticia_dia_modo", "texto", "mitad", "Día cargado: qué hacer", "mitad = opera uno de cada dos · nada = no opera", "av"),
 ]
 
 
 def convertir(tipo, v):
     """Texto del panel / variable -> valor. ValueError si no se entiende."""
+    if tipo == "sino":
+        t = str(v).strip().lower()
+        if t in ("1", "si", "sí", "true", "on", "yes"):
+            return "si"
+        if t in ("0", "no", "false", "off", ""):
+            return "no"
+        raise ValueError("sí o no")
+    if tipo == "texto":
+        return str(v or "").strip()
     if tipo == "activos":
         lista = [x.strip().upper() for x in str(v).split(",") if x.strip()]
         return ",".join(lista)
@@ -75,73 +94,157 @@ def convertir(tipo, v):
     return int(n) if tipo == "ent" else n
 
 
-def validar(crudo):
-    """(valores, errores). crudo: dict clave -> texto o número."""
+def validar_activo(crudo):
+    """Valida los ajustes de UN activo. Devuelve (valores, errores)."""
     v, err = {}, {}
-    for clave, tipo, _, _, _, _ in CAMPOS:
+    for clave, tipo, _, _, _, _ in CAMPOS_ACTIVO:
         try:
             v[clave] = convertir(tipo, crudo.get(clave))
         except (TypeError, ValueError):
             err[clave] = "número no válido"
     if err:
         return v, err
-    activos = v["activos"].split(",") if v["activos"] else []
-    if not activos or any(a not in ACTIVOS_VALIDOS for a in activos):
-        err["activos"] = "usa BTC o ETH"
     if not 0 < v["contratos"] <= 10000:
         err["contratos"] = "entre 0.01 y 10000"
     if v["delta"] < 0:
         err["delta"] = "no puede ser negativo"
-    if not 1 <= v["delay"] <= 15:
-        err["delay"] = "entre 1 y 15 minutos"
+    if not 1 <= v["delay"] <= 900:
+        err["delay"] = "entre 1 y 900 segundos (el bloque dura 900)"
     if not 0 < v["entrada_min"] < 1:
         err["entrada_min"] = "entre 0 y 1"
     if not 0 < v["entrada_max"] < 1 or v["entrada_max"] < v["entrada_min"]:
         err["entrada_max"] = "entre la mínima y 1"
     if not 0 < v["tp"] < 1:
         err["tp"] = "entre 0 y 1"
-    # Si entrada + TP pasa de 0.99 ya no es un error: el bot no pone orden de TP y
+    # Si entrada + TP pasa de 0.99 no es un error: el bot no pone orden de TP y
     # aguanta hasta que cierra el bloque, que paga 1.00. Ver Operacion.sin_tp.
     if v["exit"] is not None and not 0 < v["exit"] < v["entrada_min"]:
         err["exit"] = "tiene que ser menor que la entrada mínima"
+    if v["breakeven"] is not None and not 0 < v["breakeven"] < v["tp"]:
+        err["breakeven"] = "entre 0 y el TP"
+    return v, err
+
+
+def validar(crudo):
+    """(valores, errores) de todo: lo global y lo de cada activo.
+
+    crudo: {campos globales..., "por_activo": {"BTC": {...}, "ETH": {...}}}
+    Los errores de un activo van como "BTC.delta" para que el panel marque el campo.
+    """
+    v, err = {}, {}
+    for clave, tipo, _, _, _, _ in CAMPOS_GLOBAL:
+        try:
+            v[clave] = convertir(tipo, crudo.get(clave))
+        except (TypeError, ValueError):
+            err[clave] = "número no válido"
+    # los activos se validan siempre, incluso si algo global viene mal: así quien
+    # lea v["por_activo"] nunca se encuentra con que no está
+    crudo_pa = crudo.get("por_activo") or {}
+    v["por_activo"] = {}
+    for a in ACTIVOS_VALIDOS:
+        base = {c[0]: c[2] for c in CAMPOS_ACTIVO}
+        base.update({k: x for k, x in (crudo_pa.get(a) or {}).items() if k in base})
+        v["por_activo"][a] = validar_activo(base)[0]
+    if err:
+        return v, err
+    activos = [a for a in (v["activos"].split(",") if v["activos"] else []) if a]
+    if not activos or any(a not in ACTIVOS_VALIDOS for a in activos):
+        err["activos"] = "usa BTC, ETH o las dos"
+        activos = [a for a in activos if a in ACTIVOS_VALIDOS]
     if not 0.1 <= v["ritmo"] <= 3:
         err["ritmo"] = "entre 0.1 y 3 segundos"
     if not 0.25 <= v["ritmo_indice"] <= 10:
         err["ritmo_indice"] = "entre 0.25 y 10 segundos"
     elif v["ritmo_indice"] > Precios.MAX_ATRASO - 1:
         err["ritmo_indice"] = f"tiene que ser menor que {Precios.MAX_ATRASO - 1:g} s o el candado del índice salta solo"
-    if v["breakeven"] is not None and not 0 < v["breakeven"] < v["tp"]:
-        err["breakeven"] = "entre 0 y el TP"
     for d in ("max_perdida_dia", "meta_ganancia_dia"):
         if v[d] < 0:
             err[d] = "0 o más"
     if not 0 <= v["desliz_entrada"] <= 0.10:
         err["desliz_entrada"] = "entre 0 y 0.10"
-    if not 0 <= v["espera_entrada"] <= 10:
-        err["espera_entrada"] = "entre 0 y 10 segundos"
+    if not 0 <= v["espera_entrada"] <= 30:
+        err["espera_entrada"] = "entre 0 y 30 segundos"
+    if not 0 <= v["noticia_margen"] <= 60:
+        err["noticia_margen"] = "entre 0 y 60 minutos"
+    if not 0 <= v["noticia_dia_alto"] <= 20:
+        err["noticia_dia_alto"] = "entre 0 y 20 eventos"
+    if v["noticia_dia_modo"] not in ("mitad", "nada"):
+        err["noticia_dia_modo"] = "escribe mitad o nada"
+    if FiltroNoticias.leer_horas(v["noticia_horas"]) is None:
+        err["noticia_horas"] = "horas tipo 08:30,10:00 separadas por comas"
+
+    # los errores solo molestan si ese activo está encendido: uno apagado con ajustes
+    # raros no bloquea el guardado, y así no se pierde su configuración
+    for a in activos:
+        base = {c[0]: c[2] for c in CAMPOS_ACTIVO}
+        base.update({k: x for k, x in (crudo_pa.get(a) or {}).items() if k in base})
+        for k, t in validar_activo(base)[1].items():
+            err[f"{a}.{k}"] = t
     return v, err
+
+
+def migrar_ajustes(guardado):
+    """Ajustes viejos (un solo juego para todos los activos) -> uno por activo.
+
+    Antes el archivo era plano: delta, delay, tp... valían para BTC y ETH a la vez.
+    Se copian tal cual a los dos, así nadie pierde su configuración al actualizar.
+    """
+    if "por_activo" in guardado:
+        return _delay_a_segundos(guardado)
+    g = dict(guardado)
+    plano = {}
+    for clave, _, _, _, _, _ in CAMPOS_ACTIVO:
+        if clave in g:
+            plano[clave] = g.pop(clave)
+    g["por_activo"] = {a: dict(plano) for a in ACTIVOS_VALIDOS}
+    for a in ACTIVOS_VALIDOS:            # más viejo aún: había delta_btc / delta_eth
+        d = guardado.get(f"delta_{a.lower()}")
+        if d is not None:
+            g["por_activo"][a]["delta"] = d
+    if plano or any(g["por_activo"][a] for a in ACTIVOS_VALIDOS):
+        log("ajustes migrados: ahora cada activo lleva su propia configuración")
+    return _delay_a_segundos(g)
+
+
+def _delay_a_segundos(g):
+    """El Delay se guardaba en minutos y ahora va en segundos.
+
+    Un valor de 15 o menos solo puede ser el de antes (15 segundos de ventana no
+    tendría sentido como ajuste guardado), así que se pasa a segundos.
+    """
+    for a, vals in (g.get("por_activo") or {}).items():
+        d = vals.get("delay")
+        try:
+            d = int(float(d))
+        except (TypeError, ValueError):
+            continue
+        if 1 <= d <= 15:
+            vals["delay"] = d * 60
+            log(f"{a}: el Delay pasa de {d} min a {d * 60} s (ahora se configura en segundos)")
+    return g
 
 
 class Ajustes:
     def __init__(self, carpeta: Path):
         self.ruta = carpeta / "ajustes.json"
         crudo = {}
-        for clave, tipo, defecto, _, _, _ in CAMPOS:
+        for clave, tipo, defecto, _, _, _ in CAMPOS_GLOBAL:
             crudo[clave] = env(clave.upper()) or defecto
+        base_activo = {c[0]: (env(c[0].upper()) or c[2]) for c in CAMPOS_ACTIVO}
+        crudo["por_activo"] = {a: dict(base_activo) for a in ACTIVOS_VALIDOS}
         if self.ruta.exists():
             try:
-                guardado = json.loads(self.ruta.read_text(encoding="utf-8"))
-                if "delta" not in guardado:          # ajustes de antes: había un Delta por activo
-                    a = (guardado.get("activos") or "BTC").split(",")[0].lower()
-                    if guardado.get(f"delta_{a}") is not None:
-                        guardado["delta"] = guardado[f"delta_{a}"]
-                crudo.update({k: x for k, x in guardado.items() if k in {c[0] for c in CAMPOS}})
+                guardado = migrar_ajustes(json.loads(self.ruta.read_text(encoding="utf-8")))
+                crudo.update({k: x for k, x in guardado.items() if k in {c[0] for c in CAMPOS_GLOBAL}})
+                for a, vals in (guardado.get("por_activo") or {}).items():
+                    if a in crudo["por_activo"]:
+                        crudo["por_activo"][a].update({k: x for k, x in vals.items() if k in base_activo})
             except Exception as e:  # noqa: BLE001
                 log(f"no pude leer {self.ruta.name}: {e}")
         v, err = validar(crudo)
         if err:
             log(f"ajustes con errores ({err}); uso los valores por defecto")
-            v, _ = validar({c[0]: c[2] for c in CAMPOS})
+            v, _ = validar({c[0]: c[2] for c in CAMPOS_GLOBAL})
         self.valores = v
 
     def guardar(self, v):
@@ -176,8 +279,11 @@ class Claves:
 
 
 def config_de(activo, v):
-    return Config(delta=v["delta"], delay=v["delay"], entrada_min=v["entrada_min"],
-                  entrada_max=v["entrada_max"], tp=v["tp"], exit=v["exit"], breakeven=v["breakeven"])
+    """La Config de ESE activo; si no hay nada guardado para él, los valores por defecto."""
+    a = (v.get("por_activo") or {}).get(activo) or {c[0]: c[2] for c in CAMPOS_ACTIVO}
+    return Config(delta=a["delta"], delay=a["delay"], entrada_min=a["entrada_min"],
+                  entrada_max=a["entrada_max"], tp=a["tp"], exit=a["exit"],
+                  breakeven=a["breakeven"], contratos=a["contratos"])
 
 
 # ---------------------------------------------------------------- datos en vivo
@@ -327,6 +433,104 @@ class Noticias:
         ahora = time.time()
         return [dict(e, faltan=e["ts"] - ahora) for e in self.eventos if e["ts"] > ahora - 900][:cuantas]
 
+    def altos(self):
+        """Solo los de carpeta roja: son los que mueven el precio de golpe."""
+        return [e for e in self.eventos if e["impacto"] == "High"]
+
+
+class FiltroNoticias:
+    """No entrar en bloques que cierran encima de un dato de alto impacto.
+
+    Tres reglas, las del plan:
+      1. el bloque cierra en una hora fija (08:30, 10:00, 14:00 ET)
+      2. hay un evento rojo dentro del bloque, o justo después (el margen)
+      3. el día trae muchos rojos: se opera uno de cada dos bloques, o ninguno
+
+    No adivina nada: el calendario se publica con semanas de antelación. Si el
+    calendario no se pudo leer, el filtro NO bloquea (mejor operar que quedarse
+    parado por un fallo de red).
+    """
+
+    ET = ZoneInfo("America/New_York")
+
+    def __init__(self, noticias: "Noticias"):
+        self.n = noticias
+        self.activo = True
+        self.horas = [(8, 30), (10, 0), (14, 0)]
+        self.margen = 120.0          # segundos después del cierre que siguen contando
+        self.dia_alto = 3            # desde cuántos rojos el día se considera cargado
+        self.dia_modo = "mitad"
+        self.saltados = {}           # "YYYY-MM-DD" -> {"hora": n, "evento": n, "dia": n}
+
+    @staticmethod
+    def leer_horas(txt):
+        """'08:30,10:00' -> [(8,30),(10,0)]. None si está mal escrito."""
+        fuera = []
+        for t in str(txt or "").split(","):
+            t = t.strip()
+            if not t:
+                continue
+            try:
+                h, m = t.split(":")
+                h, m = int(h), int(m)
+            except ValueError:
+                return None
+            if not (0 <= h < 24 and 0 <= m < 60):
+                return None
+            fuera.append((h, m))
+        return fuera
+
+    def aplicar(self, v):
+        self.activo = v["filtro_noticias"] == "si"
+        self.horas = self.leer_horas(v["noticia_horas"]) or []
+        self.margen = v["noticia_margen"] * 60.0
+        self.dia_alto = v["noticia_dia_alto"]
+        self.dia_modo = v["noticia_dia_modo"]
+
+    def altos_del_dia(self, cierre):
+        d = datetime.fromtimestamp(cierre, self.ET).date()
+        return [e for e in self.n.altos() if datetime.fromtimestamp(e["ts"], self.ET).date() == d]
+
+    def motivo(self, cierre, ticker=""):
+        """Texto del porqué no se entra en el bloque que cierra en `cierre`, o None si se puede."""
+        if not self.activo:
+            return None
+        t = datetime.fromtimestamp(cierre, self.ET)
+        if (t.hour, t.minute) in self.horas:
+            return self._contar(t, "hora", f"el bloque cierra a las {t:%H:%M} ET (hora de datos)")
+        for e in self.n.altos():                 # dentro del bloque o justo después
+            if cierre - 900 < e["ts"] <= cierre + self.margen:
+                cuando = datetime.fromtimestamp(e["ts"], self.ET)
+                return self._contar(t, "evento", f"{e['titulo']} ({e['moneda']}) a las {cuando:%H:%M} ET")
+        if self.dia_alto:
+            del_dia = self.altos_del_dia(cierre)
+            if len(del_dia) >= self.dia_alto:
+                if self.dia_modo == "nada":
+                    return self._contar(t, "dia", f"día cargado: {len(del_dia)} datos rojos")
+                # mitad: se opera uno de cada dos bloques (el bloque nº par del día)
+                bloque = int((cierre - t.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()) // 900)
+                if bloque % 2:
+                    return self._contar(t, "dia", f"día cargado ({len(del_dia)} rojos): opera uno de cada dos")
+        return None
+
+    def _contar(self, t, clave, texto):
+        d = t.strftime("%Y-%m-%d")
+        c = self.saltados.setdefault(d, {"hora": 0, "evento": 0, "dia": 0})
+        c[clave] += 1
+        return texto
+
+    def informe(self):
+        """Lo que pidió el plan: cuántos bloques se saltan, por día y por semana, y por qué."""
+        dias = sorted(self.saltados)
+        sem = {"hora": 0, "evento": 0, "dia": 0}
+        for d in dias[-7:]:
+            for k in sem:
+                sem[k] += self.saltados[d][k]
+        hoy = self.saltados.get(datetime.now(self.ET).strftime("%Y-%m-%d"), {"hora": 0, "evento": 0, "dia": 0})
+        return dict(activo=self.activo, hoy=hoy, hoy_total=sum(hoy.values()),
+                    semana=sem, semana_total=sum(sem.values()),
+                    rojos_hoy=len(self.altos_del_dia(time.time())))
+
 
 class Bot:
     def __init__(self):
@@ -344,6 +548,7 @@ class Bot:
         self.ciclo_indice = CICLO_INDICE
         self.precios = Precios(self)
         self.noticias = Noticias()
+        self.filtro = FiltroNoticias(self.noticias)
         self.op = Operador({}, None, self.estado, self.registro, 1)
         self.activos, self.cfgs = [], {}
         self.aplicar(self.ajustes.valores)
@@ -360,7 +565,7 @@ class Bot:
 
     # ------------------------------------------------------------------ ajustes y claves
     def aplicar(self, v):
-        activos = v["activos"].split(",")
+        activos = [a for a in v["activos"].split(",") if a]
         with self.op.lock:
             self.activos = activos
             self.cfgs = {a: config_de(a, v) for a in activos}
@@ -368,17 +573,24 @@ class Bot:
             for a in self.estado.abiertas:                    # una abierta de un activo quitado se sigue cuidando
                 est.setdefault(a, Estrategia(config_de(a, v)))
             self.op.estrategias = est
-            self.op.contratos = v["contratos"]
             self.op.max_perdida_dia = v["max_perdida_dia"]
             self.op.meta_dia = v["meta_ganancia_dia"]
             self.ciclo = v["ritmo"]
             self.ciclo_indice = v["ritmo_indice"]
+            self.filtro.aplicar(v)
+            self.op.filtro = self.filtro
             if self.ej:
-                self.ej.contratos, self.ej.desliz, self.ej.n_activos = v["contratos"], v["desliz_entrada"], len(activos)
+                self.ej.contratos = {a: c.contratos for a, c in self.cfgs.items()}
+                self.ej.desliz, self.ej.n_activos = v["desliz_entrada"], len(activos)
                 self.ej.espera = v["espera_entrada"]
         for a, c in self.cfgs.items():
-            log(f"ajustes {a}: {c.texto()} · {v['contratos']:g} contratos · "
-                f"ritmo {v['ritmo']:g} s / índice {v['ritmo_indice']:g} s")
+            log(f"ajustes {a}: {c.texto()}")
+        log("filtro de noticias: " + (
+            f"activo · horas {v['noticia_horas']} · margen {v['noticia_margen']:g} min · "
+            f"día cargado desde {v['noticia_dia_alto']} rojos ({v['noticia_dia_modo']})"
+            if v["filtro_noticias"] == "si" else "apagado"))
+        log(f"ajustes generales: activos {', '.join(activos) or 'ninguno'} · "
+            f"ritmo {v['ritmo']:g} s / índice {v['ritmo_indice']:g} s")
 
     def conectar(self, key_id, pem):
         """Prueba la API key pidiendo el saldo. (ok, mensaje)."""
@@ -531,8 +743,8 @@ class Bot:
                     est = "sin precio del índice: no opera"
                 elif self.estado.operado.get(a) == f.ticker:
                     est = "ya operó este bloque"
-                elif cfg and quedan > cfg.delay * 60:
-                    est = f"espera los últimos {cfg.delay} min"
+                elif cfg and quedan > cfg.delay:
+                    est = f"espera los últimos {cfg.delay} s"
                 else:
                     est = "buscando entrada"
                 d = f.delta()
@@ -541,7 +753,7 @@ class Bot:
                 orden = lambda k: sorted([s_, v_] for s_, v_ in (h.get(k) or {}).items()) if mio else []
                 fila["grafico"] = dict(
                     activo=orden("activo"), contrato=orden("contrato"),
-                    referencia=f.referencia, ventana=(cfg.delay * 60) if cfg else None,
+                    referencia=f.referencia, ventana=cfg.delay if cfg else None,
                     delta_min=cfg.delta if cfg else None,
                     entrada=op.entrada if op else None, tp=op.objetivo if op else None,
                     sin_tp=bool(op.sin_tp) if op else None,
@@ -561,13 +773,23 @@ class Bot:
             ritmo=self.ciclo, ritmo_indice=self.ciclo_indice, vuelta_s=round(self.ultima_vuelta, 3),
             encendido_s=(ahora - self.estado.encendido_desde) if self.estado.encendido_desde and not self.estado.pausado else None,
             total=self.registro.resumen(), hoy=self.registro.resumen(hoy), vivo=vivo,
+            por_activo={a: dict(total=self.registro.resumen(activo=a),
+                                hoy=self.registro.resumen(hoy, activo=a),
+                                ajustes=(self.ajustes.valores.get("por_activo") or {}).get(a),
+                                encendido=a in self.activos)
+                        for a in ACTIVOS_VALIDOS},
             abiertas=[dict(activo=o.activo, lado=o.lado.upper(), contratos=o.abiertos(), entrada=o.entrada,
                            objetivo=o.objetivo, ticker=o.ticker) for o in self.estado.abiertas.values()],
             pendientes=len(self.estado.pendientes),
-            operaciones=filas[-50:][::-1], logs=list(operador.LOGS)[-250:],
+            operaciones=filas[-120:][::-1], logs=list(operador.LOGS)[-250:],
             ajustes=self.ajustes.valores,
             noticias=self.noticias.proximas(), noticias_error=self.noticias.error,
-            campos=[dict(clave=c, tipo=t, etiqueta=e, ayuda=h, seccion=sec) for c, t, _, e, h, sec in CAMPOS])
+            filtro=dict(self.filtro.informe(),
+                        bloqueado={a: p for a, p in self.op.bloqueado.items() if p}),
+            campos=[dict(clave=c, tipo=t, etiqueta=e, ayuda=h, seccion=sec) for c, t, _, e, h, sec in CAMPOS_GLOBAL],
+            campos_activo=[dict(clave=c, tipo=t, etiqueta=e, ayuda=h, seccion=sec)
+                           for c, t, _, e, h, sec in CAMPOS_ACTIVO],
+            activos_validos=list(ACTIVOS_VALIDOS))
 
 
 # ---------------------------------------------------------------- panel web

@@ -180,13 +180,37 @@ html{scroll-behavior:smooth}
   background-size:200% 100%;border-radius:4px;animation:sk 1.5s ease-in-out infinite}
 @keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
 
+/* lateral: marcador por activo y estado del filtro */
+.porfila{display:flex;align-items:baseline;gap:9px;padding:9px 0;border-top:1px solid var(--linea)}
+.porfila:first-of-type{border-top:0}
+.porfila .nom{font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:var(--claro);min-width:34px}
+.porfila .pnl{font-family:var(--mono);font-size:14px;font-weight:600;margin-left:auto}
+.porfila .det{font-size:11px;color:var(--tenue)}
+.porfila .apag{font-size:10.5px;color:var(--tenue);border:1px solid var(--linea);border-radius:3px;padding:0 5px}
+.fnota{font-size:11.5px;color:var(--gris);line-height:1.5}
+.fnota b{color:var(--claro);font-weight:500}
+.fbloq{margin-top:9px;padding-top:9px;border-top:1px solid var(--linea);font-size:11.5px;color:var(--avisa-t,var(--gris))}
+.fbloq span{display:block;margin-top:4px}
+
+/* selector de activo: Todo / BTC / ETH */
+.segm{display:inline-flex;gap:2px;padding:2px;background:var(--n0);border:1px solid var(--linea);border-radius:var(--r-s)}
+.segm button{padding:3px 10px;border:0;background:transparent;color:var(--gris);font:inherit;font-size:11.5px;
+  letter-spacing:.03em;border-radius:3px;cursor:pointer;transition:color var(--t),background var(--t)}
+.segm button:hover{color:var(--claro)}
+.segm button[aria-pressed="true"]{background:var(--n2);color:var(--claro)}
+.bloque + .bloque{margin-top:14px}
+.bloque .titulo h2 .act{color:var(--tenue);font-weight:400;margin-left:6px}
+/* un juego de ajustes por activo */
+.porAct{margin-top:14px}
+.porAct > details{margin-top:9px}
+
 /* ---------------------------------------------------------------- bloque en vivo */
 .lados{display:flex;gap:7px}
 .lado{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:var(--r-s);font-size:12px;
   background:var(--n0);border:1px solid var(--linea);transition:border-color var(--t),background var(--t)}
 .lado.dentro{background:var(--n2);border-color:var(--gris)}
 .lado b{font-weight:500;font-size:11px;letter-spacing:.04em}
-#grafico{margin:2px -4px 0;min-width:0}
+.graf{margin:2px -4px 0;min-width:0}
 .cuerpo{min-width:0}
 /* en pantalla ancha el gráfico no tiene por qué ocuparlo todo: la lectura del
    delta se pone a su lado y la tarjeta baja de alto */
@@ -194,10 +218,10 @@ html{scroll-behavior:smooth}
   .cuerpo{display:grid;grid-template-columns:minmax(0,1.85fr) minmax(0,1fr);gap:26px;align-items:start}
   .cuerpo > *{min-width:0}
   .aparte{padding-left:26px;border-left:1px solid var(--linea);align-self:stretch}
-  .aparte #gPie{margin-top:14px;padding-top:14px}
+  .aparte .gpie{margin-top:14px;padding-top:14px}
   .aparte .medidor{margin-top:0;padding-top:0;border-top:0}
 }
-#gPie{margin-top:11px;padding-top:11px;border-top:1px solid var(--linea)}
+.gpie{margin-top:11px;padding-top:11px;border-top:1px solid var(--linea)}
 /* Delta contra su umbral */
 .dcab{display:flex;align-items:baseline;gap:10px;margin-bottom:9px}
 .dcab .v{font-family:var(--mono);font-size:19px;font-weight:600;letter-spacing:-.03em;line-height:1;color:var(--claro)}
@@ -268,14 +292,15 @@ tbody tr:hover{background:rgba(255,255,255,.04)}
 label{display:block;font-size:11.5px;color:var(--gris)}
 .form .et{display:block;min-height:2.3em;line-height:1.3;color:var(--tenue);
   font-size:10.5px;letter-spacing:.07em;text-transform:uppercase}
-input,textarea{width:100%;margin-top:5px;padding:7px 10px;border-radius:var(--r-s);
+input,textarea,select{width:100%;margin-top:5px;padding:7px 10px;border-radius:var(--r-s);
   border:1px solid var(--linea-2);background:var(--n0);color:var(--claro);font:inherit;font-size:13.5px;
   transition:border-color var(--t),background var(--t)}
 input::placeholder,textarea::placeholder{color:var(--tenue)}
-input:hover,textarea:hover{border-color:var(--azul)}
-input:focus,textarea:focus{outline:none;border-color:var(--gris);background:#141414}
-input.malo,input.malo:focus{border-color:var(--baja)}
-.form input{font-family:var(--mono);font-variant-numeric:tabular-nums}
+input:hover,textarea:hover,select:hover{border-color:var(--azul)}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--gris);background:#141414}
+input.malo,select.malo,input.malo:focus{border-color:var(--baja)}
+.form input,.form select{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.form select{appearance:none;cursor:pointer}
 textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 .err{font-size:11px;color:var(--baja);margin-top:3px}
 .row{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin-top:14px}
@@ -412,30 +437,10 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 
 <div class="tablero">
   <div class="principal">
-  <div id="s-bloque">
-  <section class="bloque" id="cardGrafico" style="display:none" aria-label="Bloque en vivo">
-    <div class="titulo">
-      <h2>Bloque en vivo</h2><span id="gTicker" class="num tic"></span>
-      <span class="sp"></span>
-      <span id="gLados" class="lados"></span>
-      <span class="k solo-pc">Queda</span><span id="gQueda" class="num solo-pc" style="font-weight:600;font-size:13px;color:var(--claro)"></span>
-    </div>
-    <div class="cuerpo">
-      <div id="grafico"></div>
-      <div class="aparte">
-        <div id="medidor"></div>
-        <div id="gPie"></div>
-      </div>
-    </div>
-    <div class="wrap lectura"><table>
-      <thead><tr><th scope="col">Queda</th><th scope="col">Referencia</th><th scope="col">Precio</th><th scope="col">Índice</th><th scope="col">Delta</th><th scope="col">YES ask/bid</th><th scope="col">NO ask/bid</th><th scope="col">Estado</th></tr></thead>
-      <tbody id="vivo"></tbody>
-    </table></div>
-  </section>
-  </div>
+  <div id="s-bloque"></div>
 
 <section class="seccion panel" id="s-ops" aria-label="Operaciones">
-  <div class="titulo"><h2>Operaciones</h2><span id="opsCuenta" class="ayuda"></span>
+  <div class="titulo"><h2>Operaciones</h2><span class="segm" id="segOps"></span><span id="opsCuenta" class="ayuda"></span>
     <span class="sp"></span><a href="/operaciones.csv">bajar todas (CSV)</a>
     <button id="reiniciar" class="b-ghost chico">Reiniciar resultados</button>
     <span id="msgReiniciar" class="msg" role="status" aria-live="polite"></span></div>
@@ -454,8 +459,9 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 
   <div class="rail">
   <aside class="marcador" aria-label="Resultado">
+    <div class="segm" id="segStats" style="margin-bottom:12px"></div>
     <div class="total">
-      <span class="k">Resultado total</span>
+      <span class="k" id="sTitulo">Resultado total</span>
       <span class="v num skel" id="sProfit">–</span>
       <span class="sub" id="sProfitHoy"></span>
     </div>
@@ -472,6 +478,16 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
   <section class="noticias" aria-label="Próximas noticias">
     <div class="titulo"><h2>Próximas noticias</h2><span class="sp"></span><span class="ayuda">ForexFactory</span></div>
     <div id="noticias"></div>
+  </section>
+
+  <section class="noticias" aria-label="Filtro de noticias">
+    <div class="titulo"><h2>Filtro de noticias</h2><span class="sp"></span><span id="fEstado" class="aviso off">–</span></div>
+    <div id="filtro"></div>
+  </section>
+
+  <section class="noticias" aria-label="Resultado por activo">
+    <div class="titulo"><h2>Por activo</h2><span class="sp"></span><span class="ayuda">hoy · total</span></div>
+    <div id="porActivo"></div>
   </section>
   </div>
 </div>
@@ -491,6 +507,7 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
         <summary>Avanzado</summary>
         <div class="form" id="formAv" style="margin-top:12px"></div>
       </details>
+      <div class="porAct" id="formActivos"></div>
       <div class="row"><button class="b-main" id="guardar">Guardar ajustes</button><button class="b-ghost" id="deshacer">Deshacer</button><span id="msgAjustes" class="msg" role="status" aria-live="polite"></span></div>
       </details>
     </div>
@@ -511,7 +528,8 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 
 <script>
 const $ = id => document.getElementById(id);
-let ultimo = null, campos = [], ajustesGuardados = null;
+let ultimo = null, campos = [], camposActivo = [], activos = [], ajustesGuardados = null;
+let focoStats = 'todo', focoOps = 'todo', cartelesPara = '';
 
 async function api(path, body) {
   const r = await fetch(path, body === undefined ? {} : {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
@@ -540,7 +558,8 @@ function destellar(el, texto, cls) {
   if (cambio) { el.classList.remove('destello'); void el.offsetWidth; el.classList.add('destello'); }
 }
 
-let G = null, hoverX = null;   // estado del gráfico para la cruz
+// estado del gráfico, uno por activo: cada tarjeta tiene su propia cruz
+const GS = {}, hoverX = {};
 
 const VERDE = '#2fe07a', ROJO = '#ff5f5f', NEUTRO = '#9b9b9b', TENUE = '#757575';
 const REJILLA = '#242424', LIENZO = '#131313', FONDO = '#0a0a0a', CLARO = '#ffffff', AZUL = '#9b9b9b';
@@ -550,8 +569,8 @@ const angosto = () => window.innerWidth < 640;
 // quedarian a media escala y no se leerian
 // el lienzo mide lo mismo que la caja: una unidad del SVG es un píxel de pantalla.
 // Con un lienzo fijo, en una pantalla ancha todo el gráfico se ampliaba (1.7x en 2048 px).
-const geo = () => {
-  const c = document.getElementById('grafico');
+const geo = (a) => {
+  const c = document.getElementById('grafico_' + a);
   const W = Math.max(300, Math.min(Math.round((c && c.clientWidth) || 880), 2000));
   const ang = W < 500;      // solo el móvil necesita el lienzo más alto
   return { W, X0: ang ? 40 : 62, X1: W - (ang ? 58 : 76), H: ang ? 225 : 186 };
@@ -586,10 +605,10 @@ function capsula(y, texto, fondo, tinta) {
     + `<text x="${(GX1 + 6 + w / 2).toFixed(1)}" y="${(y + 3.6).toFixed(1)}" text-anchor="middle" fill="${tinta}" font-size="10.5" font-weight="700">${texto}</text>`;
 }
 
-function grafico(v) {
+function grafico(v, a) {
   const g = v.grafico;
-  if (!g || !g.activo || g.activo.length < 2) { G = null; return ''; }
-  const { W, X0, X1, H } = geo();
+  if (!g || !g.activo || g.activo.length < 2) { GS[a] = null; return ''; }
+  const { W, X0, X1, H } = geo(a);
   GX1 = X1;
   const Y0 = 22, Y1 = H - 40, BLOQUE = BLOQUE_S;
   const x = s => X0 + (Math.max(0, Math.min(BLOQUE, s)) / BLOQUE) * (X1 - X0);
@@ -685,7 +704,7 @@ function grafico(v) {
   o.push(`<text x="${X0 - 7}" y="${Y0 + 10}" text-anchor="end" fill="${TENUE}" font-size="10.5">${Math.round(hi).toLocaleString('es')}</text>`);
   o.push(`<text x="${X0 - 7}" y="${Y1 + 3}" text-anchor="end" fill="${TENUE}" font-size="10.5">${Math.round(lo).toLocaleString('es')}</text>`);
   // la etiqueta de la ventana baja al pie: dentro del gráfico chocaba con el mínimo del bloque
-  if (g.ventana) o.push(`<text x="${Math.min(x(BLOQUE - g.ventana) + 5, X1 - 82).toFixed(1)}" y="${Y1 + 17}" fill="${TENUE}" font-size="10.5">últimos ${Math.round(g.ventana / 60)} min</text>`);
+  if (g.ventana) o.push(`<text x="${Math.min(x(BLOQUE - g.ventana) + 5, X1 - 82).toFixed(1)}" y="${Y1 + 17}" fill="${TENUE}" font-size="10.5">últimos ${g.ventana % 60 === 0 && g.ventana >= 60 ? g.ventana / 60 + ' min' : g.ventana + ' s'}</text>`);
 
   // avance del bloque
   const frac = Math.max(0, Math.min(1, ult[0] / BLOQUE));
@@ -695,8 +714,8 @@ function grafico(v) {
   o.push(`<rect x="${X0}" y="${Y1 + 24}" width="${X1 - X0}" height="3" rx="1.5" fill="${REJILLA}"></rect>`);
   o.push(`<rect x="${X0}" y="${Y1 + 24}" width="${((X1 - X0) * frac).toFixed(1)}" height="3" rx="1.5" fill="${enVentana ? AZUL : TENUE}" opacity="${enVentana ? 0.55 : 0.45}"></rect>`);
 
-  o.push('<g id="cruz"></g>');
-  return `<svg id="svgG" viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-family:'Geist Mono',ui-monospace,monospace" role="img" aria-label="Índice de BTC durante el bloque: verde por encima de la referencia de ${ref != null ? Math.round(ref) : '–'} y rojo por debajo.">${o.join('')}</svg>`;
+  o.push(`<g id="cruz_${a}"></g>`);
+  return `<svg id="svgG_${a}" viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-family:'Geist Mono',ui-monospace,monospace" role="img" aria-label="Índice de ${a} durante el bloque: verde por encima de la referencia de ${ref != null ? Math.round(ref) : '–'} y rojo por debajo.">${o.join('')}</svg>`;
 }
 
 const reloj = s => Math.floor(Math.max(0, s) / 60) + ':' + String(Math.floor(Math.max(0, s) % 60)).padStart(2, '0');
@@ -729,9 +748,11 @@ function barraDelta(v, d) {
 }
 
 // una línea que dice por qué no está entrando ahora mismo
+const ajusteDe = (d, a) => ((d.por_activo || {})[a] || {}).ajustes || {};
+
 function razon(v, d) {
-  const g = v.grafico, dm = g.delta_min;
-  const emin = +d.ajustes.entrada_min, emax = +d.ajustes.entrada_max;
+  const g = v.grafico, dm = g.delta_min, aj = ajusteDe(d, v.activo);
+  const emin = +aj.entrada_min, emax = +aj.entrada_max;
   const dentro = a => a != null && a >= emin - 1e-9 && a <= emax + 1e-9;
   let t, cl = '';
   if (!d.conectado) { t = 'Falta conectar la API key de Kalshi.'; cl = 'warn'; }
@@ -772,7 +793,7 @@ function pintarNoticias(d) {
 }
 
 // medidor de la posición: dónde está el bid entre el stop y el objetivo
-function medidor(g, contratos) {
+function medidor(g) {
   if (g.tp == null || g.bid == null) return '';
   const ex = g.exit != null ? g.exit : 0;
   const lo = Math.min(ex, g.bid, g.entrada), hi = Math.max(g.tp, g.bid);
@@ -801,17 +822,17 @@ function cercano(serie, xf, px) {
   return mejor;
 }
 
-function dibujarCruz() {
-  const el = document.getElementById('cruz');
+function dibujarCruz(a) {
+  const el = document.getElementById('cruz_' + a);
   if (!el) return;
-  if (hoverX == null || !G) { el.innerHTML = ''; return; }
-  const { g, x, ya, X0, X1, Y0, Y1 } = G;
-  const px = Math.max(X0, Math.min(X1, hoverX));
+  if (hoverX[a] == null || !GS[a]) { el.innerHTML = ''; return; }
+  const { g, x, ya, X0, X1, Y0, Y1 } = GS[a];
+  const px = Math.max(X0, Math.min(X1, hoverX[a]));
   const pa = cercano(g.activo, x, px);
   if (!pa) { el.innerHTML = ''; return; }
   const xx = x(pa[0]);
   const col = (g.referencia == null || pa[1] >= g.referencia) ? VERDE : ROJO;
-  const filas = [['BTC', Math.round(pa[1]).toLocaleString('es'), col]];
+  const filas = [[a, Math.round(pa[1]).toLocaleString('es'), col]];
   if (g.referencia != null) filas.push(['Delta', (pa[1] - g.referencia >= 0 ? '+' : '') + n(pa[1] - g.referencia, 1), NEUTRO]);
   const mm = String(Math.floor(pa[0] / 60)).padStart(2, '0') + ':' + String(pa[0] % 60).padStart(2, '0');
   const ancho = 132, alto = 22 + filas.length * 15;
@@ -831,18 +852,131 @@ function dibujarCruz() {
   el.innerHTML = o.join('');
 }
 
-function armarHover() {
-  const cont = document.getElementById('grafico');
+function armarHover(a) {
+  const cont = document.getElementById('grafico_' + a);
   if (!cont || cont.dataset.hover) return;
   cont.dataset.hover = '1';
   const aX = ev => {
-    const svg = document.getElementById('svgG');
+    const svg = document.getElementById('svgG_' + a);
     if (!svg) return null;
     const r = svg.getBoundingClientRect();
-    return r.width ? ((ev.clientX - r.left) / r.width) * (G ? G.W : 880) : null;
+    return r.width ? ((ev.clientX - r.left) / r.width) * (GS[a] ? GS[a].W : 880) : null;
   };
-  cont.addEventListener('pointermove', ev => { hoverX = aX(ev); dibujarCruz(); });
-  cont.addEventListener('pointerleave', () => { hoverX = null; dibujarCruz(); });
+  cont.addEventListener('pointermove', ev => { hoverX[a] = aX(ev); dibujarCruz(a); });
+  cont.addEventListener('pointerleave', () => { hoverX[a] = null; dibujarCruz(a); });
+}
+
+// una tarjeta por activo. Solo se rehace cuando cambia la lista: si se rehiciera
+// cada segundo se perdería la cruz del ratón y parpadearía todo.
+function armarCarteles(lista) {
+  const clave = lista.join(',');
+  if (clave === cartelesPara) return;
+  cartelesPara = clave;
+  for (const a of lista) { delete GS[a]; delete hoverX[a]; }
+  $('s-bloque').innerHTML = lista.map(a => `
+  <section class="bloque" id="card_${a}" aria-label="Bloque en vivo de ${a}">
+    <div class="titulo">
+      <h2>${a}<span class="act">bloque en vivo</span></h2><span id="gTicker_${a}" class="num tic"></span>
+      <span class="sp"></span>
+      <span id="gLados_${a}" class="lados"></span>
+      <span class="k solo-pc">Queda</span><span id="gQueda_${a}" class="num solo-pc" style="font-weight:600;font-size:13px;color:var(--claro)"></span>
+    </div>
+    <div class="cuerpo">
+      <div class="graf" id="grafico_${a}"></div>
+      <div class="aparte">
+        <div id="medidor_${a}"></div>
+        <div class="gpie" id="gPie_${a}"></div>
+      </div>
+    </div>
+    <div class="wrap lectura"><table>
+      <thead><tr><th scope="col">Queda</th><th scope="col">Referencia</th><th scope="col">Precio</th><th scope="col">Índice</th><th scope="col">Delta</th><th scope="col">YES ask/bid</th><th scope="col">NO ask/bid</th><th scope="col">Estado</th></tr></thead>
+      <tbody id="vivo_${a}"></tbody>
+    </table></div>
+  </section>`).join('');
+}
+
+function pintarVivo(d, v) {
+  const a = v.activo;
+  $('vivo_' + a).innerHTML = v.mercado ? `<tr>
+    <td class="num">${Math.floor(v.quedan / 60)}:${String(Math.floor(v.quedan % 60)).padStart(2, '0')}</td><td class="num">${n(v.referencia, 2)}</td><td class="num">${n(v.precio, 2)}</td><td class="ayuda num">${v.indice_s == null ? '–' : Math.max(0, v.indice_s).toFixed(0) + ' s'}</td>
+    <td class="num ${clase(v.delta)}">${n(v.delta, 1)}</td><td class="num">${n(v.yes_ask)} / ${n(v.yes_bid)}</td><td class="num">${n(v.no_ask)} / ${n(v.no_bid)}</td>
+    <td>${esc(v.estado)}</td></tr>` : `<tr><td colspan="8" class="vacio">esperando datos…</td></tr>`;
+  if (!v.mercado) { $('gTicker_' + a).textContent = ''; $('gLados_' + a).innerHTML = ''; return; }
+  $('gTicker_' + a).textContent = v.mercado;
+  $('gQueda_' + a).textContent = Math.floor(v.quedan / 60) + ':' + String(Math.floor(v.quedan % 60)).padStart(2, '0');
+  // precios de YES y NO; se resalta el lado cuyo ask cae en el rango de entrada DE ESTE activo
+  const aj = ajusteDe(d, a), emin = +aj.entrada_min, emax = +aj.entrada_max;
+  $('gLados_' + a).innerHTML = [['YES', v.yes_ask, v.yes_bid, 'var(--sube)'], ['NO', v.no_ask, v.no_bid, 'var(--baja)']]
+    .map(([k, ask, bid, col]) => {
+      const dentro = ask != null && ask >= emin - 1e-9 && ask <= emax + 1e-9;
+      return `<span class="lado${dentro ? ' dentro' : ''}"><b style="color:${col}">${k}</b>`
+        + `<span class="num" style="font-weight:600">${n(ask, 3)}</span>`
+        + `<span class="num" style="color:var(--tenue)">/ ${n(bid, 3)}</span></span>`;
+    }).join('');
+  if (v.grafico && v.grafico.activo && v.grafico.activo.length > 1) {
+    $('grafico_' + a).innerHTML = grafico(v, a);
+    armarHover(a);
+    dibujarCruz(a);
+    $('medidor_' + a).innerHTML = medidor(v.grafico);
+    $('gPie_' + a).innerHTML = barraDelta(v, d) + razon(v, d);
+  }
+}
+
+// Todo / BTC / ETH
+function segmento(id, actual, alElegir) {
+  const caja = $(id);
+  if (!caja) return;
+  const ops = ['todo'].concat(activos);
+  const clave = ops.join(',');
+  if (caja.dataset.ops !== clave) {
+    caja.dataset.ops = clave;
+    caja.innerHTML = ops.map(o => `<button type="button" data-v="${o}">${o === 'todo' ? 'Todo' : o}</button>`).join('');
+    caja.onclick = ev => {
+      const b = ev.target.closest('button');
+      if (b) { alElegir(b.dataset.v); if (ultimo) render(ultimo); }
+    };
+  }
+  caja.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === actual)));
+  if (!ops.includes(actual)) alElegir('todo');
+}
+
+// lateral: cómo va cada activo por separado
+function pintarPorActivo(d) {
+  const caja = $('porActivo');
+  if (!caja) return;
+  const pa = d.por_activo || {};
+  const enc = (d.ajustes.activos || '').split(',').filter(Boolean);
+  caja.innerHTML = (d.activos_validos || []).map(a => {
+    const x = pa[a] || {}, t = x.total || {}, h = x.hoy || {};
+    return `<div class="porfila">
+      <span class="nom">${esc(a)}</span>
+      ${enc.includes(a) ? '' : '<span class="apag">apagado</span>'}
+      <span class="det">${h.ops || 0} hoy · ${t.ops || 0} en total${t.wr == null ? '' : ' · ' + t.wr + '%'}</span>
+      <span class="pnl ${clase(h.usd)}">${usd(h.usd || 0)}</span>
+    </div>`;
+  }).join('');
+}
+
+// lateral: qué está haciendo el filtro de noticias
+function pintarFiltro(d) {
+  const caja = $('filtro'), et = $('fEstado'), f = d.filtro;
+  if (!caja || !f) return;
+  et.className = 'aviso ' + (f.activo ? 'on' : 'off');
+  et.textContent = f.activo ? 'encendido' : 'apagado';
+  if (!f.activo) {
+    caja.innerHTML = '<p class="fnota">Apagado: el bot entra aunque el bloque cierre sobre un dato. Se enciende en Ajustes.</p>';
+    return;
+  }
+  const h = f.hoy || {};
+  caja.innerHTML = `<p class="fnota">
+      <b>${f.rojos_hoy}</b> dato${f.rojos_hoy === 1 ? '' : 's'} de alto impacto hoy.<br>
+      Bloques saltados hoy: <b>${f.hoy_total}</b>
+      (${h.hora || 0} por hora fija · ${h.evento || 0} por noticia · ${h.dia || 0} por día cargado).<br>
+      Esta semana: <b>${f.semana_total}</b>.
+    </p>`
+    + (Object.keys(f.bloqueado || {}).length
+      ? `<div class="fbloq">${Object.entries(f.bloqueado).map(([a, p]) =>
+        `<span>⛔ ${esc(a)}: ${esc(p)}</span>`).join('')}</div>` : '');
 }
 
 function render(d) {
@@ -866,12 +1000,18 @@ function render(d) {
   if (!d.conectado) av.push(['warn', 'Falta conectar tu API key de Kalshi (abajo, en "API de Kalshi"). Sin ella el bot solo mira precios.']);
   if (d.conectado && !d.encendido) av.push(['warn grande', 'El bot está APAGADO: no va a abrir ninguna operación.']);
   if (d.limite_diario) av.push(['warn', 'Se alcanzó el límite del día: no abre operaciones nuevas hasta mañana (CDT).']);
-  if (d.aviso_precio) av.push(['warn', 'Precio de BTC: ' + d.aviso_precio + '.']);
+  if (d.aviso_precio) av.push(['warn', 'Precio del índice: ' + d.aviso_precio + '.']);
   if (d.abiertas.length) av.push(['on', 'Operación abierta: ' + d.abiertas.map(o => `${o.activo} ${o.lado} ${o.contratos} a ${n(o.entrada)} → TP ${n(o.objetivo)}`).join(' · ')]);
   if (d.pendientes) av.push(['off', `${d.pendientes} operación(es) cerrando: esperando el resultado oficial de Kalshi.`]);
   $('avisos').innerHTML = av.map(([c, t]) => `<div class="aviso ${c}">${esc(t)}</div>`).join('');
 
-  const t = d.total, h = d.hoy;
+  activos = d.activos_validos || [];
+  segmento('segStats', focoStats, x => { focoStats = x; });
+  segmento('segOps', focoOps, x => { focoOps = x; });
+  const pa = (d.por_activo || {})[focoStats];
+  const t = focoStats === 'todo' || !pa ? d.total : pa.total;
+  const h = focoStats === 'todo' || !pa ? d.hoy : pa.hoy;
+  $('sTitulo').textContent = focoStats === 'todo' ? 'Resultado total' : 'Resultado ' + focoStats;
   destellar($('sProfit'), usd(t.usd), 'v num ' + clase(t.usd));
   $('sProfitHoy').innerHTML = `hoy <span class="${clase(h.usd)}">${usd(h.usd)}</span>`;
   destellar($('sOps'), String(t.ops), 'v num'); $('sOpsHoy').textContent = `hoy ${h.ops}`;
@@ -883,13 +1023,8 @@ function render(d) {
   destellar($('sSaldo'), d.saldo == null ? '–' : '$' + d.saldo.toFixed(2), 'v num');
   $('sKey').textContent = d.conectado ? 'key ' + d.key_id : 'sin API key';
 
-  $('vivo').innerHTML = d.vivo.map(v => v.mercado ? `<tr>
-    <td class="num">${Math.floor(v.quedan / 60)}:${String(Math.floor(v.quedan % 60)).padStart(2, '0')}</td><td class="num">${n(v.referencia, 2)}</td><td class="num">${n(v.precio, 2)}</td><td class="ayuda num">${v.indice_s == null ? '–' : Math.max(0, v.indice_s).toFixed(0) + ' s'}</td>
-    <td class="num ${clase(v.delta)}">${n(v.delta, 1)}</td><td class="num">${n(v.yes_ask)} / ${n(v.yes_bid)}</td><td class="num">${n(v.no_ask)} / ${n(v.no_bid)}</td>
-    <td>${esc(v.estado)}</td></tr>` : `<tr><td colspan="8" class="vacio">esperando datos…</td></tr>`).join('');
-
   // cabecera-instrumento: lo que se mira cada segundo
-  const vc = d.vivo.find(v => v.mercado);
+  const vc = d.vivo.find(v => v.mercado);   // la cabecera enseña el primero; cada tarjeta trae el suyo
   $('instr').hidden = !vc;
   if (vc) {
     const dl = $('hDelta');
@@ -899,74 +1034,94 @@ function render(d) {
       : Math.floor(vc.quedan / 60) + ':' + String(Math.floor(vc.quedan % 60)).padStart(2, '0');
   }
 
-  const v0 = d.vivo.find(v => v.mercado && v.grafico && v.grafico.activo && v.grafico.activo.length > 1);
-  $('cardGrafico').style.display = v0 ? '' : 'none';
-  if (v0) {
-    $('gTicker').textContent = v0.mercado;
-    $('gQueda').textContent = Math.floor(v0.quedan / 60) + ':' + String(Math.floor(v0.quedan % 60)).padStart(2, '0');
-    // precios de YES y NO en el encabezado; se resalta el lado cuyo ask cae en el rango de entrada
-    const emin = +d.ajustes.entrada_min, emax = +d.ajustes.entrada_max;
-    $('gLados').innerHTML = [['YES', v0.yes_ask, v0.yes_bid, 'var(--sube)'], ['NO', v0.no_ask, v0.no_bid, 'var(--baja)']]
-      .map(([k, ask, bid, col]) => {
-        const dentro = ask != null && ask >= emin - 1e-9 && ask <= emax + 1e-9;
-        return `<span class="lado${dentro ? ' dentro' : ''}"><b style="color:${col}">${k}</b>`
-          + `<span class="num" style="font-weight:600">${n(ask, 3)}</span>`
-          + `<span class="num" style="color:var(--tenue)">/ ${n(bid, 3)}</span></span>`;
-      }).join('');
-    $('grafico').innerHTML = grafico(v0);
-    armarHover();
-    dibujarCruz();
-    const g = v0.grafico;
-    const contratos = d.abiertas[0] ? d.abiertas[0].contratos : 1;
-    $('medidor').innerHTML = medidor(g, contratos);
-    $('gPie').innerHTML = barraDelta(v0, d) + razon(v0, d);
-  }
+  armarCarteles(d.vivo.map(v => v.activo));
+  d.vivo.forEach(v => pintarVivo(d, v));
 
   const box = $('logs'), abajo = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
   box.textContent = d.logs.join('\n') || 'sin mensajes todavía';
   if ($('auto').checked && abajo) box.scrollTop = box.scrollHeight;
 
-  $('ops').innerHTML = d.operaciones.length ? d.operaciones.map(r => `<tr><td class="num">${r.fecha} ${r.hora_entrada}</td><td>${r.activo}</td><td>${r.lado}</td>
+  const ops = focoOps === 'todo' ? d.operaciones : d.operaciones.filter(r => r.activo === focoOps);
+  $('ops').innerHTML = ops.length ? ops.map(r => `<tr><td class="num">${r.fecha} ${r.hora_entrada}</td><td>${r.activo}</td><td>${r.lado}</td>
     <td class="num">${r.entrada}</td><td>${r.salida}</td><td class="num">${r.precio_salida}</td><td class="num">${r.contratos}</td>
     <td class="${r.resultado === 'GANA' ? 'pos' : 'neg'}">${r.resultado === 'GANA' ? 'ganada' : 'perdida'}</td>
     <td class="num ${clase(+r.pnl_usd)}">${usd(+r.pnl_usd)}</td></tr>`).join('')
-    : '<tr><td colspan="9" class="vacio">Todavía no hay operaciones. Aparecerán aquí en cuanto el bot cierre la primera.</td></tr>';
-  $('opsCuenta').textContent = d.operaciones.length
-    ? (d.total.ops > d.operaciones.length ? `últimas ${d.operaciones.length} de ${d.total.ops}` : `${d.total.ops} en total`) : '';
+    : `<tr><td colspan="9" class="vacio">${focoOps === 'todo' ? 'Todavía no hay operaciones. Aparecerán aquí en cuanto el bot cierre la primera.' : 'Todavía no hay operaciones de ' + esc(focoOps) + '.'}</td></tr>`;
+  const totOps = focoOps === 'todo' ? d.total.ops : (((d.por_activo || {})[focoOps] || {}).total || {}).ops || 0;
+  $('opsCuenta').textContent = ops.length
+    ? (totOps > ops.length ? `últimas ${ops.length} de ${totOps}` : `${totOps} en total`) : '';
 
   pintarNoticias(d);
+  pintarFiltro(d);
+  pintarPorActivo(d);
 
-  const ra = $('resumenAjustes'), a = d.ajustes;
-  if (ra) ra.textContent = [a.activos, 'Delta ' + n(a.delta, 0), 'Delay ' + a.delay,
-    'ritmo ' + n(d.ritmo, 2) + ' s',
-    n(a.entrada_min, 2) + '\u2013' + n(a.entrada_max, 2), 'TP +' + n(a.tp, 2),
-    a.exit == null || a.exit === '' ? 'sin Exit' : 'Exit ' + n(a.exit, 2)].join(' \u00b7 ');
+  for (const a of activos) {           // cada bloque de ajustes dice si ese activo está operando
+    const et = $('estAct_' + a);
+    if (et) et.textContent = ((d.ajustes.activos || '').split(',').includes(a) ? '· encendido' : '· apagado');
+  }
+  const ra = $('resumenAjustes');
+  if (ra) {
+    const enc = (d.ajustes.activos || '').split(',').filter(Boolean);
+    ra.textContent = (enc.length ? enc.map(x => {
+      const j = ajusteDe(d, x);
+      return `${x} Delta ${n(j.delta, 0)} · ${n(j.entrada_min, 2)}\u2013${n(j.entrada_max, 2)} · TP +${n(j.tp, 2)} · ${n(j.contratos, 0)}c`;
+    }).join('  |  ') : 'sin activos') + '  |  ritmo ' + n(d.ritmo, 2) + ' s';
+  }
 
   const ke = $('keyEstado');
   ke.className = 'aviso ' + (d.conectado ? 'on' : 'warn');
   ke.textContent = d.conectado ? `Conectada · key ${d.key_id} · saldo ${d.saldo == null ? '–' : '$' + d.saldo.toFixed(2)}` : 'No conectada';
 
   document.querySelectorAll('.skel').forEach(e => e.classList.remove('skel'));
-  if (!campos.length) { campos = d.campos; ajustesGuardados = d.ajustes; armarForm(); }
+  if (!campos.length) {
+    campos = d.campos; camposActivo = d.campos_activo || []; ajustesGuardados = d.ajustes; armarForm();
+  }
 }
 
-function campoHTML(c) {
-  return `<div><label><span class="et">${esc(c.etiqueta)}</span><input id="f_${c.clave}" inputmode="${c.tipo === 'num' || c.tipo === 'ent' || c.tipo === 'opc' ? 'decimal' : 'text'}"></label>
-    <div class="ayuda">${esc(c.ayuda)}</div><div class="err" id="e_${c.clave}"></div></div>`;
+// pre = "" para los ajustes de toda la cuenta, "BTC." o "ETH." para los de un activo
+function campoHTML(c, pre) {
+  const k = (pre || '') + c.clave;
+  const dentro = c.tipo === 'sino'
+    ? `<select id="f_${k}"><option value="si">sí</option><option value="no">no</option></select>`
+    : `<input id="f_${k}" inputmode="${c.tipo === 'num' || c.tipo === 'ent' || c.tipo === 'opc' ? 'decimal' : 'text'}">`;
+  return `<div><label><span class="et">${esc(c.etiqueta)}</span>${dentro}</label>
+    <div class="ayuda">${esc(c.ayuda)}</div><div class="err" id="e_${k}"></div></div>`;
 }
 function armarForm() {
   const base = campos.filter(c => c.seccion !== 'av'), av = campos.filter(c => c.seccion === 'av');
-  $('form').innerHTML = base.map(campoHTML).join('');
-  $('formAv').innerHTML = av.map(campoHTML).join('');
+  $('form').innerHTML = base.map(c => campoHTML(c, '')).join('');
+  $('formAv').innerHTML = av.map(c => campoHTML(c, '')).join('');
   $('bloqueAv').hidden = !av.length;
+  // un bloque desplegable por activo: BTC y ETH no comparten nada de esto
+  $('formActivos').innerHTML = activos.map(a => `
+    <details class="avanzado" ${a === activos[0] ? 'open' : ''}>
+      <summary>Ajustes de ${esc(a)} <span class="ayuda" id="estAct_${a}"></span></summary>
+      <div class="form" style="margin-top:12px">
+        ${camposActivo.filter(c => c.seccion !== 'av').map(c => campoHTML(c, a + '.')).join('')}
+      </div>
+      <div class="form" style="margin-top:12px">
+        ${camposActivo.filter(c => c.seccion === 'av').map(c => campoHTML(c, a + '.')).join('')}
+      </div>
+    </details>`).join('');
   llenarForm(ajustesGuardados);
 }
 function llenarForm(v) {
   for (const c of campos) {
     const el = $('f_' + c.clave);
+    if (!el) continue;
     el.value = v[c.clave] == null ? '' : v[c.clave];
     el.classList.remove('malo');
     $('e_' + c.clave).textContent = '';
+  }
+  for (const a of activos) {
+    const va = (v.por_activo || {})[a] || {};
+    for (const c of camposActivo) {
+      const el = $('f_' + a + '.' + c.clave);
+      if (!el) continue;
+      el.value = va[c.clave] == null ? '' : va[c.clave];
+      el.classList.remove('malo');
+      $('e_' + a + '.' + c.clave).textContent = '';
+    }
   }
 }
 
@@ -998,10 +1153,18 @@ $('power').onclick = async () => {
 $('cancelar').onclick = salirConfirm;
 
 $('guardar').onclick = async () => {
-  const datos = {};
+  const datos = { por_activo: {} };
   for (const c of campos) {
     datos[c.clave] = $('f_' + c.clave).value;
     $('e_' + c.clave).textContent = ''; $('f_' + c.clave).classList.remove('malo');
+  }
+  for (const a of activos) {
+    datos.por_activo[a] = {};
+    for (const c of camposActivo) {
+      const k = a + '.' + c.clave;
+      datos.por_activo[a][c.clave] = $('f_' + k).value;
+      $('e_' + k).textContent = ''; $('f_' + k).classList.remove('malo');
+    }
   }
   $('guardar').disabled = true; msg($('msgAjustes'), 'guardando…', 'yendo');
   const r = await api('/api/ajustes', datos);
@@ -1014,10 +1177,10 @@ $('guardar').onclick = async () => {
     for (const [k, t] of Object.entries(r.errores || {})) {
       $('e_' + k).textContent = t; $('f_' + k).classList.add('malo'); primero = primero || k;
     }
-    if (primero) {                                  // si el campo malo esta en Avanzado, se abre
-      const caja = $('f_' + primero).closest('details');
-      if (caja) caja.open = true;
-      $('f_' + primero).focus();
+    const el = primero && $('f_' + primero);
+    if (el) {                                       // si el campo malo está plegado (Avanzado o un activo), se abre
+      for (let c = el.closest('details'); c; c = c.parentElement && c.parentElement.closest('details')) c.open = true;
+      el.focus();
     }
   }
 };

@@ -113,8 +113,11 @@ class Registro:
         self.filas = []
         return n, (copia.name if copia else None)
 
-    def resumen(self, fecha=None):
-        filas = [f for f in self.filas if f.get("modo") == self.modo and (fecha is None or f["fecha"] == fecha)]
+    def resumen(self, fecha=None, activo=None):
+        filas = [f for f in self.filas
+                 if f.get("modo") == self.modo
+                 and (fecha is None or f["fecha"] == fecha)
+                 and (activo is None or f.get("activo") == activo)]
         pnl = [float(f["pnl_usd"]) for f in filas]
         g = [p for p in pnl if p > 0]
         p_ = [p for p in pnl if p <= 0]
@@ -138,6 +141,8 @@ class Operador:
         self.meta_dia = meta_dia
         self.lock = threading.RLock()
         self.aviso_limite = None
+        self.filtro = None            # FiltroNoticias; si es None, no se filtra nada
+        self.bloqueado = {}           # activo -> por qué no entra en este bloque (lo enseña el panel)
 
     # ------------------------------------------------------------------ entrada / salida
     def procesar(self, activo: str, f: Foto):
@@ -151,12 +156,20 @@ class Operador:
                 return
             if self.estado.operado.get(activo) == f.ticker or not self.puede_entrar():
                 return
+            # filtro de noticias: si el bloque cierra sobre un dato de alto impacto, no se entra
+            porque = self.filtro.motivo(f.cierre, f.ticker) if self.filtro else None
+            if porque != self.bloqueado.get(activo):
+                self.bloqueado[activo] = porque
+                if porque:
+                    log(f"{activo} filtro de noticias: no entro en {f.ticker} · {porque}")
+            if porque:
+                return
             est: Estrategia = self.estrategias[activo]
             senal = est.entrada(f)
             if not senal:
                 return
             lado, ask = senal
-            op = self.ej.entrar(activo, f, lado, ask, self.contratos, est.cfg)
+            op = self.ej.entrar(activo, f, lado, ask, est.cfg.contratos, est.cfg)
             if op is None:
                 return                        # no se llenó: se vuelve a intentar en la foto siguiente
             self.estado.operado[activo] = f.ticker

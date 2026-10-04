@@ -66,6 +66,7 @@ class EjecutorReal:
     modo = "real"
 
     def __init__(self, k: Kalshi, contratos, desliz_entrada=0.02, n_activos=1, espera_entrada=2.0):
+        # contratos: dict activo -> nº de contratos (antes era un único número para todos)
         self.k = k
         self.contratos = contratos
         self.desliz = desliz_entrada
@@ -90,8 +91,10 @@ class EjecutorReal:
 
     def _asegurar_fondos(self, activo, shard):
         """Cada contrato puede costar hasta 1 $: el shard del mercado necesita CONTRATOS x 1 $ por activo."""
-        contratos = self.contratos
-        necesario = contratos * self.n_activos
+        # cada activo puede llevar un nº de contratos distinto: se reserva la suma de todos
+        porc = self.contratos if isinstance(self.contratos, dict) else {}
+        contratos = porc.get(activo, 1.0) if porc else self.contratos
+        necesario = sum(porc.values()) if porc else contratos * self.n_activos
         disponible = self.k.saldo(shard)
         if disponible >= necesario - 1e-6:
             return True

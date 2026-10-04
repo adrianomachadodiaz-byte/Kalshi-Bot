@@ -1,0 +1,1271 @@
+diff --git a/bot.py b/bot.py
+index 1680b79..1091a55 100644
+--- a/bot.py
++++ b/bot.py
+@@ -11,6 +11,7 @@ import os
+ import threading
+ import time
+ from datetime import datetime
++from zoneinfo import ZoneInfo
+ from http.cookies import SimpleCookie
+ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+ from pathlib import Path
+@@ -43,27 +44,45 @@ PASO_GRAFICO = 1                         # segundos entre puntos de la serie que
+ 
+ # ---------------------------------------------------------------- ajustes (panel > variables de Railway > defecto)
+ # clave, tipo, defecto, etiqueta, ayuda, sección ("" = básico, "av" = avanzado)
+-CAMPOS = [
+-    ("activos", "activos", "BTC", "Cripto", "BTC o ETH", ""),
++# Ajustes de CADA activo: BTC y ETH llevan los suyos, independientes.
++CAMPOS_ACTIVO = [
+     ("delta", "num", 100.0, "Delta ($)", "mínimo para entrar", ""),
+-    ("delay", "ent", 7, "Delay (min)", "ventana de entrada", ""),
++    ("delay", "ent", 420, "Delay (s)", "ventana de entrada, en segundos", ""),
+     ("entrada_min", "num", 0.81, "Entrada mínima", "EntryRange desde", ""),
+     ("entrada_max", "num", 0.86, "Entrada máxima", "EntryRange hasta", ""),
+     ("tp", "num", 0.13, "Take profit (+)", "sobre la entrada", ""),
+     ("exit", "opc", 0.46, "Exit (stop)", "vacío = sin Exit", ""),
+     ("contratos", "num", 1.0, "Contratos", "por operación", "av"),
+     ("breakeven", "opc", None, "BreakEven (+)", "vacío = sin BE", "av"),
++]
++# Ajustes de toda la cuenta: valen para los dos activos a la vez.
++CAMPOS_GLOBAL = [
++    ("activos", "activos", "BTC", "Cripto", "BTC, ETH o las dos", ""),
+     ("max_perdida_dia", "num", 0.0, "Pérdida máx. ($)", "0 = sin límite", "av"),
+     ("meta_ganancia_dia", "num", 0.0, "Meta ($)", "0 = sin meta", "av"),
+     ("desliz_entrada", "num", 0.02, "Deslizamiento", "sobre el ask", "av"),
+     ("espera_entrada", "num", 2.0, "Espera al entrar (s)", "0 = IOC; 2 = deja la orden puesta", "av"),
+     ("ritmo", "num", 0.25, "Ritmo (s)", "cada cuánto mira el ask", "av"),
+     ("ritmo_indice", "num", 1.0, "Ritmo índice (s)", "el feed avanza cada 2-3 s", "av"),
++    ("filtro_noticias", "sino", "si", "Filtro de noticias", "no entra si el bloque cierra sobre un dato", ""),
++    ("noticia_horas", "texto", "08:30,10:00,14:00", "Horas fijas (ET)", "bloques que cierran a esa hora", "av"),
++    ("noticia_margen", "num", 2.0, "Margen noticia (min)", "después del cierre del bloque", "av"),
++    ("noticia_dia_alto", "ent", 3, "Día cargado (eventos)", "desde cuántos rojos se recorta; 0 = nunca", "av"),
++    ("noticia_dia_modo", "texto", "mitad", "Día cargado: qué hacer", "mitad = opera uno de cada dos · nada = no opera", "av"),
+ ]
+ 
+ 
+ def convertir(tipo, v):
+     """Texto del panel / variable -> valor. ValueError si no se entiende."""
++    if tipo == "sino":
++        t = str(v).strip().lower()
++        if t in ("1", "si", "sí", "true", "on", "yes"):
++            return "si"
++        if t in ("0", "no", "false", "off", ""):
++            return "no"
++        raise ValueError("sí o no")
++    if tipo == "texto":
++        return str(v or "").strip()
+     if tipo == "activos":
+         lista = [x.strip().upper() for x in str(v).split(",") if x.strip()]
+         return ",".join(lista)
+@@ -75,73 +94,157 @@ def convertir(tipo, v):
+     return int(n) if tipo == "ent" else n
+ 
+ 
+-def validar(crudo):
+-    """(valores, errores). crudo: dict clave -> texto o número."""
++def validar_activo(crudo):
++    """Valida los ajustes de UN activo. Devuelve (valores, errores)."""
+     v, err = {}, {}
+-    for clave, tipo, _, _, _, _ in CAMPOS:
++    for clave, tipo, _, _, _, _ in CAMPOS_ACTIVO:
+         try:
+             v[clave] = convertir(tipo, crudo.get(clave))
+         except (TypeError, ValueError):
+             err[clave] = "número no válido"
+     if err:
+         return v, err
+-    activos = v["activos"].split(",") if v["activos"] else []
+-    if not activos or any(a not in ACTIVOS_VALIDOS for a in activos):
+-        err["activos"] = "usa BTC o ETH"
+     if not 0 < v["contratos"] <= 10000:
+         err["contratos"] = "entre 0.01 y 10000"
+     if v["delta"] < 0:
+         err["delta"] = "no puede ser negativo"
+-    if not 1 <= v["delay"] <= 15:
+-        err["delay"] = "entre 1 y 15 minutos"
++    if not 1 <= v["delay"] <= 900:
++        err["delay"] = "entre 1 y 900 segundos (el bloque dura 900)"
+     if not 0 < v["entrada_min"] < 1:
+         err["entrada_min"] = "entre 0 y 1"
+     if not 0 < v["entrada_max"] < 1 or v["entrada_max"] < v["entrada_min"]:
+         err["entrada_max"] = "entre la mínima y 1"
+     if not 0 < v["tp"] < 1:
+         err["tp"] = "entre 0 y 1"
+-    # Si entrada + TP pasa de 0.99 ya no es un error: el bot no pone orden de TP y
++    # Si entrada + TP pasa de 0.99 no es un error: el bot no pone orden de TP y
+     # aguanta hasta que cierra el bloque, que paga 1.00. Ver Operacion.sin_tp.
+     if v["exit"] is not None and not 0 < v["exit"] < v["entrada_min"]:
+         err["exit"] = "tiene que ser menor que la entrada mínima"
++    if v["breakeven"] is not None and not 0 < v["breakeven"] < v["tp"]:
++        err["breakeven"] = "entre 0 y el TP"
++    return v, err
++
++
++def validar(crudo):
++    """(valores, errores) de todo: lo global y lo de cada activo.
++
++    crudo: {campos globales..., "por_activo": {"BTC": {...}, "ETH": {...}}}
++    Los errores de un activo van como "BTC.delta" para que el panel marque el campo.
++    """
++    v, err = {}, {}
++    for clave, tipo, _, _, _, _ in CAMPOS_GLOBAL:
++        try:
++            v[clave] = convertir(tipo, crudo.get(clave))
++        except (TypeError, ValueError):
++            err[clave] = "número no válido"
++    # los activos se validan siempre, incluso si algo global viene mal: así quien
++    # lea v["por_activo"] nunca se encuentra con que no está
++    crudo_pa = crudo.get("por_activo") or {}
++    v["por_activo"] = {}
++    for a in ACTIVOS_VALIDOS:
++        base = {c[0]: c[2] for c in CAMPOS_ACTIVO}
++        base.update({k: x for k, x in (crudo_pa.get(a) or {}).items() if k in base})
++        v["por_activo"][a] = validar_activo(base)[0]
++    if err:
++        return v, err
++    activos = [a for a in (v["activos"].split(",") if v["activos"] else []) if a]
++    if not activos or any(a not in ACTIVOS_VALIDOS for a in activos):
++        err["activos"] = "usa BTC, ETH o las dos"
++        activos = [a for a in activos if a in ACTIVOS_VALIDOS]
+     if not 0.1 <= v["ritmo"] <= 3:
+         err["ritmo"] = "entre 0.1 y 3 segundos"
+     if not 0.25 <= v["ritmo_indice"] <= 10:
+         err["ritmo_indice"] = "entre 0.25 y 10 segundos"
+     elif v["ritmo_indice"] > Precios.MAX_ATRASO - 1:
+         err["ritmo_indice"] = f"tiene que ser menor que {Precios.MAX_ATRASO - 1:g} s o el candado del índice salta solo"
+-    if v["breakeven"] is not None and not 0 < v["breakeven"] < v["tp"]:
+-        err["breakeven"] = "entre 0 y el TP"
+     for d in ("max_perdida_dia", "meta_ganancia_dia"):
+         if v[d] < 0:
+             err[d] = "0 o más"
+     if not 0 <= v["desliz_entrada"] <= 0.10:
+         err["desliz_entrada"] = "entre 0 y 0.10"
+-    if not 0 <= v["espera_entrada"] <= 10:
+-        err["espera_entrada"] = "entre 0 y 10 segundos"
++    if not 0 <= v["espera_entrada"] <= 30:
++        err["espera_entrada"] = "entre 0 y 30 segundos"
++    if not 0 <= v["noticia_margen"] <= 60:
++        err["noticia_margen"] = "entre 0 y 60 minutos"
++    if not 0 <= v["noticia_dia_alto"] <= 20:
++        err["noticia_dia_alto"] = "entre 0 y 20 eventos"
++    if v["noticia_dia_modo"] not in ("mitad", "nada"):
++        err["noticia_dia_modo"] = "escribe mitad o nada"
++    if FiltroNoticias.leer_horas(v["noticia_horas"]) is None:
++        err["noticia_horas"] = "horas tipo 08:30,10:00 separadas por comas"
++
++    # los errores solo molestan si ese activo está encendido: uno apagado con ajustes
++    # raros no bloquea el guardado, y así no se pierde su configuración
++    for a in activos:
++        base = {c[0]: c[2] for c in CAMPOS_ACTIVO}
++        base.update({k: x for k, x in (crudo_pa.get(a) or {}).items() if k in base})
++        for k, t in validar_activo(base)[1].items():
++            err[f"{a}.{k}"] = t
+     return v, err
+ 
+ 
++def migrar_ajustes(guardado):
++    """Ajustes viejos (un solo juego para todos los activos) -> uno por activo.
++
++    Antes el archivo era plano: delta, delay, tp... valían para BTC y ETH a la vez.
++    Se copian tal cual a los dos, así nadie pierde su configuración al actualizar.
++    """
++    if "por_activo" in guardado:
++        return _delay_a_segundos(guardado)
++    g = dict(guardado)
++    plano = {}
++    for clave, _, _, _, _, _ in CAMPOS_ACTIVO:
++        if clave in g:
++            plano[clave] = g.pop(clave)
++    g["por_activo"] = {a: dict(plano) for a in ACTIVOS_VALIDOS}
++    for a in ACTIVOS_VALIDOS:            # más viejo aún: había delta_btc / delta_eth
++        d = guardado.get(f"delta_{a.lower()}")
++        if d is not None:
++            g["por_activo"][a]["delta"] = d
++    if plano or any(g["por_activo"][a] for a in ACTIVOS_VALIDOS):
++        log("ajustes migrados: ahora cada activo lleva su propia configuración")
++    return _delay_a_segundos(g)
++
++
++def _delay_a_segundos(g):
++    """El Delay se guardaba en minutos y ahora va en segundos.
++
++    Un valor de 15 o menos solo puede ser el de antes (15 segundos de ventana no
++    tendría sentido como ajuste guardado), así que se pasa a segundos.
++    """
++    for a, vals in (g.get("por_activo") or {}).items():
++        d = vals.get("delay")
++        try:
++            d = int(float(d))
++        except (TypeError, ValueError):
++            continue
++        if 1 <= d <= 15:
++            vals["delay"] = d * 60
++            log(f"{a}: el Delay pasa de {d} min a {d * 60} s (ahora se configura en segundos)")
++    return g
++
++
+ class Ajustes:
+     def __init__(self, carpeta: Path):
+         self.ruta = carpeta / "ajustes.json"
+         crudo = {}
+-        for clave, tipo, defecto, _, _, _ in CAMPOS:
++        for clave, tipo, defecto, _, _, _ in CAMPOS_GLOBAL:
+             crudo[clave] = env(clave.upper()) or defecto
++        base_activo = {c[0]: (env(c[0].upper()) or c[2]) for c in CAMPOS_ACTIVO}
++        crudo["por_activo"] = {a: dict(base_activo) for a in ACTIVOS_VALIDOS}
+         if self.ruta.exists():
+             try:
+-                guardado = json.loads(self.ruta.read_text(encoding="utf-8"))
+-                if "delta" not in guardado:          # ajustes de antes: había un Delta por activo
+-                    a = (guardado.get("activos") or "BTC").split(",")[0].lower()
+-                    if guardado.get(f"delta_{a}") is not None:
+-                        guardado["delta"] = guardado[f"delta_{a}"]
+-                crudo.update({k: x for k, x in guardado.items() if k in {c[0] for c in CAMPOS}})
++                guardado = migrar_ajustes(json.loads(self.ruta.read_text(encoding="utf-8")))
++                crudo.update({k: x for k, x in guardado.items() if k in {c[0] for c in CAMPOS_GLOBAL}})
++                for a, vals in (guardado.get("por_activo") or {}).items():
++                    if a in crudo["por_activo"]:
++                        crudo["por_activo"][a].update({k: x for k, x in vals.items() if k in base_activo})
+             except Exception as e:  # noqa: BLE001
+                 log(f"no pude leer {self.ruta.name}: {e}")
+         v, err = validar(crudo)
+         if err:
+             log(f"ajustes con errores ({err}); uso los valores por defecto")
+-            v, _ = validar({c[0]: c[2] for c in CAMPOS})
++            v, _ = validar({c[0]: c[2] for c in CAMPOS_GLOBAL})
+         self.valores = v
+ 
+     def guardar(self, v):
+@@ -176,8 +279,11 @@ class Claves:
+ 
+ 
+ def config_de(activo, v):
+-    return Config(delta=v["delta"], delay=v["delay"], entrada_min=v["entrada_min"],
+-                  entrada_max=v["entrada_max"], tp=v["tp"], exit=v["exit"], breakeven=v["breakeven"])
++    """La Config de ESE activo; si no hay nada guardado para él, los valores por defecto."""
++    a = (v.get("por_activo") or {}).get(activo) or {c[0]: c[2] for c in CAMPOS_ACTIVO}
++    return Config(delta=a["delta"], delay=a["delay"], entrada_min=a["entrada_min"],
++                  entrada_max=a["entrada_max"], tp=a["tp"], exit=a["exit"],
++                  breakeven=a["breakeven"], contratos=a["contratos"])
+ 
+ 
+ # ---------------------------------------------------------------- datos en vivo
+@@ -327,6 +433,104 @@ class Noticias:
+         ahora = time.time()
+         return [dict(e, faltan=e["ts"] - ahora) for e in self.eventos if e["ts"] > ahora - 900][:cuantas]
+ 
++    def altos(self):
++        """Solo los de carpeta roja: son los que mueven el precio de golpe."""
++        return [e for e in self.eventos if e["impacto"] == "High"]
++
++
++class FiltroNoticias:
++    """No entrar en bloques que cierran encima de un dato de alto impacto.
++
++    Tres reglas, las del plan:
++      1. el bloque cierra en una hora fija (08:30, 10:00, 14:00 ET)
++      2. hay un evento rojo dentro del bloque, o justo después (el margen)
++      3. el día trae muchos rojos: se opera uno de cada dos bloques, o ninguno
++
++    No adivina nada: el calendario se publica con semanas de antelación. Si el
++    calendario no se pudo leer, el filtro NO bloquea (mejor operar que quedarse
++    parado por un fallo de red).
++    """
++
++    ET = ZoneInfo("America/New_York")
++
++    def __init__(self, noticias: "Noticias"):
++        self.n = noticias
++        self.activo = True
++        self.horas = [(8, 30), (10, 0), (14, 0)]
++        self.margen = 120.0          # segundos después del cierre que siguen contando
++        self.dia_alto = 3            # desde cuántos rojos el día se considera cargado
++        self.dia_modo = "mitad"
++        self.saltados = {}           # "YYYY-MM-DD" -> {"hora": n, "evento": n, "dia": n}
++
++    @staticmethod
++    def leer_horas(txt):
++        """'08:30,10:00' -> [(8,30),(10,0)]. None si está mal escrito."""
++        fuera = []
++        for t in str(txt or "").split(","):
++            t = t.strip()
++            if not t:
++                continue
++            try:
++                h, m = t.split(":")
++                h, m = int(h), int(m)
++            except ValueError:
++                return None
++            if not (0 <= h < 24 and 0 <= m < 60):
++                return None
++            fuera.append((h, m))
++        return fuera
++
++    def aplicar(self, v):
++        self.activo = v["filtro_noticias"] == "si"
++        self.horas = self.leer_horas(v["noticia_horas"]) or []
++        self.margen = v["noticia_margen"] * 60.0
++        self.dia_alto = v["noticia_dia_alto"]
++        self.dia_modo = v["noticia_dia_modo"]
++
++    def altos_del_dia(self, cierre):
++        d = datetime.fromtimestamp(cierre, self.ET).date()
++        return [e for e in self.n.altos() if datetime.fromtimestamp(e["ts"], self.ET).date() == d]
++
++    def motivo(self, cierre, ticker=""):
++        """Texto del porqué no se entra en el bloque que cierra en `cierre`, o None si se puede."""
++        if not self.activo:
++            return None
++        t = datetime.fromtimestamp(cierre, self.ET)
++        if (t.hour, t.minute) in self.horas:
++            return self._contar(t, "hora", f"el bloque cierra a las {t:%H:%M} ET (hora de datos)")
++        for e in self.n.altos():                 # dentro del bloque o justo después
++            if cierre - 900 < e["ts"] <= cierre + self.margen:
++                cuando = datetime.fromtimestamp(e["ts"], self.ET)
++                return self._contar(t, "evento", f"{e['titulo']} ({e['moneda']}) a las {cuando:%H:%M} ET")
++        if self.dia_alto:
++            del_dia = self.altos_del_dia(cierre)
++            if len(del_dia) >= self.dia_alto:
++                if self.dia_modo == "nada":
++                    return self._contar(t, "dia", f"día cargado: {len(del_dia)} datos rojos")
++                # mitad: se opera uno de cada dos bloques (el bloque nº par del día)
++                bloque = int((cierre - t.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()) // 900)
++                if bloque % 2:
++                    return self._contar(t, "dia", f"día cargado ({len(del_dia)} rojos): opera uno de cada dos")
++        return None
++
++    def _contar(self, t, clave, texto):
++        d = t.strftime("%Y-%m-%d")
++        c = self.saltados.setdefault(d, {"hora": 0, "evento": 0, "dia": 0})
++        c[clave] += 1
++        return texto
++
++    def informe(self):
++        """Lo que pidió el plan: cuántos bloques se saltan, por día y por semana, y por qué."""
++        dias = sorted(self.saltados)
++        sem = {"hora": 0, "evento": 0, "dia": 0}
++        for d in dias[-7:]:
++            for k in sem:
++                sem[k] += self.saltados[d][k]
++        hoy = self.saltados.get(datetime.now(self.ET).strftime("%Y-%m-%d"), {"hora": 0, "evento": 0, "dia": 0})
++        return dict(activo=self.activo, hoy=hoy, hoy_total=sum(hoy.values()),
++                    semana=sem, semana_total=sum(sem.values()),
++                    rojos_hoy=len(self.altos_del_dia(time.time())))
++
+ 
+ class Bot:
+     def __init__(self):
+@@ -344,6 +548,7 @@ class Bot:
+         self.ciclo_indice = CICLO_INDICE
+         self.precios = Precios(self)
+         self.noticias = Noticias()
++        self.filtro = FiltroNoticias(self.noticias)
+         self.op = Operador({}, None, self.estado, self.registro, 1)
+         self.activos, self.cfgs = [], {}
+         self.aplicar(self.ajustes.valores)
+@@ -360,7 +565,7 @@ class Bot:
+ 
+     # ------------------------------------------------------------------ ajustes y claves
+     def aplicar(self, v):
+-        activos = v["activos"].split(",")
++        activos = [a for a in v["activos"].split(",") if a]
+         with self.op.lock:
+             self.activos = activos
+             self.cfgs = {a: config_de(a, v) for a in activos}
+@@ -368,17 +573,24 @@ class Bot:
+             for a in self.estado.abiertas:                    # una abierta de un activo quitado se sigue cuidando
+                 est.setdefault(a, Estrategia(config_de(a, v)))
+             self.op.estrategias = est
+-            self.op.contratos = v["contratos"]
+             self.op.max_perdida_dia = v["max_perdida_dia"]
+             self.op.meta_dia = v["meta_ganancia_dia"]
+             self.ciclo = v["ritmo"]
+             self.ciclo_indice = v["ritmo_indice"]
++            self.filtro.aplicar(v)
++            self.op.filtro = self.filtro
+             if self.ej:
+-                self.ej.contratos, self.ej.desliz, self.ej.n_activos = v["contratos"], v["desliz_entrada"], len(activos)
++                self.ej.contratos = {a: c.contratos for a, c in self.cfgs.items()}
++                self.ej.desliz, self.ej.n_activos = v["desliz_entrada"], len(activos)
+                 self.ej.espera = v["espera_entrada"]
+         for a, c in self.cfgs.items():
+-            log(f"ajustes {a}: {c.texto()} · {v['contratos']:g} contratos · "
+-                f"ritmo {v['ritmo']:g} s / índice {v['ritmo_indice']:g} s")
++            log(f"ajustes {a}: {c.texto()}")
++        log("filtro de noticias: " + (
++            f"activo · horas {v['noticia_horas']} · margen {v['noticia_margen']:g} min · "
++            f"día cargado desde {v['noticia_dia_alto']} rojos ({v['noticia_dia_modo']})"
++            if v["filtro_noticias"] == "si" else "apagado"))
++        log(f"ajustes generales: activos {', '.join(activos) or 'ninguno'} · "
++            f"ritmo {v['ritmo']:g} s / índice {v['ritmo_indice']:g} s")
+ 
+     def conectar(self, key_id, pem):
+         """Prueba la API key pidiendo el saldo. (ok, mensaje)."""
+@@ -531,8 +743,8 @@ class Bot:
+                     est = "sin precio del índice: no opera"
+                 elif self.estado.operado.get(a) == f.ticker:
+                     est = "ya operó este bloque"
+-                elif cfg and quedan > cfg.delay * 60:
+-                    est = f"espera los últimos {cfg.delay} min"
++                elif cfg and quedan > cfg.delay:
++                    est = f"espera los últimos {cfg.delay} s"
+                 else:
+                     est = "buscando entrada"
+                 d = f.delta()
+@@ -541,7 +753,7 @@ class Bot:
+                 orden = lambda k: sorted([s_, v_] for s_, v_ in (h.get(k) or {}).items()) if mio else []
+                 fila["grafico"] = dict(
+                     activo=orden("activo"), contrato=orden("contrato"),
+-                    referencia=f.referencia, ventana=(cfg.delay * 60) if cfg else None,
++                    referencia=f.referencia, ventana=cfg.delay if cfg else None,
+                     delta_min=cfg.delta if cfg else None,
+                     entrada=op.entrada if op else None, tp=op.objetivo if op else None,
+                     sin_tp=bool(op.sin_tp) if op else None,
+@@ -561,13 +773,23 @@ class Bot:
+             ritmo=self.ciclo, ritmo_indice=self.ciclo_indice, vuelta_s=round(self.ultima_vuelta, 3),
+             encendido_s=(ahora - self.estado.encendido_desde) if self.estado.encendido_desde and not self.estado.pausado else None,
+             total=self.registro.resumen(), hoy=self.registro.resumen(hoy), vivo=vivo,
++            por_activo={a: dict(total=self.registro.resumen(activo=a),
++                                hoy=self.registro.resumen(hoy, activo=a),
++                                ajustes=(self.ajustes.valores.get("por_activo") or {}).get(a),
++                                encendido=a in self.activos)
++                        for a in ACTIVOS_VALIDOS},
+             abiertas=[dict(activo=o.activo, lado=o.lado.upper(), contratos=o.abiertos(), entrada=o.entrada,
+                            objetivo=o.objetivo, ticker=o.ticker) for o in self.estado.abiertas.values()],
+             pendientes=len(self.estado.pendientes),
+-            operaciones=filas[-50:][::-1], logs=list(operador.LOGS)[-250:],
++            operaciones=filas[-120:][::-1], logs=list(operador.LOGS)[-250:],
+             ajustes=self.ajustes.valores,
+             noticias=self.noticias.proximas(), noticias_error=self.noticias.error,
+-            campos=[dict(clave=c, tipo=t, etiqueta=e, ayuda=h, seccion=sec) for c, t, _, e, h, sec in CAMPOS])
++            filtro=dict(self.filtro.informe(),
++                        bloqueado={a: p for a, p in self.op.bloqueado.items() if p}),
++            campos=[dict(clave=c, tipo=t, etiqueta=e, ayuda=h, seccion=sec) for c, t, _, e, h, sec in CAMPOS_GLOBAL],
++            campos_activo=[dict(clave=c, tipo=t, etiqueta=e, ayuda=h, seccion=sec)
++                           for c, t, _, e, h, sec in CAMPOS_ACTIVO],
++            activos_validos=list(ACTIVOS_VALIDOS))
+ 
+ 
+ # ---------------------------------------------------------------- panel web
+diff --git a/ejecutores.py b/ejecutores.py
+index 29559df..ec58bff 100644
+--- a/ejecutores.py
++++ b/ejecutores.py
+@@ -66,6 +66,7 @@ class EjecutorReal:
+     modo = "real"
+ 
+     def __init__(self, k: Kalshi, contratos, desliz_entrada=0.02, n_activos=1, espera_entrada=2.0):
++        # contratos: dict activo -> nº de contratos (antes era un único número para todos)
+         self.k = k
+         self.contratos = contratos
+         self.desliz = desliz_entrada
+@@ -90,8 +91,10 @@ class EjecutorReal:
+ 
+     def _asegurar_fondos(self, activo, shard):
+         """Cada contrato puede costar hasta 1 $: el shard del mercado necesita CONTRATOS x 1 $ por activo."""
+-        contratos = self.contratos
+-        necesario = contratos * self.n_activos
++        # cada activo puede llevar un nº de contratos distinto: se reserva la suma de todos
++        porc = self.contratos if isinstance(self.contratos, dict) else {}
++        contratos = porc.get(activo, 1.0) if porc else self.contratos
++        necesario = sum(porc.values()) if porc else contratos * self.n_activos
+         disponible = self.k.saldo(shard)
+         if disponible >= necesario - 1e-6:
+             return True
+diff --git a/estrategia.py b/estrategia.py
+index 6dbeae5..cf54cf8 100644
+--- a/estrategia.py
++++ b/estrategia.py
+@@ -18,18 +18,19 @@ def comision(p):
+ @dataclass
+ class Config:
+     delta: float                       # entra solo si |precio - referencia| >= delta
+-    delay: int                         # entra solo en los últimos `delay` minutos
++    delay: int                         # entra solo en los últimos `delay` SEGUNDOS del bloque
+     entrada_min: float                 # EntryRange
+     entrada_max: float
+     tp: float                          # TP = entrada + tp (cuenta cuando el bid llega)
+     exit: Optional[float]              # stop fijo: sale si el bid <= exit (None = sin Exit)
+     breakeven: Optional[float] = None  # si el bid sube +X, el stop pasa al precio de entrada
++    contratos: float = 1.0             # contratos por operación de ESTE activo
+ 
+     def texto(self):
+         ex = f"{self.exit:.2f}" if self.exit is not None else "sin"
+         be = f"+{self.breakeven:.2f}" if self.breakeven is not None else "sin"
+-        return (f"Delta {self.delta:g} · Delay {self.delay} · Entrada {self.entrada_min:.2f}-{self.entrada_max:.2f} · "
+-                f"TP +{self.tp:.2f} · Exit {ex} · BreakEven {be}")
++        return (f"Delta {self.delta:g} · Delay {self.delay} s · Entrada {self.entrada_min:.2f}-{self.entrada_max:.2f} · "
++                f"TP +{self.tp:.2f} · Exit {ex} · BreakEven {be} · {self.contratos:g} contratos")
+ 
+ 
+ @dataclass
+@@ -120,7 +121,7 @@ class Estrategia:
+         c = self.cfg
+         if not f.valida() or f.ts >= f.cierre:
+             return None
+-        if f.segundo() < BLOQUE - 60 * c.delay:
++        if f.segundo() < BLOQUE - c.delay:
+             return None
+         d = f.delta()
+         if d is None or d < c.delta - 1e-9:
+diff --git a/operador.py b/operador.py
+index 7a35495..d3a4709 100644
+--- a/operador.py
++++ b/operador.py
+@@ -113,8 +113,11 @@ class Registro:
+         self.filas = []
+         return n, (copia.name if copia else None)
+ 
+-    def resumen(self, fecha=None):
+-        filas = [f for f in self.filas if f.get("modo") == self.modo and (fecha is None or f["fecha"] == fecha)]
++    def resumen(self, fecha=None, activo=None):
++        filas = [f for f in self.filas
++                 if f.get("modo") == self.modo
++                 and (fecha is None or f["fecha"] == fecha)
++                 and (activo is None or f.get("activo") == activo)]
+         pnl = [float(f["pnl_usd"]) for f in filas]
+         g = [p for p in pnl if p > 0]
+         p_ = [p for p in pnl if p <= 0]
+@@ -138,6 +141,8 @@ class Operador:
+         self.meta_dia = meta_dia
+         self.lock = threading.RLock()
+         self.aviso_limite = None
++        self.filtro = None            # FiltroNoticias; si es None, no se filtra nada
++        self.bloqueado = {}           # activo -> por qué no entra en este bloque (lo enseña el panel)
+ 
+     # ------------------------------------------------------------------ entrada / salida
+     def procesar(self, activo: str, f: Foto):
+@@ -151,12 +156,20 @@ class Operador:
+                 return
+             if self.estado.operado.get(activo) == f.ticker or not self.puede_entrar():
+                 return
++            # filtro de noticias: si el bloque cierra sobre un dato de alto impacto, no se entra
++            porque = self.filtro.motivo(f.cierre, f.ticker) if self.filtro else None
++            if porque != self.bloqueado.get(activo):
++                self.bloqueado[activo] = porque
++                if porque:
++                    log(f"{activo} filtro de noticias: no entro en {f.ticker} · {porque}")
++            if porque:
++                return
+             est: Estrategia = self.estrategias[activo]
+             senal = est.entrada(f)
+             if not senal:
+                 return
+             lado, ask = senal
+-            op = self.ej.entrar(activo, f, lado, ask, self.contratos, est.cfg)
++            op = self.ej.entrar(activo, f, lado, ask, est.cfg.contratos, est.cfg)
+             if op is None:
+                 return                        # no se llenó: se vuelve a intentar en la foto siguiente
+             self.estado.operado[activo] = f.ticker
+diff --git a/panel.html b/panel.html
+index f513a67..67cb603 100644
+--- a/panel.html
++++ b/panel.html
+@@ -180,13 +180,37 @@ html{scroll-behavior:smooth}
+   background-size:200% 100%;border-radius:4px;animation:sk 1.5s ease-in-out infinite}
+ @keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
+ 
++/* lateral: marcador por activo y estado del filtro */
++.porfila{display:flex;align-items:baseline;gap:9px;padding:9px 0;border-top:1px solid var(--linea)}
++.porfila:first-of-type{border-top:0}
++.porfila .nom{font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:var(--claro);min-width:34px}
++.porfila .pnl{font-family:var(--mono);font-size:14px;font-weight:600;margin-left:auto}
++.porfila .det{font-size:11px;color:var(--tenue)}
++.porfila .apag{font-size:10.5px;color:var(--tenue);border:1px solid var(--linea);border-radius:3px;padding:0 5px}
++.fnota{font-size:11.5px;color:var(--gris);line-height:1.5}
++.fnota b{color:var(--claro);font-weight:500}
++.fbloq{margin-top:9px;padding-top:9px;border-top:1px solid var(--linea);font-size:11.5px;color:var(--avisa-t,var(--gris))}
++.fbloq span{display:block;margin-top:4px}
++
++/* selector de activo: Todo / BTC / ETH */
++.segm{display:inline-flex;gap:2px;padding:2px;background:var(--n0);border:1px solid var(--linea);border-radius:var(--r-s)}
++.segm button{padding:3px 10px;border:0;background:transparent;color:var(--gris);font:inherit;font-size:11.5px;
++  letter-spacing:.03em;border-radius:3px;cursor:pointer;transition:color var(--t),background var(--t)}
++.segm button:hover{color:var(--claro)}
++.segm button[aria-pressed="true"]{background:var(--n2);color:var(--claro)}
++.bloque + .bloque{margin-top:14px}
++.bloque .titulo h2 .act{color:var(--tenue);font-weight:400;margin-left:6px}
++/* un juego de ajustes por activo */
++.porAct{margin-top:14px}
++.porAct > details{margin-top:9px}
++
+ /* ---------------------------------------------------------------- bloque en vivo */
+ .lados{display:flex;gap:7px}
+ .lado{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:var(--r-s);font-size:12px;
+   background:var(--n0);border:1px solid var(--linea);transition:border-color var(--t),background var(--t)}
+ .lado.dentro{background:var(--n2);border-color:var(--gris)}
+ .lado b{font-weight:500;font-size:11px;letter-spacing:.04em}
+-#grafico{margin:2px -4px 0;min-width:0}
++.graf{margin:2px -4px 0;min-width:0}
+ .cuerpo{min-width:0}
+ /* en pantalla ancha el gráfico no tiene por qué ocuparlo todo: la lectura del
+    delta se pone a su lado y la tarjeta baja de alto */
+@@ -194,10 +218,10 @@ html{scroll-behavior:smooth}
+   .cuerpo{display:grid;grid-template-columns:minmax(0,1.85fr) minmax(0,1fr);gap:26px;align-items:start}
+   .cuerpo > *{min-width:0}
+   .aparte{padding-left:26px;border-left:1px solid var(--linea);align-self:stretch}
+-  .aparte #gPie{margin-top:14px;padding-top:14px}
++  .aparte .gpie{margin-top:14px;padding-top:14px}
+   .aparte .medidor{margin-top:0;padding-top:0;border-top:0}
+ }
+-#gPie{margin-top:11px;padding-top:11px;border-top:1px solid var(--linea)}
++.gpie{margin-top:11px;padding-top:11px;border-top:1px solid var(--linea)}
+ /* Delta contra su umbral */
+ .dcab{display:flex;align-items:baseline;gap:10px;margin-bottom:9px}
+ .dcab .v{font-family:var(--mono);font-size:19px;font-weight:600;letter-spacing:-.03em;line-height:1;color:var(--claro)}
+@@ -268,14 +292,15 @@ tbody tr:hover{background:rgba(255,255,255,.04)}
+ label{display:block;font-size:11.5px;color:var(--gris)}
+ .form .et{display:block;min-height:2.3em;line-height:1.3;color:var(--tenue);
+   font-size:10.5px;letter-spacing:.07em;text-transform:uppercase}
+-input,textarea{width:100%;margin-top:5px;padding:7px 10px;border-radius:var(--r-s);
++input,textarea,select{width:100%;margin-top:5px;padding:7px 10px;border-radius:var(--r-s);
+   border:1px solid var(--linea-2);background:var(--n0);color:var(--claro);font:inherit;font-size:13.5px;
+   transition:border-color var(--t),background var(--t)}
+ input::placeholder,textarea::placeholder{color:var(--tenue)}
+-input:hover,textarea:hover{border-color:var(--azul)}
+-input:focus,textarea:focus{outline:none;border-color:var(--gris);background:#141414}
+-input.malo,input.malo:focus{border-color:var(--baja)}
+-.form input{font-family:var(--mono);font-variant-numeric:tabular-nums}
++input:hover,textarea:hover,select:hover{border-color:var(--azul)}
++input:focus,textarea:focus,select:focus{outline:none;border-color:var(--gris);background:#141414}
++input.malo,select.malo,input.malo:focus{border-color:var(--baja)}
++.form input,.form select{font-family:var(--mono);font-variant-numeric:tabular-nums}
++.form select{appearance:none;cursor:pointer}
+ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
+ .err{font-size:11px;color:var(--baja);margin-top:3px}
+ .row{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin-top:14px}
+@@ -412,30 +437,10 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
+ 
+ <div class="tablero">
+   <div class="principal">
+-  <div id="s-bloque">
+-  <section class="bloque" id="cardGrafico" style="display:none" aria-label="Bloque en vivo">
+-    <div class="titulo">
+-      <h2>Bloque en vivo</h2><span id="gTicker" class="num tic"></span>
+-      <span class="sp"></span>
+-      <span id="gLados" class="lados"></span>
+-      <span class="k solo-pc">Queda</span><span id="gQueda" class="num solo-pc" style="font-weight:600;font-size:13px;color:var(--claro)"></span>
+-    </div>
+-    <div class="cuerpo">
+-      <div id="grafico"></div>
+-      <div class="aparte">
+-        <div id="medidor"></div>
+-        <div id="gPie"></div>
+-      </div>
+-    </div>
+-    <div class="wrap lectura"><table>
+-      <thead><tr><th scope="col">Queda</th><th scope="col">Referencia</th><th scope="col">Precio</th><th scope="col">Índice</th><th scope="col">Delta</th><th scope="col">YES ask/bid</th><th scope="col">NO ask/bid</th><th scope="col">Estado</th></tr></thead>
+-      <tbody id="vivo"></tbody>
+-    </table></div>
+-  </section>
+-  </div>
++  <div id="s-bloque"></div>
+ 
+ <section class="seccion panel" id="s-ops" aria-label="Operaciones">
+-  <div class="titulo"><h2>Operaciones</h2><span id="opsCuenta" class="ayuda"></span>
++  <div class="titulo"><h2>Operaciones</h2><span class="segm" id="segOps"></span><span id="opsCuenta" class="ayuda"></span>
+     <span class="sp"></span><a href="/operaciones.csv">bajar todas (CSV)</a>
+     <button id="reiniciar" class="b-ghost chico">Reiniciar resultados</button>
+     <span id="msgReiniciar" class="msg" role="status" aria-live="polite"></span></div>
+@@ -454,8 +459,9 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
+ 
+   <div class="rail">
+   <aside class="marcador" aria-label="Resultado">
++    <div class="segm" id="segStats" style="margin-bottom:12px"></div>
+     <div class="total">
+-      <span class="k">Resultado total</span>
++      <span class="k" id="sTitulo">Resultado total</span>
+       <span class="v num skel" id="sProfit">–</span>
+       <span class="sub" id="sProfitHoy"></span>
+     </div>
+@@ -473,6 +479,16 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
+     <div class="titulo"><h2>Próximas noticias</h2><span class="sp"></span><span class="ayuda">ForexFactory</span></div>
+     <div id="noticias"></div>
+   </section>
++
++  <section class="noticias" aria-label="Filtro de noticias">
++    <div class="titulo"><h2>Filtro de noticias</h2><span class="sp"></span><span id="fEstado" class="aviso off">–</span></div>
++    <div id="filtro"></div>
++  </section>
++
++  <section class="noticias" aria-label="Resultado por activo">
++    <div class="titulo"><h2>Por activo</h2><span class="sp"></span><span class="ayuda">hoy · total</span></div>
++    <div id="porActivo"></div>
++  </section>
+   </div>
+ </div>
+ 
+@@ -491,6 +507,7 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
+         <summary>Avanzado</summary>
+         <div class="form" id="formAv" style="margin-top:12px"></div>
+       </details>
++      <div class="porAct" id="formActivos"></div>
+       <div class="row"><button class="b-main" id="guardar">Guardar ajustes</button><button class="b-ghost" id="deshacer">Deshacer</button><span id="msgAjustes" class="msg" role="status" aria-live="polite"></span></div>
+       </details>
+     </div>
+@@ -511,7 +528,8 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
+ 
+ <script>
+ const $ = id => document.getElementById(id);
+-let ultimo = null, campos = [], ajustesGuardados = null;
++let ultimo = null, campos = [], camposActivo = [], activos = [], ajustesGuardados = null;
++let focoStats = 'todo', focoOps = 'todo', cartelesPara = '';
+ 
+ async function api(path, body) {
+   const r = await fetch(path, body === undefined ? {} : {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+@@ -540,7 +558,8 @@ function destellar(el, texto, cls) {
+   if (cambio) { el.classList.remove('destello'); void el.offsetWidth; el.classList.add('destello'); }
+ }
+ 
+-let G = null, hoverX = null;   // estado del gráfico para la cruz
++// estado del gráfico, uno por activo: cada tarjeta tiene su propia cruz
++const GS = {}, hoverX = {};
+ 
+ const VERDE = '#2fe07a', ROJO = '#ff5f5f', NEUTRO = '#9b9b9b', TENUE = '#757575';
+ const REJILLA = '#242424', LIENZO = '#131313', FONDO = '#0a0a0a', CLARO = '#ffffff', AZUL = '#9b9b9b';
+@@ -550,8 +569,8 @@ const angosto = () => window.innerWidth < 640;
+ // quedarian a media escala y no se leerian
+ // el lienzo mide lo mismo que la caja: una unidad del SVG es un píxel de pantalla.
+ // Con un lienzo fijo, en una pantalla ancha todo el gráfico se ampliaba (1.7x en 2048 px).
+-const geo = () => {
+-  const c = document.getElementById('grafico');
++const geo = (a) => {
++  const c = document.getElementById('grafico_' + a);
+   const W = Math.max(300, Math.min(Math.round((c && c.clientWidth) || 880), 2000));
+   const ang = W < 500;      // solo el móvil necesita el lienzo más alto
+   return { W, X0: ang ? 40 : 62, X1: W - (ang ? 58 : 76), H: ang ? 225 : 186 };
+@@ -586,10 +605,10 @@ function capsula(y, texto, fondo, tinta) {
+     + `<text x="${(GX1 + 6 + w / 2).toFixed(1)}" y="${(y + 3.6).toFixed(1)}" text-anchor="middle" fill="${tinta}" font-size="10.5" font-weight="700">${texto}</text>`;
+ }
+ 
+-function grafico(v) {
++function grafico(v, a) {
+   const g = v.grafico;
+-  if (!g || !g.activo || g.activo.length < 2) { G = null; return ''; }
+-  const { W, X0, X1, H } = geo();
++  if (!g || !g.activo || g.activo.length < 2) { GS[a] = null; return ''; }
++  const { W, X0, X1, H } = geo(a);
+   GX1 = X1;
+   const Y0 = 22, Y1 = H - 40, BLOQUE = BLOQUE_S;
+   const x = s => X0 + (Math.max(0, Math.min(BLOQUE, s)) / BLOQUE) * (X1 - X0);
+@@ -685,7 +704,7 @@ function grafico(v) {
+   o.push(`<text x="${X0 - 7}" y="${Y0 + 10}" text-anchor="end" fill="${TENUE}" font-size="10.5">${Math.round(hi).toLocaleString('es')}</text>`);
+   o.push(`<text x="${X0 - 7}" y="${Y1 + 3}" text-anchor="end" fill="${TENUE}" font-size="10.5">${Math.round(lo).toLocaleString('es')}</text>`);
+   // la etiqueta de la ventana baja al pie: dentro del gráfico chocaba con el mínimo del bloque
+-  if (g.ventana) o.push(`<text x="${Math.min(x(BLOQUE - g.ventana) + 5, X1 - 82).toFixed(1)}" y="${Y1 + 17}" fill="${TENUE}" font-size="10.5">últimos ${Math.round(g.ventana / 60)} min</text>`);
++  if (g.ventana) o.push(`<text x="${Math.min(x(BLOQUE - g.ventana) + 5, X1 - 82).toFixed(1)}" y="${Y1 + 17}" fill="${TENUE}" font-size="10.5">últimos ${g.ventana % 60 === 0 && g.ventana >= 60 ? g.ventana / 60 + ' min' : g.ventana + ' s'}</text>`);
+ 
+   // avance del bloque
+   const frac = Math.max(0, Math.min(1, ult[0] / BLOQUE));
+@@ -695,8 +714,8 @@ function grafico(v) {
+   o.push(`<rect x="${X0}" y="${Y1 + 24}" width="${X1 - X0}" height="3" rx="1.5" fill="${REJILLA}"></rect>`);
+   o.push(`<rect x="${X0}" y="${Y1 + 24}" width="${((X1 - X0) * frac).toFixed(1)}" height="3" rx="1.5" fill="${enVentana ? AZUL : TENUE}" opacity="${enVentana ? 0.55 : 0.45}"></rect>`);
+ 
+-  o.push('<g id="cruz"></g>');
+-  return `<svg id="svgG" viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-family:'Geist Mono',ui-monospace,monospace" role="img" aria-label="Índice de BTC durante el bloque: verde por encima de la referencia de ${ref != null ? Math.round(ref) : '–'} y rojo por debajo.">${o.join('')}</svg>`;
++  o.push(`<g id="cruz_${a}"></g>`);
++  return `<svg id="svgG_${a}" viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-family:'Geist Mono',ui-monospace,monospace" role="img" aria-label="Índice de ${a} durante el bloque: verde por encima de la referencia de ${ref != null ? Math.round(ref) : '–'} y rojo por debajo.">${o.join('')}</svg>`;
+ }
+ 
+ const reloj = s => Math.floor(Math.max(0, s) / 60) + ':' + String(Math.floor(Math.max(0, s) % 60)).padStart(2, '0');
+@@ -729,9 +748,11 @@ function barraDelta(v, d) {
+ }
+ 
+ // una línea que dice por qué no está entrando ahora mismo
++const ajusteDe = (d, a) => ((d.por_activo || {})[a] || {}).ajustes || {};
++
+ function razon(v, d) {
+-  const g = v.grafico, dm = g.delta_min;
+-  const emin = +d.ajustes.entrada_min, emax = +d.ajustes.entrada_max;
++  const g = v.grafico, dm = g.delta_min, aj = ajusteDe(d, v.activo);
++  const emin = +aj.entrada_min, emax = +aj.entrada_max;
+   const dentro = a => a != null && a >= emin - 1e-9 && a <= emax + 1e-9;
+   let t, cl = '';
+   if (!d.conectado) { t = 'Falta conectar la API key de Kalshi.'; cl = 'warn'; }
+@@ -772,7 +793,7 @@ function pintarNoticias(d) {
+ }
+ 
+ // medidor de la posición: dónde está el bid entre el stop y el objetivo
+-function medidor(g, contratos) {
++function medidor(g) {
+   if (g.tp == null || g.bid == null) return '';
+   const ex = g.exit != null ? g.exit : 0;
+   const lo = Math.min(ex, g.bid, g.entrada), hi = Math.max(g.tp, g.bid);
+@@ -801,17 +822,17 @@ function cercano(serie, xf, px) {
+   return mejor;
+ }
+ 
+-function dibujarCruz() {
+-  const el = document.getElementById('cruz');
++function dibujarCruz(a) {
++  const el = document.getElementById('cruz_' + a);
+   if (!el) return;
+-  if (hoverX == null || !G) { el.innerHTML = ''; return; }
+-  const { g, x, ya, X0, X1, Y0, Y1 } = G;
+-  const px = Math.max(X0, Math.min(X1, hoverX));
++  if (hoverX[a] == null || !GS[a]) { el.innerHTML = ''; return; }
++  const { g, x, ya, X0, X1, Y0, Y1 } = GS[a];
++  const px = Math.max(X0, Math.min(X1, hoverX[a]));
+   const pa = cercano(g.activo, x, px);
+   if (!pa) { el.innerHTML = ''; return; }
+   const xx = x(pa[0]);
+   const col = (g.referencia == null || pa[1] >= g.referencia) ? VERDE : ROJO;
+-  const filas = [['BTC', Math.round(pa[1]).toLocaleString('es'), col]];
++  const filas = [[a, Math.round(pa[1]).toLocaleString('es'), col]];
+   if (g.referencia != null) filas.push(['Delta', (pa[1] - g.referencia >= 0 ? '+' : '') + n(pa[1] - g.referencia, 1), NEUTRO]);
+   const mm = String(Math.floor(pa[0] / 60)).padStart(2, '0') + ':' + String(pa[0] % 60).padStart(2, '0');
+   const ancho = 132, alto = 22 + filas.length * 15;
+@@ -831,18 +852,131 @@ function dibujarCruz() {
+   el.innerHTML = o.join('');
+ }
+ 
+-function armarHover() {
+-  const cont = document.getElementById('grafico');
++function armarHover(a) {
++  const cont = document.getElementById('grafico_' + a);
+   if (!cont || cont.dataset.hover) return;
+   cont.dataset.hover = '1';
+   const aX = ev => {
+-    const svg = document.getElementById('svgG');
++    const svg = document.getElementById('svgG_' + a);
+     if (!svg) return null;
+     const r = svg.getBoundingClientRect();
+-    return r.width ? ((ev.clientX - r.left) / r.width) * (G ? G.W : 880) : null;
++    return r.width ? ((ev.clientX - r.left) / r.width) * (GS[a] ? GS[a].W : 880) : null;
+   };
+-  cont.addEventListener('pointermove', ev => { hoverX = aX(ev); dibujarCruz(); });
+-  cont.addEventListener('pointerleave', () => { hoverX = null; dibujarCruz(); });
++  cont.addEventListener('pointermove', ev => { hoverX[a] = aX(ev); dibujarCruz(a); });
++  cont.addEventListener('pointerleave', () => { hoverX[a] = null; dibujarCruz(a); });
++}
++
++// una tarjeta por activo. Solo se rehace cuando cambia la lista: si se rehiciera
++// cada segundo se perdería la cruz del ratón y parpadearía todo.
++function armarCarteles(lista) {
++  const clave = lista.join(',');
++  if (clave === cartelesPara) return;
++  cartelesPara = clave;
++  for (const a of lista) { delete GS[a]; delete hoverX[a]; }
++  $('s-bloque').innerHTML = lista.map(a => `
++  <section class="bloque" id="card_${a}" aria-label="Bloque en vivo de ${a}">
++    <div class="titulo">
++      <h2>${a}<span class="act">bloque en vivo</span></h2><span id="gTicker_${a}" class="num tic"></span>
++      <span class="sp"></span>
++      <span id="gLados_${a}" class="lados"></span>
++      <span class="k solo-pc">Queda</span><span id="gQueda_${a}" class="num solo-pc" style="font-weight:600;font-size:13px;color:var(--claro)"></span>
++    </div>
++    <div class="cuerpo">
++      <div class="graf" id="grafico_${a}"></div>
++      <div class="aparte">
++        <div id="medidor_${a}"></div>
++        <div class="gpie" id="gPie_${a}"></div>
++      </div>
++    </div>
++    <div class="wrap lectura"><table>
++      <thead><tr><th scope="col">Queda</th><th scope="col">Referencia</th><th scope="col">Precio</th><th scope="col">Índice</th><th scope="col">Delta</th><th scope="col">YES ask/bid</th><th scope="col">NO ask/bid</th><th scope="col">Estado</th></tr></thead>
++      <tbody id="vivo_${a}"></tbody>
++    </table></div>
++  </section>`).join('');
++}
++
++function pintarVivo(d, v) {
++  const a = v.activo;
++  $('vivo_' + a).innerHTML = v.mercado ? `<tr>
++    <td class="num">${Math.floor(v.quedan / 60)}:${String(Math.floor(v.quedan % 60)).padStart(2, '0')}</td><td class="num">${n(v.referencia, 2)}</td><td class="num">${n(v.precio, 2)}</td><td class="ayuda num">${v.indice_s == null ? '–' : Math.max(0, v.indice_s).toFixed(0) + ' s'}</td>
++    <td class="num ${clase(v.delta)}">${n(v.delta, 1)}</td><td class="num">${n(v.yes_ask)} / ${n(v.yes_bid)}</td><td class="num">${n(v.no_ask)} / ${n(v.no_bid)}</td>
++    <td>${esc(v.estado)}</td></tr>` : `<tr><td colspan="8" class="vacio">esperando datos…</td></tr>`;
++  if (!v.mercado) { $('gTicker_' + a).textContent = ''; $('gLados_' + a).innerHTML = ''; return; }
++  $('gTicker_' + a).textContent = v.mercado;
++  $('gQueda_' + a).textContent = Math.floor(v.quedan / 60) + ':' + String(Math.floor(v.quedan % 60)).padStart(2, '0');
++  // precios de YES y NO; se resalta el lado cuyo ask cae en el rango de entrada DE ESTE activo
++  const aj = ajusteDe(d, a), emin = +aj.entrada_min, emax = +aj.entrada_max;
++  $('gLados_' + a).innerHTML = [['YES', v.yes_ask, v.yes_bid, 'var(--sube)'], ['NO', v.no_ask, v.no_bid, 'var(--baja)']]
++    .map(([k, ask, bid, col]) => {
++      const dentro = ask != null && ask >= emin - 1e-9 && ask <= emax + 1e-9;
++      return `<span class="lado${dentro ? ' dentro' : ''}"><b style="color:${col}">${k}</b>`
++        + `<span class="num" style="font-weight:600">${n(ask, 3)}</span>`
++        + `<span class="num" style="color:var(--tenue)">/ ${n(bid, 3)}</span></span>`;
++    }).join('');
++  if (v.grafico && v.grafico.activo && v.grafico.activo.length > 1) {
++    $('grafico_' + a).innerHTML = grafico(v, a);
++    armarHover(a);
++    dibujarCruz(a);
++    $('medidor_' + a).innerHTML = medidor(v.grafico);
++    $('gPie_' + a).innerHTML = barraDelta(v, d) + razon(v, d);
++  }
++}
++
++// Todo / BTC / ETH
++function segmento(id, actual, alElegir) {
++  const caja = $(id);
++  if (!caja) return;
++  const ops = ['todo'].concat(activos);
++  const clave = ops.join(',');
++  if (caja.dataset.ops !== clave) {
++    caja.dataset.ops = clave;
++    caja.innerHTML = ops.map(o => `<button type="button" data-v="${o}">${o === 'todo' ? 'Todo' : o}</button>`).join('');
++    caja.onclick = ev => {
++      const b = ev.target.closest('button');
++      if (b) { alElegir(b.dataset.v); if (ultimo) render(ultimo); }
++    };
++  }
++  caja.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === actual)));
++  if (!ops.includes(actual)) alElegir('todo');
++}
++
++// lateral: cómo va cada activo por separado
++function pintarPorActivo(d) {
++  const caja = $('porActivo');
++  if (!caja) return;
++  const pa = d.por_activo || {};
++  const enc = (d.ajustes.activos || '').split(',').filter(Boolean);
++  caja.innerHTML = (d.activos_validos || []).map(a => {
++    const x = pa[a] || {}, t = x.total || {}, h = x.hoy || {};
++    return `<div class="porfila">
++      <span class="nom">${esc(a)}</span>
++      ${enc.includes(a) ? '' : '<span class="apag">apagado</span>'}
++      <span class="det">${h.ops || 0} hoy · ${t.ops || 0} en total${t.wr == null ? '' : ' · ' + t.wr + '%'}</span>
++      <span class="pnl ${clase(h.usd)}">${usd(h.usd || 0)}</span>
++    </div>`;
++  }).join('');
++}
++
++// lateral: qué está haciendo el filtro de noticias
++function pintarFiltro(d) {
++  const caja = $('filtro'), et = $('fEstado'), f = d.filtro;
++  if (!caja || !f) return;
++  et.className = 'aviso ' + (f.activo ? 'on' : 'off');
++  et.textContent = f.activo ? 'encendido' : 'apagado';
++  if (!f.activo) {
++    caja.innerHTML = '<p class="fnota">Apagado: el bot entra aunque el bloque cierre sobre un dato. Se enciende en Ajustes.</p>';
++    return;
++  }
++  const h = f.hoy || {};
++  caja.innerHTML = `<p class="fnota">
++      <b>${f.rojos_hoy}</b> dato${f.rojos_hoy === 1 ? '' : 's'} de alto impacto hoy.<br>
++      Bloques saltados hoy: <b>${f.hoy_total}</b>
++      (${h.hora || 0} por hora fija · ${h.evento || 0} por noticia · ${h.dia || 0} por día cargado).<br>
++      Esta semana: <b>${f.semana_total}</b>.
++    </p>`
++    + (Object.keys(f.bloqueado || {}).length
++      ? `<div class="fbloq">${Object.entries(f.bloqueado).map(([a, p]) =>
++        `<span>⛔ ${esc(a)}: ${esc(p)}</span>`).join('')}</div>` : '');
+ }
+ 
+ function render(d) {
+@@ -866,12 +1000,18 @@ function render(d) {
+   if (!d.conectado) av.push(['warn', 'Falta conectar tu API key de Kalshi (abajo, en "API de Kalshi"). Sin ella el bot solo mira precios.']);
+   if (d.conectado && !d.encendido) av.push(['warn grande', 'El bot está APAGADO: no va a abrir ninguna operación.']);
+   if (d.limite_diario) av.push(['warn', 'Se alcanzó el límite del día: no abre operaciones nuevas hasta mañana (CDT).']);
+-  if (d.aviso_precio) av.push(['warn', 'Precio de BTC: ' + d.aviso_precio + '.']);
++  if (d.aviso_precio) av.push(['warn', 'Precio del índice: ' + d.aviso_precio + '.']);
+   if (d.abiertas.length) av.push(['on', 'Operación abierta: ' + d.abiertas.map(o => `${o.activo} ${o.lado} ${o.contratos} a ${n(o.entrada)} → TP ${n(o.objetivo)}`).join(' · ')]);
+   if (d.pendientes) av.push(['off', `${d.pendientes} operación(es) cerrando: esperando el resultado oficial de Kalshi.`]);
+   $('avisos').innerHTML = av.map(([c, t]) => `<div class="aviso ${c}">${esc(t)}</div>`).join('');
+ 
+-  const t = d.total, h = d.hoy;
++  activos = d.activos_validos || [];
++  segmento('segStats', focoStats, x => { focoStats = x; });
++  segmento('segOps', focoOps, x => { focoOps = x; });
++  const pa = (d.por_activo || {})[focoStats];
++  const t = focoStats === 'todo' || !pa ? d.total : pa.total;
++  const h = focoStats === 'todo' || !pa ? d.hoy : pa.hoy;
++  $('sTitulo').textContent = focoStats === 'todo' ? 'Resultado total' : 'Resultado ' + focoStats;
+   destellar($('sProfit'), usd(t.usd), 'v num ' + clase(t.usd));
+   $('sProfitHoy').innerHTML = `hoy <span class="${clase(h.usd)}">${usd(h.usd)}</span>`;
+   destellar($('sOps'), String(t.ops), 'v num'); $('sOpsHoy').textContent = `hoy ${h.ops}`;
+@@ -883,13 +1023,8 @@ function render(d) {
+   destellar($('sSaldo'), d.saldo == null ? '–' : '$' + d.saldo.toFixed(2), 'v num');
+   $('sKey').textContent = d.conectado ? 'key ' + d.key_id : 'sin API key';
+ 
+-  $('vivo').innerHTML = d.vivo.map(v => v.mercado ? `<tr>
+-    <td class="num">${Math.floor(v.quedan / 60)}:${String(Math.floor(v.quedan % 60)).padStart(2, '0')}</td><td class="num">${n(v.referencia, 2)}</td><td class="num">${n(v.precio, 2)}</td><td class="ayuda num">${v.indice_s == null ? '–' : Math.max(0, v.indice_s).toFixed(0) + ' s'}</td>
+-    <td class="num ${clase(v.delta)}">${n(v.delta, 1)}</td><td class="num">${n(v.yes_ask)} / ${n(v.yes_bid)}</td><td class="num">${n(v.no_ask)} / ${n(v.no_bid)}</td>
+-    <td>${esc(v.estado)}</td></tr>` : `<tr><td colspan="8" class="vacio">esperando datos…</td></tr>`).join('');
+-
+   // cabecera-instrumento: lo que se mira cada segundo
+-  const vc = d.vivo.find(v => v.mercado);
++  const vc = d.vivo.find(v => v.mercado);   // la cabecera enseña el primero; cada tarjeta trae el suyo
+   $('instr').hidden = !vc;
+   if (vc) {
+     const dl = $('hDelta');
+@@ -899,75 +1034,95 @@ function render(d) {
+       : Math.floor(vc.quedan / 60) + ':' + String(Math.floor(vc.quedan % 60)).padStart(2, '0');
+   }
+ 
+-  const v0 = d.vivo.find(v => v.mercado && v.grafico && v.grafico.activo && v.grafico.activo.length > 1);
+-  $('cardGrafico').style.display = v0 ? '' : 'none';
+-  if (v0) {
+-    $('gTicker').textContent = v0.mercado;
+-    $('gQueda').textContent = Math.floor(v0.quedan / 60) + ':' + String(Math.floor(v0.quedan % 60)).padStart(2, '0');
+-    // precios de YES y NO en el encabezado; se resalta el lado cuyo ask cae en el rango de entrada
+-    const emin = +d.ajustes.entrada_min, emax = +d.ajustes.entrada_max;
+-    $('gLados').innerHTML = [['YES', v0.yes_ask, v0.yes_bid, 'var(--sube)'], ['NO', v0.no_ask, v0.no_bid, 'var(--baja)']]
+-      .map(([k, ask, bid, col]) => {
+-        const dentro = ask != null && ask >= emin - 1e-9 && ask <= emax + 1e-9;
+-        return `<span class="lado${dentro ? ' dentro' : ''}"><b style="color:${col}">${k}</b>`
+-          + `<span class="num" style="font-weight:600">${n(ask, 3)}</span>`
+-          + `<span class="num" style="color:var(--tenue)">/ ${n(bid, 3)}</span></span>`;
+-      }).join('');
+-    $('grafico').innerHTML = grafico(v0);
+-    armarHover();
+-    dibujarCruz();
+-    const g = v0.grafico;
+-    const contratos = d.abiertas[0] ? d.abiertas[0].contratos : 1;
+-    $('medidor').innerHTML = medidor(g, contratos);
+-    $('gPie').innerHTML = barraDelta(v0, d) + razon(v0, d);
+-  }
++  armarCarteles(d.vivo.map(v => v.activo));
++  d.vivo.forEach(v => pintarVivo(d, v));
+ 
+   const box = $('logs'), abajo = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+   box.textContent = d.logs.join('\n') || 'sin mensajes todavía';
+   if ($('auto').checked && abajo) box.scrollTop = box.scrollHeight;
+ 
+-  $('ops').innerHTML = d.operaciones.length ? d.operaciones.map(r => `<tr><td class="num">${r.fecha} ${r.hora_entrada}</td><td>${r.activo}</td><td>${r.lado}</td>
++  const ops = focoOps === 'todo' ? d.operaciones : d.operaciones.filter(r => r.activo === focoOps);
++  $('ops').innerHTML = ops.length ? ops.map(r => `<tr><td class="num">${r.fecha} ${r.hora_entrada}</td><td>${r.activo}</td><td>${r.lado}</td>
+     <td class="num">${r.entrada}</td><td>${r.salida}</td><td class="num">${r.precio_salida}</td><td class="num">${r.contratos}</td>
+     <td class="${r.resultado === 'GANA' ? 'pos' : 'neg'}">${r.resultado === 'GANA' ? 'ganada' : 'perdida'}</td>
+     <td class="num ${clase(+r.pnl_usd)}">${usd(+r.pnl_usd)}</td></tr>`).join('')
+-    : '<tr><td colspan="9" class="vacio">Todavía no hay operaciones. Aparecerán aquí en cuanto el bot cierre la primera.</td></tr>';
+-  $('opsCuenta').textContent = d.operaciones.length
+-    ? (d.total.ops > d.operaciones.length ? `últimas ${d.operaciones.length} de ${d.total.ops}` : `${d.total.ops} en total`) : '';
++    : `<tr><td colspan="9" class="vacio">${focoOps === 'todo' ? 'Todavía no hay operaciones. Aparecerán aquí en cuanto el bot cierre la primera.' : 'Todavía no hay operaciones de ' + esc(focoOps) + '.'}</td></tr>`;
++  const totOps = focoOps === 'todo' ? d.total.ops : (((d.por_activo || {})[focoOps] || {}).total || {}).ops || 0;
++  $('opsCuenta').textContent = ops.length
++    ? (totOps > ops.length ? `últimas ${ops.length} de ${totOps}` : `${totOps} en total`) : '';
+ 
+   pintarNoticias(d);
++  pintarFiltro(d);
++  pintarPorActivo(d);
+ 
+-  const ra = $('resumenAjustes'), a = d.ajustes;
+-  if (ra) ra.textContent = [a.activos, 'Delta ' + n(a.delta, 0), 'Delay ' + a.delay,
+-    'ritmo ' + n(d.ritmo, 2) + ' s',
+-    n(a.entrada_min, 2) + '\u2013' + n(a.entrada_max, 2), 'TP +' + n(a.tp, 2),
+-    a.exit == null || a.exit === '' ? 'sin Exit' : 'Exit ' + n(a.exit, 2)].join(' \u00b7 ');
++  for (const a of activos) {           // cada bloque de ajustes dice si ese activo está operando
++    const et = $('estAct_' + a);
++    if (et) et.textContent = ((d.ajustes.activos || '').split(',').includes(a) ? '· encendido' : '· apagado');
++  }
++  const ra = $('resumenAjustes');
++  if (ra) {
++    const enc = (d.ajustes.activos || '').split(',').filter(Boolean);
++    ra.textContent = (enc.length ? enc.map(x => {
++      const j = ajusteDe(d, x);
++      return `${x} Delta ${n(j.delta, 0)} · ${n(j.entrada_min, 2)}\u2013${n(j.entrada_max, 2)} · TP +${n(j.tp, 2)} · ${n(j.contratos, 0)}c`;
++    }).join('  |  ') : 'sin activos') + '  |  ritmo ' + n(d.ritmo, 2) + ' s';
++  }
+ 
+   const ke = $('keyEstado');
+   ke.className = 'aviso ' + (d.conectado ? 'on' : 'warn');
+   ke.textContent = d.conectado ? `Conectada · key ${d.key_id} · saldo ${d.saldo == null ? '–' : '$' + d.saldo.toFixed(2)}` : 'No conectada';
+ 
+   document.querySelectorAll('.skel').forEach(e => e.classList.remove('skel'));
+-  if (!campos.length) { campos = d.campos; ajustesGuardados = d.ajustes; armarForm(); }
++  if (!campos.length) {
++    campos = d.campos; camposActivo = d.campos_activo || []; ajustesGuardados = d.ajustes; armarForm();
++  }
+ }
+ 
+-function campoHTML(c) {
+-  return `<div><label><span class="et">${esc(c.etiqueta)}</span><input id="f_${c.clave}" inputmode="${c.tipo === 'num' || c.tipo === 'ent' || c.tipo === 'opc' ? 'decimal' : 'text'}"></label>
+-    <div class="ayuda">${esc(c.ayuda)}</div><div class="err" id="e_${c.clave}"></div></div>`;
++// pre = "" para los ajustes de toda la cuenta, "BTC." o "ETH." para los de un activo
++function campoHTML(c, pre) {
++  const k = (pre || '') + c.clave;
++  const dentro = c.tipo === 'sino'
++    ? `<select id="f_${k}"><option value="si">sí</option><option value="no">no</option></select>`
++    : `<input id="f_${k}" inputmode="${c.tipo === 'num' || c.tipo === 'ent' || c.tipo === 'opc' ? 'decimal' : 'text'}">`;
++  return `<div><label><span class="et">${esc(c.etiqueta)}</span>${dentro}</label>
++    <div class="ayuda">${esc(c.ayuda)}</div><div class="err" id="e_${k}"></div></div>`;
+ }
+ function armarForm() {
+   const base = campos.filter(c => c.seccion !== 'av'), av = campos.filter(c => c.seccion === 'av');
+-  $('form').innerHTML = base.map(campoHTML).join('');
+-  $('formAv').innerHTML = av.map(campoHTML).join('');
++  $('form').innerHTML = base.map(c => campoHTML(c, '')).join('');
++  $('formAv').innerHTML = av.map(c => campoHTML(c, '')).join('');
+   $('bloqueAv').hidden = !av.length;
++  // un bloque desplegable por activo: BTC y ETH no comparten nada de esto
++  $('formActivos').innerHTML = activos.map(a => `
++    <details class="avanzado" ${a === activos[0] ? 'open' : ''}>
++      <summary>Ajustes de ${esc(a)} <span class="ayuda" id="estAct_${a}"></span></summary>
++      <div class="form" style="margin-top:12px">
++        ${camposActivo.filter(c => c.seccion !== 'av').map(c => campoHTML(c, a + '.')).join('')}
++      </div>
++      <div class="form" style="margin-top:12px">
++        ${camposActivo.filter(c => c.seccion === 'av').map(c => campoHTML(c, a + '.')).join('')}
++      </div>
++    </details>`).join('');
+   llenarForm(ajustesGuardados);
+ }
+ function llenarForm(v) {
+   for (const c of campos) {
+     const el = $('f_' + c.clave);
++    if (!el) continue;
+     el.value = v[c.clave] == null ? '' : v[c.clave];
+     el.classList.remove('malo');
+     $('e_' + c.clave).textContent = '';
+   }
++  for (const a of activos) {
++    const va = (v.por_activo || {})[a] || {};
++    for (const c of camposActivo) {
++      const el = $('f_' + a + '.' + c.clave);
++      if (!el) continue;
++      el.value = va[c.clave] == null ? '' : va[c.clave];
++      el.classList.remove('malo');
++      $('e_' + a + '.' + c.clave).textContent = '';
++    }
++  }
+ }
+ 
+ async function refrescar() { try { const d = await api('/api/estado'); if (d) render(d); } catch (e) { $('pill').textContent = 'sin conexión'; $('pill').className = 'pill warn'; } }
+@@ -998,11 +1153,19 @@ $('power').onclick = async () => {
+ $('cancelar').onclick = salirConfirm;
+ 
+ $('guardar').onclick = async () => {
+-  const datos = {};
++  const datos = { por_activo: {} };
+   for (const c of campos) {
+     datos[c.clave] = $('f_' + c.clave).value;
+     $('e_' + c.clave).textContent = ''; $('f_' + c.clave).classList.remove('malo');
+   }
++  for (const a of activos) {
++    datos.por_activo[a] = {};
++    for (const c of camposActivo) {
++      const k = a + '.' + c.clave;
++      datos.por_activo[a][c.clave] = $('f_' + k).value;
++      $('e_' + k).textContent = ''; $('f_' + k).classList.remove('malo');
++    }
++  }
+   $('guardar').disabled = true; msg($('msgAjustes'), 'guardando…', 'yendo');
+   const r = await api('/api/ajustes', datos);
+   $('guardar').disabled = false;
+@@ -1014,10 +1177,10 @@ $('guardar').onclick = async () => {
+     for (const [k, t] of Object.entries(r.errores || {})) {
+       $('e_' + k).textContent = t; $('f_' + k).classList.add('malo'); primero = primero || k;
+     }
+-    if (primero) {                                  // si el campo malo esta en Avanzado, se abre
+-      const caja = $('f_' + primero).closest('details');
+-      if (caja) caja.open = true;
+-      $('f_' + primero).focus();
++    const el = primero && $('f_' + primero);
++    if (el) {                                       // si el campo malo está plegado (Avanzado o un activo), se abre
++      for (let c = el.closest('details'); c; c = c.parentElement && c.parentElement.closest('details')) c.open = true;
++      el.focus();
+     }
+   }
+ };
+diff --git a/probar_con_datos.py b/probar_con_datos.py
+index 188c46c..797b466 100644
+--- a/probar_con_datos.py
++++ b/probar_con_datos.py
+@@ -22,7 +22,7 @@ from ejecutores import EjecutorSim
+ from estrategia import Config, Estrategia, Foto
+ from operador import Estado, Operador, Registro
+ 
+-CFG_BTC = Config(delta=100, delay=7, entrada_min=0.81, entrada_max=0.86, tp=0.13, exit=0.46, breakeven=None)
++CFG_BTC = Config(delta=100, delay=420, entrada_min=0.81, entrada_max=0.86, tp=0.13, exit=0.46, breakeven=None)
+ 
+ 
+ def archivos(rutas):
+diff --git a/probar_sin_tp.py b/probar_sin_tp.py
+index d8a32d0..91430ee 100644
+--- a/probar_sin_tp.py
++++ b/probar_sin_tp.py
+@@ -11,7 +11,7 @@ os.environ.setdefault("DATA_DIR", "/tmp/probar_sin_tp")
+ os.environ.setdefault("NOTICIAS", "0")
+ 
+ import bot as B
+-from ejecutores import TOPE_TP, EjecutorReal, EjecutorSim, nueva_operacion
++from ejecutores import EjecutorSim, nueva_operacion
+ from estrategia import Config, Estrategia, Foto
+ 
+ fallos = []
+@@ -32,13 +32,15 @@ def foto(bid, segundo=880):
+ 
+ 
+ print("\n1) el panel acepta entrada 0.98 con TP 0.03")
+-crudo = {c: ("" if d is None else str(d)) for c, t, d, *_ in B.CAMPOS}
+-crudo.update(entrada_min="0.97", entrada_max="0.98", tp="0.03", exit="0.90", delta="100", delay="7")
++crudo = {c: ("" if d is None else str(d)) for c, t, d, *_ in B.CAMPOS_GLOBAL}
++pa = {c: ("" if d is None else str(d)) for c, t, d, *_ in B.CAMPOS_ACTIVO}
++pa.update(entrada_min="0.97", entrada_max="0.98", tp="0.03", exit="0.90", delta="100", delay="420")
++crudo["por_activo"] = {"BTC": pa, "ETH": dict(pa)}
+ v, err = B.validar(crudo)
+ check(not err, f"validar() no da error (dio: {err})")
+ 
+ print("\n2) la operación nace sin TP y con objetivo 1.00")
+-cfg = Config(delta=100, delay=7, entrada_min=0.97, entrada_max=0.98, tp=0.03, exit=0.90,
++cfg = Config(delta=100, delay=420, entrada_min=0.97, entrada_max=0.98, tp=0.03, exit=0.90,
+              breakeven=None)
+ f = foto(0.97)
+ op = nueva_operacion("BTC", f, "yes", 0.98, 1.0, cfg, 0.0)
+@@ -60,7 +62,7 @@ check(sim.tp(op, foto(0.99)) is False, "EjecutorSim.tp() no vende")
+ check(op.abiertos() == 1.0, f"la posición sigue abierta ({op.abiertos():g} contratos)")
+ 
+ print("\n6) un TP normal (0.85 + 0.13) sigue igual que antes")
+-cfg2 = Config(delta=100, delay=7, entrada_min=0.81, entrada_max=0.86, tp=0.13, exit=0.46,
++cfg2 = Config(delta=100, delay=420, entrada_min=0.81, entrada_max=0.86, tp=0.13, exit=0.46,
+               breakeven=None)
+ op2 = nueva_operacion("BTC", foto(0.84), "yes", 0.85, 1.0, cfg2, 0.0)
+ est2 = Estrategia(cfg2)
+@@ -70,7 +72,7 @@ check(est2.salida(op2, foto(0.98)) == "tp", "salida() con bid 0.98 devuelve 'tp'
+ check(est2.salida(op2, foto(0.46)) == "stop", "salida() con bid 0.46 devuelve 'stop'")
+ 
+ print("\n7) el BreakEven sigue armándose aunque no haya TP")
+-cfg3 = Config(delta=100, delay=7, entrada_min=0.97, entrada_max=0.98, tp=0.03, exit=0.90,
++cfg3 = Config(delta=100, delay=420, entrada_min=0.97, entrada_max=0.98, tp=0.03, exit=0.90,
+               breakeven=0.01)
+ op3 = nueva_operacion("BTC", foto(0.97), "yes", 0.98, 1.0, cfg3, 0.0)
+ est3 = Estrategia(cfg3)
+@@ -81,43 +83,9 @@ check(est3.salida(op3, foto(0.975)) == "stop", "con el BE armado, bid 0.975 devu
+ 
+ print("\n8) el tope viejo de 0.99 ya no veta nada, pero el TP sigue acotado a (0,1)")
+ for tp, debe_fallar in [("0.03", False), ("0.5", False), ("0", True), ("1", True), ("1.5", True)]:
+-    c = dict(crudo, tp=tp)
++    c = dict(crudo, por_activo={"BTC": dict(pa, tp=tp), "ETH": dict(pa)})
+     _, e = B.validar(c)
+-    check(("tp" in e) == debe_fallar, f"tp={tp} -> {'rechazado' if 'tp' in e else 'aceptado'}")
+-
+-print("\n9) EL CRUCE DE SPREAD NO SE ACTIVA CUANDO NO HAY TP  (el bug de la v1)")
+-ej = EjecutorReal.__new__(EjecutorReal)      # sin tocar Kalshi: solo se prueba el cálculo del límite
+-ej.desliz = 0.02
+-
+-# (a) sin TP (entrada_max + TP pasa de 0.99): NUNCA puede pagar más que entrada_max
+-sin_tp = Config(delta=140, delay=5, entrada_min=0.97, entrada_max=0.98, tp=0.03, exit=None, breakeven=None)
+-for ask in (0.97, 0.98):
+-    lim, cruzo = ej.limite_entrada(ask, sin_tp)
+-    check(not cruzo, f"sin TP, ask {ask}: no cruza")
+-    check(lim <= sin_tp.entrada_max + 1e-9, f"sin TP, ask {ask}: limite {lim:.4f} <= 0.98")
+-check(ej.limite_entrada(0.97, sin_tp)[0] == 0.98, "sin TP, ask 0.97 -> limite 0.98 (ask+2c topado)")
+-
+-# (b) TP JUSTO en el tope (0.86 + 0.13 = 0.99): ahí sí se cruza, como estaba pensado
+-justo = Config(delta=100, delay=7, entrada_min=0.81, entrada_max=0.86, tp=0.13, exit=0.46, breakeven=None)
+-lim, cruzo = ej.limite_entrada(0.86, justo)
+-check(cruzo, "TP justo en 0.99, ask en el máximo: sí cruza")
+-check(abs(lim - 0.88) < 1e-9, f"TP justo en 0.99: limite {lim:.4f} = ask + 2c")
+-lim, cruzo = ej.limite_entrada(0.84, justo)
+-check(not cruzo, "TP justo en 0.99 pero ask por debajo del máximo: no cruza")
+-check(abs(lim - 0.86) < 1e-9, f"limite {lim:.4f} topado en entrada_max")
+-
+-# (c) config normal (0.81-0.81 + 0.15 = 0.96): nunca cruza
+-normal = Config(delta=100, delay=7, entrada_min=0.78, entrada_max=0.81, tp=0.15, exit=0.40, breakeven=None)
+-for ask in (0.78, 0.80, 0.81):
+-    lim, cruzo = ej.limite_entrada(ask, normal)
+-    check(not cruzo, f"config normal, ask {ask}: no cruza")
+-    check(lim <= 0.81 + 1e-9, f"config normal, ask {ask}: limite {lim:.4f} <= 0.81")
+-
+-# (d) jamás una orden de entrada a 1.00
+-alto = Config(delta=140, delay=5, entrada_min=0.99, entrada_max=0.99, tp=0.05, exit=None, breakeven=None)
+-lim, _ = ej.limite_entrada(0.99, alto)
+-check(lim <= TOPE_TP + 1e-9, f"entrada a 0.99: limite {lim:.4f} nunca pasa de {TOPE_TP}")
+-
++    check(("BTC.tp" in e) == debe_fallar, f"tp={tp} -> {'rechazado' if 'BTC.tp' in e else 'aceptado'}")
+ 
+ print("\nRESULTADO:", "BIEN" if not fallos else f"MAL ({len(fallos)} fallos)")
+ sys.exit(1 if fallos else 0)
