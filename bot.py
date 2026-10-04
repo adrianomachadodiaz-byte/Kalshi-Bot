@@ -468,6 +468,7 @@ class FiltroNoticias:
         self.dia_alto = 3            # desde cuántos rojos el día se considera cargado
         self.dia_modo = "mitad"
         self.saltados = {}           # "YYYY-MM-DD" -> {"hora": n, "evento": n, "dia": n}
+        self.vistos = set()          # tickers ya contados, para no sumar el mismo bloque mil veces
 
     @staticmethod
     def leer_horas(txt):
@@ -504,26 +505,30 @@ class FiltroNoticias:
             return None
         t = datetime.fromtimestamp(cierre, self.ET)
         if (t.hour, t.minute) in self.horas:
-            return self._contar(t, "hora", f"el bloque cierra a las {t:%H:%M} ET (hora de datos)")
+            return self._contar(t, "hora", ticker, f"el bloque cierra a las {t:%H:%M} ET (hora de datos)")
         for e in self.n.altos():                 # dentro del bloque o justo después
             if cierre - 900 < e["ts"] <= cierre + self.margen:
                 cuando = datetime.fromtimestamp(e["ts"], self.ET)
-                return self._contar(t, "evento", f"{e['titulo']} ({e['moneda']}) a las {cuando:%H:%M} ET")
+                return self._contar(t, "evento", ticker, f"{e['titulo']} ({e['moneda']}) a las {cuando:%H:%M} ET")
         if self.dia_alto:
             del_dia = self.altos_del_dia(cierre)
             if len(del_dia) >= self.dia_alto:
                 if self.dia_modo == "nada":
-                    return self._contar(t, "dia", f"día cargado: {len(del_dia)} datos rojos")
+                    return self._contar(t, "dia", ticker, f"día cargado: {len(del_dia)} datos rojos")
                 # mitad: se opera uno de cada dos bloques (el bloque nº par del día)
                 bloque = int((cierre - t.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()) // 900)
                 if bloque % 2:
-                    return self._contar(t, "dia", f"día cargado ({len(del_dia)} rojos): opera uno de cada dos")
+                    return self._contar(t, "dia", ticker, f"día cargado ({len(del_dia)} rojos): opera uno de cada dos")
         return None
 
-    def _contar(self, t, clave, texto):
+    def _contar(self, t, clave, ticker, texto):
+        # se llama varias veces por segundo mientras dura el bloque: cada bloque
+        # (su ticker) cuenta UNA vez, si no el informe daría miles
         d = t.strftime("%Y-%m-%d")
         c = self.saltados.setdefault(d, {"hora": 0, "evento": 0, "dia": 0})
-        c[clave] += 1
+        if ticker not in self.vistos:
+            self.vistos.add(ticker)
+            c[clave] += 1
         return texto
 
     def informe(self):
