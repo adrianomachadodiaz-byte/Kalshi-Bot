@@ -401,16 +401,23 @@ class Noticias:
             threading.Thread(target=self._bucle, daemon=True).start()
 
     def _bucle(self):
+        espera = self.CADA
         while True:
             try:
                 self._bajar()
+                espera = self.CADA
             except Exception as e:                       # una noticia no tumba el bot
                 self.error = str(e)[:120]
-                log_cada("noticias", 900, f"no pude leer el calendario de ForexFactory: {self.error}")
-            time.sleep(self.CADA)
+                log_cada("noticias", f"no pude leer el calendario de ForexFactory: {self.error}", 900)
+                # ForexFactory corta por IP (429). Si pasa, se espera cada vez más,
+                # hasta 2 h: el calendario de la semana no cambia tan deprisa.
+                espera = min(espera * 2, 7200)
+            time.sleep(espera)
 
     def _bajar(self):
         r = self.s.get(self.URL, timeout=10, headers={"User-Agent": "kalshi-bot/1.0"})
+        if r.status_code == 429:
+            raise RuntimeError("ForexFactory dice 429 (demasiadas peticiones): espero más y vuelvo a probar")
         r.raise_for_status()
         fuera = []
         for e in r.json():
@@ -610,7 +617,8 @@ class Bot:
             return False, f"no pude conectar con Kalshi: {e}"
         v = self.ajustes.valores
         with self.op.lock:
-            ej = EjecutorReal(k, v["contratos"], v["desliz_entrada"], len(self.activos), v["espera_entrada"])
+            contratos = {a: config_de(a, v).contratos for a in self.activos}
+            ej = EjecutorReal(k, contratos, v["desliz_entrada"], len(self.activos), v["espera_entrada"])
             if self.ej:
                 ej.info = self.ej.info
             self.k, self.ej, self.op.ej, self.mercados.k = k, ej, ej, k
