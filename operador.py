@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from estrategia import Estrategia, Foto, Operacion
+from estrategia import BLOQUE, Estrategia, Foto, Operacion
 
 CDT = ZoneInfo("America/Chicago")
 COLUMNAS = ["fecha", "hora_entrada", "hora_salida", "activo", "mercado", "lado", "entrada", "salida",
@@ -143,6 +143,7 @@ class Operador:
         self.aviso_limite = None
         self.filtro = None            # FiltroNoticias; si es None, no se filtra nada
         self.bloqueado = {}           # activo -> por qué no entra en este bloque (lo enseña el panel)
+        self.intento = {}             # activo -> lo más cerca que estuvo de entrar en el bloque actual
 
     # ------------------------------------------------------------------ entrada / salida
     def procesar(self, activo: str, f: Foto):
@@ -165,6 +166,7 @@ class Operador:
             if porque:
                 return
             est: Estrategia = self.estrategias[activo]
+            self._anotar_intento(activo, f, est)
             senal = est.entrada(f)
             if not senal:
                 return
@@ -200,6 +202,40 @@ class Operador:
             self._terminar(op)
         elif cambio:
             self.estado.guardar()
+
+    def _anotar_intento(self, activo, f, est):
+        """Guarda lo más cerca que estuvo de entrar: para explicar luego por qué no entró."""
+        c = est.cfg
+        i = self.intento.get(activo)
+        if not i or i["ticker"] != f.ticker:
+            if i and i["vueltas"]:
+                self._porque_no(activo, i)
+            i = dict(ticker=f.ticker, ya=None, na=None, dmax=None, vueltas=0,
+                     emin=c.entrada_min, emax=c.entrada_max, dmin=c.delta, delay=c.delay)
+            self.intento[activo] = i
+        if f.segundo() < BLOQUE - c.delay:
+            return                                  # fuera de la ventana no cuenta
+        i["vueltas"] += 1
+        d = f.delta()
+        if d is not None and (i["dmax"] is None or d > i["dmax"]):
+            i["dmax"] = d
+        for lado in ("yes", "no"):
+            a = f.ask(lado)
+            k = "ya" if lado == "yes" else "na"
+            if a is not None and (i[k] is None or a > i[k]):
+                i[k] = a
+
+    def _porque_no(self, activo, i):
+        """Una línea en el registro diciendo qué faltó. Si no, el bloque sin operar es un misterio."""
+        n = lambda x: "–" if x is None else f"{x:.3f}"
+        if i["dmax"] is None:
+            falta = "no hubo precio del índice"
+        elif i["dmax"] < i["dmin"] - 1e-9:
+            falta = f"Delta se quedó en {i['dmax']:+.1f} y pide {i['dmin']:g}"
+        else:
+            falta = (f"ningún lado llegó al rango {i['emin']:.2f}-{i['emax']:.2f} "
+                     f"(lo más alto: YES {n(i['ya'])}, NO {n(i['na'])})")
+        log(f"{activo} sin entrada en {i['ticker']}: {falta} · mirando los últimos {i['delay']:g} s")
 
     def _bloque_cerrado(self, activo):
         op = self.estado.abiertas.pop(activo)
