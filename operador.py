@@ -271,7 +271,8 @@ class Operador:
             if i and i["vueltas"]:
                 self._porque_no(activo, i)
             i = dict(ticker=f.ticker, ya=None, na=None, dmax=None, vueltas=0,
-                     emin=c.entrada_min, emax=c.entrada_max, dmin=c.delta, delay=c.delay)
+                     emin=c.entrada_min, emax=c.entrada_max, dmin=c.delta, delay=c.delay,
+                     usa_delta=c.usa_delta)
             self.intento[activo] = i
         if f.segundo() < BLOQUE - c.delay:
             return                                  # fuera de la ventana no cuenta
@@ -288,7 +289,10 @@ class Operador:
     def _porque_no(self, activo, i):
         """Una línea en el registro diciendo qué faltó. Si no, el bloque sin operar es un misterio."""
         n = lambda x: "–" if x is None else f"{x:.3f}"
-        if i["dmax"] is None:
+        if not i.get("usa_delta"):
+            falta = (f"ningún lado llegó al rango {i['emin']:.2f}-{i['emax']:.2f} "
+                     f"(lo más alto: YES {n(i['ya'])}, NO {n(i['na'])})")
+        elif i["dmax"] is None:
             falta = "no hubo precio del índice"
         elif i["dmax"] < i["dmin"] - 1e-9:
             falta = f"Delta se quedó en {i['dmax']:+.1f} y pide {i['dmin']:g}"

@@ -37,7 +37,11 @@ PORT = int(env("PORT", "8080"))
 DATA_DIR = Path(env("DATA_DIR", "/data" if os.environ.get("RAILWAY_ENVIRONMENT") else "datos"))
 REST_URL = env("KALSHI_REST_URL", "https://api.elections.kalshi.com/trade-api/v2")
 INDICE_URL = env("KALSHI_INDICE_URL", INDICE_URL_DEF)    # feed público del índice ({activo} = btc/eth)
-ACTIVOS_VALIDOS = ("BTC", "ETH", "SOL", "XRP", "DOGE", "HYPE")
+ACTIVOS_VALIDOS = ("BTC", "ETH", "SOL", "XRP", "DOGE", "HYPE", "GOLD", "SILVER", "OIL")
+# Kalshi liquida estos tres con Pyth, y el precio en vivo de Pyth no es público (sí el de
+# cripto, que sale del feed gratuito de Kalshi). Sin precio del subyacente no hay Delta:
+# estos activos entran solo por la ventana y por el precio del contrato.
+SIN_INDICE = ("GOLD", "SILVER", "OIL")
 CICLO = float(env("CICLO_S", "0.25"))    # valor inicial; manda el del panel (campo "ritmo")
 CICLO_INDICE = float(env("CICLO_INDICE_S", "1.0"))   # el índice avanza cada 2-3 s: pedirlo más rápido es tirar peticiones
 PASO_GRAFICO = 1                         # segundos entre puntos de la serie que dibuja el panel
@@ -55,6 +59,10 @@ DEFECTO_ACTIVO = {
     "XRP": {"delta": 0.0017},
     "DOGE": {"delta": 0.0001},
     "HYPE": {"delta": 0.1},
+    # en estos el Delta no se usa; el 0 deja claro en el panel que no filtra nada
+    "GOLD": {"delta": 0.0},
+    "SILVER": {"delta": 0.0},
+    "OIL": {"delta": 0.0},
 }
 
 
@@ -314,7 +322,8 @@ def config_de(activo, v):
     a = (v.get("por_activo") or {}).get(activo) or defectos_de(activo)
     return Config(delta=a["delta"], delay=a["delay"], entrada_min=a["entrada_min"],
                   entrada_max=a["entrada_max"], tp=a["tp"], exit=a["exit"],
-                  breakeven=a["breakeven"], contratos=a["contratos"])
+                  breakeven=a["breakeven"], contratos=a["contratos"],
+                  usa_delta=activo not in SIN_INDICE)
 
 
 # ---------------------------------------------------------------- datos en vivo
@@ -376,6 +385,8 @@ class Precios:
 
     def get(self, activo):
         """Precio del índice, o None si no hay uno fresco (entonces el bot no opera)."""
+        if activo in SIN_INDICE:      # no tienen feed público: ni se pide, para no llenar el log de 404
+            return None
         ahora = time.time()
         ts, p, atraso = self.cache.get(activo, (0.0, None, None))
         if ahora - ts < self.bot.ciclo_indice:     # el archivo solo avanza cada 2-3 s (medido el 30-sep-2026)
@@ -784,7 +795,7 @@ class Bot:
                     est = "sin API key"
                 elif self.estado.pausado:
                     est = "apagado"
-                elif f.precio is None:
+                elif f.precio is None and a not in SIN_INDICE:
                     est = "sin precio del índice: no opera"
                 elif self.estado.operado.get(a) == f.ticker:
                     est = "ya operó este bloque"
@@ -836,7 +847,7 @@ class Bot:
             campos=[dict(clave=c, tipo=t, etiqueta=e, ayuda=h, seccion=sec) for c, t, _, e, h, sec in CAMPOS_GLOBAL],
             campos_activo=[dict(clave=c, tipo=t, etiqueta=e, ayuda=h, seccion=sec)
                            for c, t, _, e, h, sec in CAMPOS_ACTIVO],
-            activos_validos=list(ACTIVOS_VALIDOS))
+            activos_validos=list(ACTIVOS_VALIDOS), sin_indice=list(SIN_INDICE))
 
 
 # ---------------------------------------------------------------- panel web

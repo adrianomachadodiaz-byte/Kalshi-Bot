@@ -25,11 +25,13 @@ class Config:
     exit: Optional[float]              # stop fijo: sale si el bid <= exit (None = sin Exit)
     breakeven: Optional[float] = None  # si el bid sube +X, el stop pasa al precio de entrada
     contratos: float = 1.0             # contratos por operación de ESTE activo
+    usa_delta: bool = True             # False en los activos sin precio en vivo (oro, plata, petróleo)
 
     def texto(self):
         ex = f"{self.exit:.2f}" if self.exit is not None else "sin"
         be = f"+{self.breakeven:.2f}" if self.breakeven is not None else "sin"
-        return (f"Delta {self.delta:g} · Delay {self.delay} s · Entrada {self.entrada_min:.2f}-{self.entrada_max:.2f} · "
+        dl = f"Delta {self.delta:g}" if self.usa_delta else "sin Delta"
+        return (f"{dl} · Delay {self.delay} s · Entrada {self.entrada_min:.2f}-{self.entrada_max:.2f} · "
                 f"TP +{self.tp:.2f} · Exit {ex} · BreakEven {be} · {self.contratos:g} contratos")
 
 
@@ -123,9 +125,10 @@ class Estrategia:
             return None
         if f.segundo() < BLOQUE - c.delay:
             return None
-        d = f.delta()
-        if d is None or d < c.delta - 1e-9:
-            return None
+        if c.usa_delta:
+            d = f.delta()
+            if d is None or d < c.delta - 1e-9:
+                return None
         lados = [(lado, f.ask(lado)) for lado in ("yes", "no")
                  if c.entrada_min - TOL <= f.ask(lado) <= c.entrada_max + TOL]
         if not lados:

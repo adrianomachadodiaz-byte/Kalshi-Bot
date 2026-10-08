@@ -194,6 +194,7 @@ html{scroll-behavior:smooth}
 .curva{margin:8px -4px 0;min-width:0;position:relative}
 .curva svg{display:block;width:100%;height:auto}
 .curva .nada{padding:14px 4px;font-size:11.5px;color:var(--tenue)}
+.sinlinea{margin:0;padding:26px 6px;font-size:12px;line-height:1.6;color:var(--tenue)}
 .cglobo{position:absolute;pointer-events:none;background:var(--n0);border:1px solid var(--linea-2);
   border-radius:5px;padding:4px 8px;font-size:11px;color:var(--gris);white-space:nowrap;
   transform:translate(-50%,-115%);opacity:0;transition:opacity 120ms ease-out}
@@ -255,6 +256,13 @@ html{scroll-behavior:smooth}
 .crip > summary:hover .fl{color:var(--claro)}
 .crip.off > summary h2{color:var(--gris)}
 .apagado{font-size:10.5px;color:var(--tenue);border:1px solid var(--linea);border-radius:3px;padding:1px 6px}
+/* icono de cada activo: moneda para las criptos, lingote para los metales */
+.ico{width:19px;height:19px;flex:0 0 auto;margin-right:8px;color:var(--gris);
+  transition:color var(--t)}
+.crip[open] > summary .ico,.crip > summary:hover .ico{color:var(--claro)}
+.ico .sim{font-family:var(--mono);font-size:10px;font-weight:700;fill:currentColor;stroke:none}
+.porfila .ico{width:15px;height:15px;margin-right:0}
+
 /* punto verde: esta cripto tiene una operación abierta ahora mismo */
 .punto{display:none;width:7px;height:7px;flex:0 0 auto;margin-left:7px;border-radius:50%;
   background:var(--sube);box-shadow:0 0 0 3px var(--sube-f)}
@@ -391,6 +399,8 @@ input.malo,select.malo,input.malo:focus{border-color:var(--baja)}
 .form select{appearance:none;cursor:pointer}
 textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 .err{font-size:11px;color:var(--baja);margin-top:3px}
+.apagado-campo{opacity:.45}
+.apagado-campo input{cursor:not-allowed}
 .row{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin-top:14px}
 .avanzado{margin-top:14px;border-top:1px solid var(--linea);padding-top:12px}
 .avanzado summary{cursor:pointer;font-size:12px;color:var(--gris);list-style:none;display:flex;align-items:center;
@@ -633,6 +643,8 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 const $ = id => document.getElementById(id);
 let ultimo = null, campos = [], camposActivo = [], activos = [], ajustesGuardados = null;
 let focoStats = 'todo', focoOps = 'todo', focoPeriodo = 'total', cartelesPara = '';
+let sinIndice = [];          // oro, plata y petróleo: operan sin Delta
+const conDelta = a => !sinIndice.includes(a);
 const PERIODOS = [['total', 'Todo'], ['semana', '7 días'], ['hoy', 'Hoy']];
 
 async function api(path, body) {
@@ -646,8 +658,10 @@ const n = (x, d = 3) => x == null ? '–' : Number(x).toFixed(d);
 // BTC vale 85.000 $ y DOGE 0,087 $: con dos decimales DOGE sería siempre "0,09".
 // Los decimales salen del precio de la moneda, no de un número fijo.
 const decim = p => {
+  // el oro vale 4136,82 y su bloque se decide por céntimos: redondear a 4137 escondía
+  // justo lo que importa. Solo BTC (cinco cifras) se queda sin decimales.
   const v = Math.abs(Number(p) || 0);
-  return v >= 1000 ? 0 : v >= 100 ? 1 : v >= 10 ? 2 : v >= 1 ? 4 : v >= 0.01 ? 5 : 6;
+  return v >= 10000 ? 0 : v >= 10 ? 2 : v >= 1 ? 4 : v >= 0.01 ? 5 : 6;
 };
 // el Delta es una diferencia, así que necesita un dígito más de finura que el precio
 const dec2 = p => Math.min(8, decim(p) + 1);
@@ -890,6 +904,12 @@ function razon(v, d) {
   else if (d.limite_diario) { t = 'Límite del día alcanzado.'; cl = 'warn'; }
   else if (v.indice_s != null && v.indice_s > 15) { t = 'El índice viene atrasado: no opera.'; cl = 'warn'; }
   else if (g.ventana && v.quedan > g.ventana) t = `La ventana de entrada abre en ${reloj(v.quedan - g.ventana)}.`;
+  else if (!conDelta(v.activo)) {
+    t = dentro(v.yes_ask) || dentro(v.no_ask)
+      ? 'Todo en regla: entra en el próximo vistazo.'
+      : `Precio fuera de ${n(emin, 2)}–${n(emax, 2)}: YES ${n(v.yes_ask, 2)}, NO ${n(v.no_ask, 2)}.`;
+    cl = dentro(v.yes_ask) || dentro(v.no_ask) ? 'ok' : '';
+  }
   else if (v.delta == null) t = 'Sin precio del índice.';
   else if (dm && Math.abs(v.delta) < dm) t = `Delta corto: faltan ${nq(dm - Math.abs(v.delta), dec2(g.referencia))} $.`;
   else if (!dentro(v.yes_ask) && !dentro(v.no_ask))
@@ -995,6 +1015,27 @@ function armarHover(a) {
   cont.addEventListener('pointerleave', () => { hoverX[a] = null; dibujarCruz(a); });
 }
 
+// Un icono por activo: moneda para las criptos, lingote para los metales, gota para
+// el petróleo. De trazo y en gris, como el resto de los controles del panel.
+const MONEDA = '<circle cx="12" cy="12" r="8.6"></circle>';
+const LINGOTE = '<path d="M3.4 18l2.8-8.4h11.6l2.8 8.4z"></path>';
+const GOTA = '<path d="M12 4.2c3.1 3.6 5 6.2 5 8.7a5 5 0 0 1-10 0c0-2.5 1.9-5.1 5-8.7z"></path>';
+const ICONOS = {
+  BTC: [MONEDA, '₿'], ETH: [MONEDA, 'Ξ'], SOL: [MONEDA, 'S'], XRP: [MONEDA, 'X'],
+  DOGE: [MONEDA, 'Ð'], HYPE: [MONEDA, 'H'],
+  GOLD: [LINGOTE, 'Au'], SILVER: [LINGOTE, 'Ag'], OIL: [GOTA, ''],
+};
+
+function icono(a) {
+  const [forma, sim] = ICONOS[a] || [MONEDA, (a || '?')[0]];
+  // el símbolo va centrado dentro de la forma; sin símbolo, la forma sola basta
+  const chico = sim.length > 1;      // "Au" no cabe con el mismo cuerpo que "₿"
+  const texto = sim ? `<text class="sim" x="12" y="${chico ? 16.6 : 15.4}" text-anchor="middle"`
+    + `${chico ? ' style="font-size:7.5px"' : ''}>${esc(sim)}</text>` : '';
+  return `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"`
+    + ` stroke-linejoin="round" aria-hidden="true">${forma}${texto}</svg>`;
+}
+
 // una tarjeta por activo. Solo se rehace cuando cambia la lista: si se rehiciera
 // cada segundo se perdería la cruz del ratón y parpadearía todo.
 // Una tarjeta por cripto, con su gráfico y SU configuración dentro. Se arma una sola
@@ -1013,6 +1054,7 @@ function armarCarteles(lista, encendidos) {
     <summary>
      <div class="titulo" style="margin:0">
       ${FLECHA}
+      ${icono(a)}
       <h2>${a}<span class="punto" id="pt_${a}" title="${a} tiene una operación abierta"></span><span class="act">bloque en vivo</span></h2><span id="gTicker_${a}" class="num tic"></span>
       <button class="sw" id="sw_${a}" data-sw="${a}" type="button" role="switch" aria-checked="false"><span class="pista"><span class="bola"></span></span><span class="et" id="swEt_${a}">–</span></button>
       <span class="msg" id="msgSw_${a}" role="status" aria-live="polite"></span>
@@ -1034,8 +1076,8 @@ function armarCarteles(lista, encendidos) {
     </table></div>
     <details class="ajcrip" id="aj_${a}">
       <summary>Ajustes de ${a} <span class="ayuda" id="estAct_${a}"></span></summary>
-      <div class="form">${camposActivo.filter(c => c.seccion !== 'av').map(c => campoHTML(c, a + '.')).join('')}</div>
-      <div class="form">${camposActivo.filter(c => c.seccion === 'av').map(c => campoHTML(c, a + '.')).join('')}</div>
+      <div class="form">${camposActivo.filter(c => c.seccion !== 'av').map(c => campoHTML(c, a + '.', a)).join('')}</div>
+      <div class="form">${camposActivo.filter(c => c.seccion === 'av').map(c => campoHTML(c, a + '.', a)).join('')}</div>
       <div class="row">
         <button class="b-main" data-guardar="${a}">Guardar ${a}</button>
         <button class="b-ghost" data-deshacer="${a}">Deshacer</button>
@@ -1062,7 +1104,7 @@ function pintarVivo(d, v) {
   if (!$('vivo_' + a)) return;
   $('vivo_' + a).innerHTML = v.mercado ? `<tr>
     <td class="num">${Math.floor(v.quedan / 60)}:${String(Math.floor(v.quedan % 60)).padStart(2, '0')}</td><td class="num">${n(v.referencia, decim(v.referencia))}</td><td class="num">${n(v.precio, decim(v.referencia))}</td><td class="ayuda num">${v.indice_s == null ? '–' : Math.max(0, v.indice_s).toFixed(0) + ' s'}</td>
-    <td class="num ${clase(v.delta)}">${n(v.delta, dec2(v.referencia))}</td><td class="num">${n(v.yes_ask)} / ${n(v.yes_bid)}</td><td class="num">${n(v.no_ask)} / ${n(v.no_bid)}</td>
+    <td class="num ${clase(v.delta)}">${conDelta(a) ? n(v.delta, dec2(v.referencia)) : '<span class="ayuda" title="sin precio público del subyacente">no usa</span>'}</td><td class="num">${n(v.yes_ask)} / ${n(v.yes_bid)}</td><td class="num">${n(v.no_ask)} / ${n(v.no_bid)}</td>
     <td>${esc(v.estado)}</td></tr>` : `<tr><td colspan="8" class="vacio">esperando datos…</td></tr>`;
   if (!v.mercado) {
     $('gTicker_' + a).textContent = ''; $('gLados_' + a).innerHTML = '';
@@ -1082,7 +1124,14 @@ function pintarVivo(d, v) {
         + `<span class="num" style="font-weight:600">${n(ask, 3)}</span>`
         + `<span class="num" style="color:var(--tenue)">/ ${n(bid, 3)}</span></span>`;
     }).join('');
-  if (v.grafico && v.grafico.activo && v.grafico.activo.length > 1) {
+  if (!conDelta(a) && v.grafico) {
+    // Kalshi liquida estos con Pyth y ese precio no es público: no hay línea que dibujar
+    $('grafico_' + a).innerHTML = '<p class="sinlinea">Kalshi liquida ' + esc(a) + ' con Pyth, '
+      + 'y ese precio no es público: aquí no hay gráfico ni Delta.<br>'
+      + 'Entra solo por la ventana y por el precio del contrato.</p>';
+    $('medidor_' + a).innerHTML = v.grafico ? medidor(v.grafico) : '';
+    $('gPie_' + a).innerHTML = razon(v, d);
+  } else if (v.grafico && v.grafico.activo && v.grafico.activo.length > 1) {
     $('grafico_' + a).innerHTML = grafico(v, a);
     armarHover(a);
     dibujarCruz(a);
@@ -1134,7 +1183,7 @@ function pintarPorActivo(d) {
   caja.innerHTML = (d.activos_validos || []).map(a => {
     const x = pa[a] || {}, t = x.total || {}, h = x.hoy || {};
     return `<div class="porfila">
-      <span class="nom">${esc(a)}</span>
+      ${icono(a)}<span class="nom">${esc(a)}</span>
       ${enc.includes(a) ? '' : '<span class="apag">apagado</span>'}
       <span class="det">${h.ops || 0} hoy · ${t.ops || 0} en total${t.wr == null ? '' : ' · ' + t.wr + '%'}</span>
       <span class="pnl ${clase(h.usd)}">${usd(h.usd || 0)}</span>
@@ -1255,6 +1304,7 @@ function render(d) {
   $('avisos').innerHTML = av.map(([c, t]) => `<div class="aviso ${c}">${esc(t)}</div>`).join('');
 
   activos = d.activos_validos || [];
+  sinIndice = d.sin_indice || [];
   if (!campos.length) { campos = d.campos; camposActivo = d.campos_activo || []; ajustesGuardados = d.ajustes; armarForm(); }
   segmento('segStats', focoStats, x => { focoStats = x; });
   segmento('segOps', focoOps, x => { focoOps = x; });
@@ -1399,13 +1449,16 @@ function render(d) {
 // pre = "" para los ajustes de toda la cuenta, "BTC." o "ETH." para los de un activo
 const idc = k => k.replace('.', '-');     // "BTC.delta" -> "BTC-delta", válido en CSS
 
-function campoHTML(c, pre) {
+function campoHTML(c, pre, activo) {
   const k = idc((pre || '') + c.clave);
+  // el Delta no pinta nada en un activo sin precio en vivo: se deja a la vista pero apagado
+  const muerto = c.clave === 'delta' && activo && !conDelta(activo);
   const dentro = c.tipo === 'sino'
     ? `<select id="f_${k}"><option value="si">sí</option><option value="no">no</option></select>`
-    : `<input id="f_${k}" inputmode="${c.tipo === 'num' || c.tipo === 'ent' || c.tipo === 'opc' ? 'decimal' : 'text'}">`;
-  return `<div><label><span class="et">${esc(c.etiqueta)}</span>${dentro}</label>
-    <div class="ayuda">${esc(c.ayuda)}</div><div class="err" id="e_${k}"></div></div>`;
+    : `<input id="f_${k}"${muerto ? ' disabled' : ''} inputmode="${c.tipo === 'num' || c.tipo === 'ent' || c.tipo === 'opc' ? 'decimal' : 'text'}">`;
+  return `<div${muerto ? ' class="apagado-campo"' : ''}><label><span class="et">${esc(c.etiqueta)}</span>${dentro}</label>
+    <div class="ayuda">${muerto ? 'no se usa: ' + esc(activo) + ' no tiene precio público' : esc(c.ayuda)}</div>`
+    + `<div class="err" id="e_${k}"></div></div>`;
 }
 function armarForm() {
   const base = campos.filter(c => c.seccion !== 'av'), av = campos.filter(c => c.seccion === 'av');
