@@ -79,7 +79,8 @@ ok(f.motivo(ts(10, 0)) is None, "filtro apagado: no bloquea nada")
 print("\n5) informe de bloques saltados")
 f = nuevo([ev(9, 45)])
 for h, m in [(8, 30), (10, 0), (9, 45), (9, 50)]:
-    f.motivo(ts(h, m))
+    for _ in range(40):                 # el bot lo pregunta 4 veces por segundo: cada bloque cuenta UNA vez
+        f.motivo(ts(h, m), f"KXBTC15M-{h:02d}{m:02d}")
 inf = f.informe()
 print("  ", inf)
 ok(inf["hoy"]["hora"] == 2 and inf["hoy"]["evento"] == 2,

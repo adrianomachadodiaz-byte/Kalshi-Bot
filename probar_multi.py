@@ -35,11 +35,17 @@ viejo = {"activos": "BTC", "delta": 250.0, "delay": 5, "entrada_min": 0.70,
 Path(DATOS, "ajustes.json").write_text(json.dumps(viejo), encoding="utf-8")
 aj = B.Ajustes(Path(DATOS))
 pa = aj.valores["por_activo"]
-ok(set(pa) == {"BTC", "ETH"}, f"aparecen los dos activos: {sorted(pa)}")
+ok(set(pa) == set(B.ACTIVOS_VALIDOS), f"aparecen las cinco criptos: {sorted(pa)}")
 for a in ("BTC", "ETH"):
     ok(pa[a]["delta"] == 250.0 and pa[a]["tp"] == 0.10 and pa[a]["contratos"] == 3.0,
        f"{a} hereda los valores viejos (delta {pa[a]['delta']:g}, tp {pa[a]['tp']:.2f}, "
        f"{pa[a]['contratos']:g} contratos)")
+# el Delta va en dólares del índice: 250 $ es razonable en BTC y absurdo en DOGE (vale 0,09 $)
+for a in ("XRP", "DOGE", "HYPE"):
+    ok(pa[a]["tp"] == 0.10 and pa[a]["contratos"] == 3.0,
+       f"{a} hereda lo que sí es trasladable (tp {pa[a]['tp']:.2f}, {pa[a]['contratos']:g} contratos)")
+    ok(pa[a]["delta"] == B.DEFECTO_ACTIVO[a]["delta"],
+       f"{a} NO hereda el Delta de BTC: arranca en {pa[a]['delta']:g} $")
 ok("delta" not in aj.valores, "el Delta ya no vive en la raíz, solo dentro de cada activo")
 ok(pa["BTC"]["delay"] == 300 and pa["ETH"]["delay"] == 300,
    f"el Delay viejo de 5 min pasa a 300 s ({pa['BTC']['delay']})")

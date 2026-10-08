@@ -37,7 +37,7 @@ PORT = int(env("PORT", "8080"))
 DATA_DIR = Path(env("DATA_DIR", "/data" if os.environ.get("RAILWAY_ENVIRONMENT") else "datos"))
 REST_URL = env("KALSHI_REST_URL", "https://api.elections.kalshi.com/trade-api/v2")
 INDICE_URL = env("KALSHI_INDICE_URL", INDICE_URL_DEF)    # feed público del índice ({activo} = btc/eth)
-ACTIVOS_VALIDOS = ("BTC", "ETH")
+ACTIVOS_VALIDOS = ("BTC", "ETH", "XRP", "DOGE", "HYPE")
 CICLO = float(env("CICLO_S", "0.25"))    # valor inicial; manda el del panel (campo "ritmo")
 CICLO_INDICE = float(env("CICLO_INDICE_S", "1.0"))   # el índice avanza cada 2-3 s: pedirlo más rápido es tirar peticiones
 PASO_GRAFICO = 1                         # segundos entre puntos de la serie que dibuja el panel
@@ -45,6 +45,19 @@ PASO_GRAFICO = 1                         # segundos entre puntos de la serie que
 # ---------------------------------------------------------------- ajustes (panel > variables de Railway > defecto)
 # clave, tipo, defecto, etiqueta, ayuda, sección ("" = básico, "av" = avanzado)
 # Ajustes de CADA activo: BTC y ETH llevan los suyos, independientes.
+DEFECTO_ACTIVO = {
+    # El Delta se mide en dólares del índice. 100 $ en BTC es ~0,12 % de su precio;
+    # el mismo 0,12 % en cada moneda es lo que hay abajo. Son solo los valores de
+    # arranque: en el panel se cambia uno por uno.
+    "BTC": {"delta": 100.0},
+    "ETH": {"delta": 3.0},
+    "XRP": {"delta": 0.0017},
+    "DOGE": {"delta": 0.0001},
+    "HYPE": {"delta": 0.1},
+}
+
+
+
 CAMPOS_ACTIVO = [
     ("delta", "num", 100.0, "Delta ($)", "mínimo para entrar", ""),
     ("delay", "ent", 420, "Delay (s)", "ventana de entrada, en segundos", ""),
@@ -70,6 +83,13 @@ CAMPOS_GLOBAL = [
     ("noticia_dia_alto", "ent", 3, "Día cargado (eventos)", "desde cuántos rojos se recorta; 0 = nunca", "av"),
     ("noticia_dia_modo", "texto", "mitad", "Día cargado: qué hacer", "mitad = opera uno de cada dos · nada = no opera", "av"),
 ]
+
+
+def defectos_de(activo):
+    """Los valores de arranque de un activo: los generales con su Delta propio encima."""
+    d = {c[0]: c[2] for c in CAMPOS_ACTIVO}
+    d.update(DEFECTO_ACTIVO.get(activo, {}))
+    return d
 
 
 def convertir(tipo, v):
@@ -142,7 +162,7 @@ def validar(crudo):
     crudo_pa = crudo.get("por_activo") or {}
     v["por_activo"] = {}
     for a in ACTIVOS_VALIDOS:
-        base = {c[0]: c[2] for c in CAMPOS_ACTIVO}
+        base = defectos_de(a)
         base.update({k: x for k, x in (crudo_pa.get(a) or {}).items() if k in base})
         v["por_activo"][a] = validar_activo(base)[0]
     if err:
@@ -176,7 +196,7 @@ def validar(crudo):
     # los errores solo molestan si ese activo está encendido: uno apagado con ajustes
     # raros no bloquea el guardado, y así no se pierde su configuración
     for a in activos:
-        base = {c[0]: c[2] for c in CAMPOS_ACTIVO}
+        base = defectos_de(a)
         base.update({k: x for k, x in (crudo_pa.get(a) or {}).items() if k in base})
         for k, t in validar_activo(base)[1].items():
             err[f"{a}.{k}"] = t
@@ -196,7 +216,14 @@ def migrar_ajustes(guardado):
     for clave, _, _, _, _, _ in CAMPOS_ACTIVO:
         if clave in g:
             plano[clave] = g.pop(clave)
-    g["por_activo"] = {a: dict(plano) for a in ACTIVOS_VALIDOS}
+    # los ajustes planos eran de BTC/ETH: se copian a todos MENOS el Delta, que va en
+    # dólares del índice y no se puede trasladar de BTC (85.000 $) a DOGE (0,09 $)
+    g["por_activo"] = {}
+    for a in ACTIVOS_VALIDOS:
+        vals = dict(plano)
+        if a not in ("BTC", "ETH") and "delta" in vals:
+            vals["delta"] = defectos_de(a)["delta"]
+        g["por_activo"][a] = vals
     for a in ACTIVOS_VALIDOS:            # más viejo aún: había delta_btc / delta_eth
         d = guardado.get(f"delta_{a.lower()}")
         if d is not None:
@@ -230,8 +257,11 @@ class Ajustes:
         crudo = {}
         for clave, tipo, defecto, _, _, _ in CAMPOS_GLOBAL:
             crudo[clave] = env(clave.upper()) or defecto
-        base_activo = {c[0]: (env(c[0].upper()) or c[2]) for c in CAMPOS_ACTIVO}
-        crudo["por_activo"] = {a: dict(base_activo) for a in ACTIVOS_VALIDOS}
+        # una variable de Railway (DELTA, TP...) sigue valiendo para todos; si no hay,
+        # cada activo arranca con lo suyo
+        crudo["por_activo"] = {a: {k: (env(k.upper()) or d) for k, d in defectos_de(a).items()}
+                               for a in ACTIVOS_VALIDOS}
+        base_activo = {c[0]: c[2] for c in CAMPOS_ACTIVO}
         if self.ruta.exists():
             try:
                 guardado = migrar_ajustes(json.loads(self.ruta.read_text(encoding="utf-8")))
@@ -280,7 +310,7 @@ class Claves:
 
 def config_de(activo, v):
     """La Config de ESE activo; si no hay nada guardado para él, los valores por defecto."""
-    a = (v.get("por_activo") or {}).get(activo) or {c[0]: c[2] for c in CAMPOS_ACTIVO}
+    a = (v.get("por_activo") or {}).get(activo) or defectos_de(activo)
     return Config(delta=a["delta"], delay=a["delay"], entrada_min=a["entrada_min"],
                   entrada_max=a["entrada_max"], tp=a["tp"], exit=a["exit"],
                   breakeven=a["breakeven"], contratos=a["contratos"])

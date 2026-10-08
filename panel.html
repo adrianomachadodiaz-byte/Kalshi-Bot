@@ -200,9 +200,33 @@ html{scroll-behavior:smooth}
 .segm button[aria-pressed="true"]{background:var(--n2);color:var(--claro)}
 .bloque + .bloque{margin-top:14px}
 .bloque .titulo h2 .act{color:var(--tenue);font-weight:400;margin-left:6px}
-/* un juego de ajustes por activo */
-.porAct{margin-top:14px}
-.porAct > details{margin-top:9px}
+/* cada cripto se pliega con su flechita */
+.crip > summary{list-style:none;cursor:pointer;margin:0}
+.crip > summary::-webkit-details-marker{display:none}
+.fl{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;flex:0 0 auto;
+  margin-right:2px;color:var(--gris);transition:transform 160ms var(--sal),color var(--t)}
+.crip[open] > summary .fl{transform:rotate(90deg)}
+.crip > summary:hover .fl{color:var(--claro)}
+.crip.off > summary h2{color:var(--gris)}
+.apagado{font-size:10.5px;color:var(--tenue);border:1px solid var(--linea);border-radius:3px;padding:1px 6px}
+/* interruptor de cada cripto, en su cabecera */
+.sw{padding:3px 11px;border-radius:var(--r-s);border:1px solid var(--linea-2);background:var(--n0);
+  color:var(--gris);font:inherit;font-size:11.5px;letter-spacing:.03em;cursor:pointer;
+  transition:color var(--t),border-color var(--t),background var(--t)}
+.sw:hover:not(:disabled){color:var(--claro);border-color:var(--gris)}
+.sw[data-on="1"]{color:var(--claro);background:var(--n2)}
+.sw.pide{border-color:var(--baja);color:var(--baja)}
+.sw:disabled{opacity:.5;cursor:default}
+.crip .cuerpo,.crip .lectura,.crip .ajcrip{margin-top:12px}
+/* los ajustes de esa cripto, justo debajo de su gráfico */
+.ajcrip{border-top:1px solid var(--linea);padding-top:12px}
+.ajcrip > summary{cursor:pointer;color:var(--gris);font-size:11.5px;letter-spacing:.06em;
+  text-transform:uppercase;list-style:none;display:flex;align-items:center;gap:8px}
+.ajcrip > summary::-webkit-details-marker{display:none}
+.ajcrip > summary:hover{color:var(--claro)}
+.ajcrip > summary::before{content:"›";display:inline-block;transition:transform 160ms var(--sal)}
+.ajcrip[open] > summary::before{transform:rotate(90deg)}
+.ajcrip .form{margin-top:12px}
 
 /* ---------------------------------------------------------------- bloque en vivo */
 .lados{display:flex;gap:7px}
@@ -420,7 +444,7 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
   <span id="pill" class="pill off">cargando</span>
   <span class="sp"></span>
   <div class="lecturas" id="instr" hidden>
-    <div><span class="k">Delta</span><span class="v num" id="hDelta">–</span></div>
+    <div><span class="k" id="hQuien">Delta</span><span class="v num" id="hDelta">–</span></div>
     <div><span class="k">Queda</span><span class="v num chico" id="hQueda">–</span></div>
   </div>
   <span class="sp"></span>
@@ -500,14 +524,14 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
   <div class="grid2">
     <div>
       <details class="plegable">
-      <summary><h2>Ajustes</h2><span id="resumenAjustes" class="aviso off">cargando</span></summary>
-      <p class="ayuda" style="margin:12px 0 10px">Se aplican al guardar, sin reiniciar.</p>
+      <summary><h2>Ajustes generales</h2><span id="resumenAjustes" class="aviso off">cargando</span></summary>
+      <p class="ayuda" style="margin:12px 0 10px">Valen para todas las criptos. Los de cada una están debajo de su gráfico. Se aplican al guardar, sin reiniciar.</p>
       <div class="form" id="form"></div>
       <details id="bloqueAv" class="avanzado" hidden>
         <summary>Avanzado</summary>
         <div class="form" id="formAv" style="margin-top:12px"></div>
       </details>
-      <div class="porAct" id="formActivos"></div>
+
       <div class="row"><button class="b-main" id="guardar">Guardar ajustes</button><button class="b-ghost" id="deshacer">Deshacer</button><span id="msgAjustes" class="msg" role="status" aria-live="polite"></span></div>
       </details>
     </div>
@@ -539,6 +563,19 @@ async function api(path, body) {
 const usd = x => x == null ? '–' : (x >= 0 ? '+' : '−') + '$' + Math.abs(x).toFixed(2);
 const clase = x => x == null ? '' : x > 0 ? 'pos' : x < 0 ? 'neg' : '';
 const n = (x, d = 3) => x == null ? '–' : Number(x).toFixed(d);
+// BTC vale 85.000 $ y DOGE 0,087 $: con dos decimales DOGE sería siempre "0,09".
+// Los decimales salen del precio de la moneda, no de un número fijo.
+const decim = p => {
+  const v = Math.abs(Number(p) || 0);
+  return v >= 1000 ? 0 : v >= 100 ? 1 : v >= 10 ? 2 : v >= 1 ? 4 : v >= 0.01 ? 5 : 6;
+};
+// el Delta es una diferencia, así que necesita un dígito más de finura que el precio
+const dec2 = p => Math.min(8, decim(p) + 1);
+// un número sin ceros de adorno y con la coma de aquí: 300, 0,0051, 0,00055
+const nq = (x, d) => x == null ? '–' : Number(Number(x).toFixed(d)).toLocaleString('es',
+  { maximumFractionDigits: 20 });
+const mil = (x, p) => x == null ? '–' : Number(x).toLocaleString('es',
+  { minimumFractionDigits: decim(p), maximumFractionDigits: decim(p) });
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 function dur(s) {
   if (s == null) return '–';
@@ -619,7 +656,7 @@ function grafico(v, a) {
   // la escala sigue al precio, no a los umbrales: la línea se lee. El suelo (un tercio
   // del umbral) evita que una racha plana se vea como una montaña rusa.
   const centro = (hi + lo) / 2;
-  const semi = Math.max((hi - lo) / 2 * 1.16, 8, (dm || 0) * 0.35);
+  const semi = Math.max((hi - lo) / 2 * 1.16, Math.abs(centro) * 1e-4, (dm || 0) * 0.35, 1e-9);
   lo = centro - semi; hi = centro + semi;
   const ya = p => Y1 - (p - lo) / (hi - lo) * (Y1 - Y0);
   const corta = y => Math.max(Y0, Math.min(Y1, y));
@@ -675,7 +712,7 @@ function grafico(v, a) {
   if (ref != null) {
     o.push(`<line x1="${X0}" y1="${yRef.toFixed(1)}" x2="${X1}" y2="${yRef.toFixed(1)}" stroke="${NEUTRO}" stroke-width="1" opacity="0.5"></line>`);
     const xRef = Math.max(X0 + 4, x(g.activo[0][0]) + 6);   // no se monta sobre la zona rayada
-    o.push(`<text x="${xRef.toFixed(1)}" y="${(yRef - 5).toFixed(1)}" fill="${NEUTRO}" font-size="11">referencia ${Math.round(ref).toLocaleString('es')}</text>`);
+    o.push(`<text x="${xRef.toFixed(1)}" y="${(yRef - 5).toFixed(1)}" fill="${NEUTRO}" font-size="11">referencia ${mil(ref, ref)}</text>`);
   }
 
   // extremos del bloque
@@ -684,15 +721,15 @@ function grafico(v, a) {
     for (const p of g.activo) { if (p[1] > mx[1]) mx = p; if (p[1] < mn[1]) mn = p; }
     [[mx, VERDE, -8], [mn, ROJO, 15]].forEach(([p, c, dy]) => {
       if (Math.abs(x(p[0]) - x(ult[0])) < 30) return;
-      const px = x(p[0]), py = ya(p[1]);
+      const px = Math.min(Math.max(x(p[0]), X0 + 14), X1 - 14), py = ya(p[1]);
       o.push(`<line x1="${px.toFixed(1)}" y1="${(py + (dy < 0 ? -2 : 2)).toFixed(1)}" x2="${px.toFixed(1)}" y2="${(py + (dy < 0 ? -6 : 6)).toFixed(1)}" stroke="${c}" stroke-width="1" opacity="0.55"></line>`);
-      o.push(`<text x="${px.toFixed(1)}" y="${(py + dy).toFixed(1)}" text-anchor="middle" fill="${TENUE}" font-size="10">${p[1] - ref >= 0 ? '+' : ''}${n(p[1] - ref, 0)}</text>`);
+      o.push(`<text x="${px.toFixed(1)}" y="${(py + dy).toFixed(1)}" text-anchor="middle" fill="${TENUE}" font-size="10">${p[1] - ref >= 0 ? '+' : ''}${nq(p[1] - ref, dec2(ref))}</text>`);
     });
   }
 
   o.push(`<circle cx="${pa[pa.length - 1][0].toFixed(1)}" cy="${pa[pa.length - 1][1].toFixed(1)}" r="6.5" fill="${col}" opacity="0.2"></circle>`);
   o.push(`<circle cx="${pa[pa.length - 1][0].toFixed(1)}" cy="${pa[pa.length - 1][1].toFixed(1)}" r="3.2" fill="${col}"></circle>`);
-  o.push(capsula(ya(ult[1]), Math.round(ult[1]).toLocaleString('es'), col, arriba ? '#06301a' : '#2e0b0b'));
+  o.push(capsula(ya(ult[1]), mil(ult[1], ref), col, arriba ? '#06301a' : '#2e0b0b'));
 
   // marca de la entrada
   if (g.contrato && g.contrato.length) {
@@ -701,8 +738,8 @@ function grafico(v, a) {
     o.push(`<text x="${(xe + 5).toFixed(1)}" y="${Y0 + 10}" fill="${NEUTRO}" font-size="10.5">entra</text>`);
   }
 
-  o.push(`<text x="${X0 - 7}" y="${Y0 + 10}" text-anchor="end" fill="${TENUE}" font-size="10.5">${Math.round(hi).toLocaleString('es')}</text>`);
-  o.push(`<text x="${X0 - 7}" y="${Y1 + 3}" text-anchor="end" fill="${TENUE}" font-size="10.5">${Math.round(lo).toLocaleString('es')}</text>`);
+  o.push(`<text x="${X0 - 7}" y="${Y0 + 10}" text-anchor="end" fill="${TENUE}" font-size="10.5">${mil(hi, ref)}</text>`);
+  o.push(`<text x="${X0 - 7}" y="${Y1 + 3}" text-anchor="end" fill="${TENUE}" font-size="10.5">${mil(lo, ref)}</text>`);
   // la etiqueta de la ventana baja al pie: dentro del gráfico chocaba con el mínimo del bloque
   if (g.ventana) {
     // Con un Delay corto la banda queda pegada al borde y el texto se montaba encima de
@@ -735,6 +772,7 @@ const reloj = s => Math.floor(Math.max(0, s) / 60) + ':' + String(Math.floor(Mat
 function barraDelta(v, d) {
   const g = v.grafico, dm = g.delta_min, dl = v.delta;
   if (!dm || dl == null) return '';
+  const dd = dec2(g.referencia);
   const tope = dm * 1.25, pct = z => 50 + Math.max(-50, Math.min(50, (z / tope) * 50));
   const borde = (50 - 50 * dm / tope).toFixed(1);
   let mx = null, mn = null;
@@ -746,15 +784,15 @@ function barraDelta(v, d) {
   const ok = Math.abs(dl) >= dm, c = dl >= 0 ? 'pos' : 'neg';
   const tick = z => z == null ? '' : `<i class="dtick" style="left:${pct(z).toFixed(1)}%"></i>`;
   return `<div class="dcab"><span class="k">Delta</span>
-      <span class="v num ${ok ? c : ''}">${dl >= 0 ? '+' : '−'}${n(Math.abs(dl), 1)}</span>
-      <span class="k der">${ok ? 'umbral cumplido' : 'umbral ' + n(dm, 0) + ' $'}</span></div>
-    <div class="dpista" role="img" aria-label="Delta ${n(dl, 1)} sobre un umbral de ${n(dm, 0)} dólares">
+      <span class="v num ${ok ? c : ''}">${dl >= 0 ? '+' : '−'}${n(Math.abs(dl), dd)}</span>
+      <span class="k der">${ok ? 'umbral cumplido' : 'umbral ' + nq(dm, dd) + ' $'}</span></div>
+    <div class="dpista" role="img" aria-label="Delta ${n(dl, dd)} sobre un umbral de ${n(dm, dd)} dólares">
       <div class="dzona izq" style="width:${borde}%;--z:var(--baja)"></div>
       <div class="dzona der" style="width:${borde}%;--z:var(--sube)"></div>
       <div class="dcero"></div>${tick(mn)}${tick(mx)}
       <b class="dmarca ${ok ? c : ''}" style="left:${pct(dl).toFixed(1)}%"></b>
     </div>
-    <div class="dpies"><span class="num">−${n(dm, 0)}</span><span>referencia</span><span class="num">+${n(dm, 0)}</span></div>`;
+    <div class="dpies"><span class="num">−${nq(dm, dd)}</span><span>referencia</span><span class="num">+${nq(dm, dd)}</span></div>`;
 }
 
 // una línea que dice por qué no está entrando ahora mismo
@@ -772,7 +810,7 @@ function razon(v, d) {
   else if (v.indice_s != null && v.indice_s > 15) { t = 'El índice viene atrasado: no opera.'; cl = 'warn'; }
   else if (g.ventana && v.quedan > g.ventana) t = `La ventana de entrada abre en ${reloj(v.quedan - g.ventana)}.`;
   else if (v.delta == null) t = 'Sin precio del índice.';
-  else if (dm && Math.abs(v.delta) < dm) t = `Delta corto: faltan ${n(dm - Math.abs(v.delta), 0)} $.`;
+  else if (dm && Math.abs(v.delta) < dm) t = `Delta corto: faltan ${nq(dm - Math.abs(v.delta), dec2(g.referencia))} $.`;
   else if (!dentro(v.yes_ask) && !dentro(v.no_ask))
     t = `Precio fuera de ${n(emin, 2)}–${n(emax, 2)}: YES ${n(v.yes_ask, 2)}, NO ${n(v.no_ask, 2)}.`;
   else { t = 'Todo en regla: entra en el próximo vistazo.'; cl = 'ok'; }
@@ -842,8 +880,8 @@ function dibujarCruz(a) {
   if (!pa) { el.innerHTML = ''; return; }
   const xx = x(pa[0]);
   const col = (g.referencia == null || pa[1] >= g.referencia) ? VERDE : ROJO;
-  const filas = [[a, Math.round(pa[1]).toLocaleString('es'), col]];
-  if (g.referencia != null) filas.push(['Delta', (pa[1] - g.referencia >= 0 ? '+' : '') + n(pa[1] - g.referencia, 1), NEUTRO]);
+  const filas = [[a, mil(pa[1], g.referencia), col]];
+  if (g.referencia != null) filas.push(['Delta', (pa[1] - g.referencia >= 0 ? '+' : '') + n(pa[1] - g.referencia, dec2(g.referencia)), NEUTRO]);
   const mm = String(Math.floor(pa[0] / 60)).padStart(2, '0') + ':' + String(pa[0] % 60).padStart(2, '0');
   const ancho = 132, alto = 22 + filas.length * 15;
   const cx = xx > (X0 + X1) / 2 ? xx - ancho - 10 : xx + 10;
@@ -878,19 +916,30 @@ function armarHover(a) {
 
 // una tarjeta por activo. Solo se rehace cuando cambia la lista: si se rehiciera
 // cada segundo se perdería la cruz del ratón y parpadearía todo.
-function armarCarteles(lista) {
+// Una tarjeta por cripto, con su gráfico y SU configuración dentro. Se arma una sola
+// vez: si se rehiciera en cada refresco se perdería lo que el usuario esté plegando o
+// escribiendo en un campo.
+function armarCarteles(lista, encendidos) {
   const clave = lista.join(',');
   if (clave === cartelesPara) return;
   cartelesPara = clave;
   for (const a of lista) { delete GS[a]; delete hoverX[a]; }
+  const FLECHA = '<svg class="fl" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+    + 'stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>';
   $('s-bloque').innerHTML = lista.map(a => `
-  <section class="bloque" id="card_${a}" aria-label="Bloque en vivo de ${a}">
-    <div class="titulo">
+  <section class="bloque" aria-label="${a}">
+  <details class="crip" id="card_${a}" ${encendidos.includes(a) ? 'open' : ''}>
+    <summary>
+     <div class="titulo" style="margin:0">
+      ${FLECHA}
       <h2>${a}<span class="act">bloque en vivo</span></h2><span id="gTicker_${a}" class="num tic"></span>
+      <button class="sw" id="sw_${a}" data-sw="${a}" type="button">–</button>
+      <span class="msg" id="msgSw_${a}" role="status" aria-live="polite"></span>
       <span class="sp"></span>
       <span id="gLados_${a}" class="lados"></span>
-      <span class="k solo-pc">Queda</span><span id="gQueda_${a}" class="num solo-pc" style="font-weight:600;font-size:13px;color:var(--claro)"></span>
-    </div>
+      <span class="k solo-pc" id="gQLab_${a}" hidden>Queda</span><span id="gQueda_${a}" class="num solo-pc" style="font-weight:600;font-size:13px;color:var(--claro)"></span>
+     </div>
+    </summary>
     <div class="cuerpo">
       <div class="graf" id="grafico_${a}"></div>
       <div class="aparte">
@@ -902,18 +951,47 @@ function armarCarteles(lista) {
       <thead><tr><th scope="col">Queda</th><th scope="col">Referencia</th><th scope="col">Precio</th><th scope="col">Índice</th><th scope="col">Delta</th><th scope="col">YES ask/bid</th><th scope="col">NO ask/bid</th><th scope="col">Estado</th></tr></thead>
       <tbody id="vivo_${a}"></tbody>
     </table></div>
+    <details class="ajcrip" id="aj_${a}">
+      <summary>Ajustes de ${a} <span class="ayuda" id="estAct_${a}"></span></summary>
+      <div class="form">${camposActivo.filter(c => c.seccion !== 'av').map(c => campoHTML(c, a + '.')).join('')}</div>
+      <div class="form">${camposActivo.filter(c => c.seccion === 'av').map(c => campoHTML(c, a + '.')).join('')}</div>
+      <div class="row">
+        <button class="b-main" data-guardar="${a}">Guardar ${a}</button>
+        <button class="b-ghost" data-deshacer="${a}">Deshacer</button>
+        <span class="msg" id="msgAct_${a}" role="status" aria-live="polite"></span>
+      </div>
+    </details>
+  </details>
   </section>`).join('');
+  llenarForm(ajustesGuardados);
+  $('s-bloque').addEventListener('click', ev => {
+    const g = ev.target.closest('[data-guardar]'), h = ev.target.closest('[data-deshacer]');
+    const w = ev.target.closest('[data-sw]');
+    if (g) { ev.preventDefault(); guardarAjustes(g, $('msgAct_' + g.dataset.guardar)); }
+    if (h) { ev.preventDefault(); llenarForm(ajustesGuardados); }
+    if (w) {                       // está dentro del summary: sin esto se plegaría la tarjeta
+      ev.preventDefault(); ev.stopPropagation();
+      alternarActivo(w.dataset.sw);
+    }
+  });
 }
 
 function pintarVivo(d, v) {
   const a = v.activo;
+  if (!$('vivo_' + a)) return;
   $('vivo_' + a).innerHTML = v.mercado ? `<tr>
-    <td class="num">${Math.floor(v.quedan / 60)}:${String(Math.floor(v.quedan % 60)).padStart(2, '0')}</td><td class="num">${n(v.referencia, 2)}</td><td class="num">${n(v.precio, 2)}</td><td class="ayuda num">${v.indice_s == null ? '–' : Math.max(0, v.indice_s).toFixed(0) + ' s'}</td>
-    <td class="num ${clase(v.delta)}">${n(v.delta, 1)}</td><td class="num">${n(v.yes_ask)} / ${n(v.yes_bid)}</td><td class="num">${n(v.no_ask)} / ${n(v.no_bid)}</td>
+    <td class="num">${Math.floor(v.quedan / 60)}:${String(Math.floor(v.quedan % 60)).padStart(2, '0')}</td><td class="num">${n(v.referencia, decim(v.referencia))}</td><td class="num">${n(v.precio, decim(v.referencia))}</td><td class="ayuda num">${v.indice_s == null ? '–' : Math.max(0, v.indice_s).toFixed(0) + ' s'}</td>
+    <td class="num ${clase(v.delta)}">${n(v.delta, dec2(v.referencia))}</td><td class="num">${n(v.yes_ask)} / ${n(v.yes_bid)}</td><td class="num">${n(v.no_ask)} / ${n(v.no_bid)}</td>
     <td>${esc(v.estado)}</td></tr>` : `<tr><td colspan="8" class="vacio">esperando datos…</td></tr>`;
-  if (!v.mercado) { $('gTicker_' + a).textContent = ''; $('gLados_' + a).innerHTML = ''; return; }
+  if (!v.mercado) {
+    $('gTicker_' + a).textContent = ''; $('gLados_' + a).innerHTML = '';
+    $('gQueda_' + a).textContent = ''; $('gQLab_' + a).hidden = true; $('grafico_' + a).innerHTML = '';
+    $('medidor_' + a).innerHTML = ''; $('gPie_' + a).innerHTML = '';
+    return;
+  }
   $('gTicker_' + a).textContent = v.mercado;
   $('gQueda_' + a).textContent = Math.floor(v.quedan / 60) + ':' + String(Math.floor(v.quedan % 60)).padStart(2, '0');
+  $('gQLab_' + a).hidden = false;
   // precios de YES y NO; se resalta el lado cuyo ask cae en el rango de entrada DE ESTE activo
   const aj = ajusteDe(d, a), emin = +aj.entrada_min, emax = +aj.entrada_max;
   $('gLados_' + a).innerHTML = [['YES', v.yes_ask, v.yes_bid, 'var(--sube)'], ['NO', v.no_ask, v.no_bid, 'var(--baja)']]
@@ -1019,6 +1097,7 @@ function render(d) {
   $('avisos').innerHTML = av.map(([c, t]) => `<div class="aviso ${c}">${esc(t)}</div>`).join('');
 
   activos = d.activos_validos || [];
+  if (!campos.length) { campos = d.campos; camposActivo = d.campos_activo || []; ajustesGuardados = d.ajustes; armarForm(); }
   segmento('segStats', focoStats, x => { focoStats = x; });
   segmento('segOps', focoOps, x => { focoOps = x; });
   const pa = (d.por_activo || {})[focoStats];
@@ -1041,14 +1120,29 @@ function render(d) {
   $('instr').hidden = !vc;
   if (vc) {
     const dl = $('hDelta');
-    dl.textContent = vc.delta == null ? '–' : (vc.delta >= 0 ? '+' : '−') + n(Math.abs(vc.delta), 0);
+    // con cinco criptos hace falta decir de cuál es este Delta
+    $('hQuien').textContent = vc.activo;
+    dl.textContent = vc.delta == null ? '–'
+      : (vc.delta >= 0 ? '+' : '−') + n(Math.abs(vc.delta), dec2(vc.referencia));
     dl.className = 'v num ' + clase(vc.delta);
     $('hQueda').textContent = vc.quedan == null ? '–'
       : Math.floor(vc.quedan / 60) + ':' + String(Math.floor(vc.quedan % 60)).padStart(2, '0');
   }
 
-  armarCarteles(d.vivo.map(v => v.activo));
+  // hay tarjeta para cada cripto, encendida o no: si solo las hubiera para las
+  // encendidas, una apagada no se podría ni configurar
+  const enc = (d.ajustes.activos || '').split(',').filter(Boolean);
+  armarCarteles(activos, enc);
+  const conDatos = new Set(d.vivo.map(v => v.activo));
   d.vivo.forEach(v => pintarVivo(d, v));
+  for (const a of activos) {
+    const card = $('card_' + a);
+    if (!card) continue;
+    const on = enc.includes(a);
+    card.classList.toggle('off', !on);
+    pintarSw(a, on);
+    if (!conDatos.has(a)) pintarVivo(d, { activo: a, mercado: null });
+  }
 
   const box = $('logs'), abajo = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
   box.textContent = d.logs.join('\n') || 'sin mensajes todavía';
@@ -1074,11 +1168,14 @@ function render(d) {
   }
   const ra = $('resumenAjustes');
   if (ra) {
+    // lo de cada cripto está en su tarjeta; aquí solo lo que de verdad es general
     const enc = (d.ajustes.activos || '').split(',').filter(Boolean);
-    ra.textContent = (enc.length ? enc.map(x => {
-      const j = ajusteDe(d, x);
-      return `${x} Delta ${n(j.delta, 0)} · ${n(j.entrada_min, 2)}\u2013${n(j.entrada_max, 2)} · TP +${n(j.tp, 2)} · ${n(j.contratos, 0)}c`;
-    }).join('  |  ') : 'sin activos') + '  |  ritmo ' + n(d.ritmo, 2) + ' s';
+    const a = d.ajustes;
+    ra.textContent = [enc.length ? enc.join(' · ') : 'sin criptos',
+      'ritmo ' + n(d.ritmo, 2) + ' s',
+      'deslizamiento ' + n(a.desliz_entrada, 2),
+      'espera ' + n(a.espera_entrada, 0) + ' s',
+      a.filtro_noticias === 'si' ? 'filtro de noticias' : 'sin filtro'].join('  \u00b7  ');
   }
 
   const ke = $('keyEstado');
@@ -1086,14 +1183,13 @@ function render(d) {
   ke.textContent = d.conectado ? `Conectada · key ${d.key_id} · saldo ${d.saldo == null ? '–' : '$' + d.saldo.toFixed(2)}` : 'No conectada';
 
   document.querySelectorAll('.skel').forEach(e => e.classList.remove('skel'));
-  if (!campos.length) {
-    campos = d.campos; camposActivo = d.campos_activo || []; ajustesGuardados = d.ajustes; armarForm();
-  }
 }
 
 // pre = "" para los ajustes de toda la cuenta, "BTC." o "ETH." para los de un activo
+const idc = k => k.replace('.', '-');     // "BTC.delta" -> "BTC-delta", válido en CSS
+
 function campoHTML(c, pre) {
-  const k = (pre || '') + c.clave;
+  const k = idc((pre || '') + c.clave);
   const dentro = c.tipo === 'sino'
     ? `<select id="f_${k}"><option value="si">sí</option><option value="no">no</option></select>`
     : `<input id="f_${k}" inputmode="${c.tipo === 'num' || c.tipo === 'ent' || c.tipo === 'opc' ? 'decimal' : 'text'}">`;
@@ -1105,18 +1201,7 @@ function armarForm() {
   $('form').innerHTML = base.map(c => campoHTML(c, '')).join('');
   $('formAv').innerHTML = av.map(c => campoHTML(c, '')).join('');
   $('bloqueAv').hidden = !av.length;
-  // un bloque desplegable por activo: BTC y ETH no comparten nada de esto
-  $('formActivos').innerHTML = activos.map(a => `
-    <details class="avanzado" ${a === activos[0] ? 'open' : ''}>
-      <summary>Ajustes de ${esc(a)} <span class="ayuda" id="estAct_${a}"></span></summary>
-      <div class="form" style="margin-top:12px">
-        ${camposActivo.filter(c => c.seccion !== 'av').map(c => campoHTML(c, a + '.')).join('')}
-      </div>
-      <div class="form" style="margin-top:12px">
-        ${camposActivo.filter(c => c.seccion === 'av').map(c => campoHTML(c, a + '.')).join('')}
-      </div>
-    </details>`).join('');
-  llenarForm(ajustesGuardados);
+  llenarForm(ajustesGuardados);   // los de cada cripto los arma armarCarteles()
 }
 function llenarForm(v) {
   for (const c of campos) {
@@ -1129,11 +1214,11 @@ function llenarForm(v) {
   for (const a of activos) {
     const va = (v.por_activo || {})[a] || {};
     for (const c of camposActivo) {
-      const el = $('f_' + a + '.' + c.clave);
+      const el = $('f_' + a + '-' + c.clave);
       if (!el) continue;
       el.value = va[c.clave] == null ? '' : va[c.clave];
       el.classList.remove('malo');
-      $('e_' + a + '.' + c.clave).textContent = '';
+      $('e_' + a + '-' + c.clave).textContent = '';
     }
   }
 }
@@ -1165,38 +1250,81 @@ $('power').onclick = async () => {
 };
 $('cancelar').onclick = salirConfirm;
 
-$('guardar').onclick = async () => {
+// Hay un botón de guardar por cripto y otro para los generales, pero todos mandan la
+// página entera: el servidor valida y aplica el conjunto, así nunca se guarda a medias.
+async function guardarAjustes(boton, caja) {
   const datos = { por_activo: {} };
   for (const c of campos) {
-    datos[c.clave] = $('f_' + c.clave).value;
-    $('e_' + c.clave).textContent = ''; $('f_' + c.clave).classList.remove('malo');
+    const el = $('f_' + c.clave);
+    if (!el) continue;
+    datos[c.clave] = el.value;
+    $('e_' + c.clave).textContent = ''; el.classList.remove('malo');
   }
   for (const a of activos) {
     datos.por_activo[a] = {};
     for (const c of camposActivo) {
-      const k = a + '.' + c.clave;
-      datos.por_activo[a][c.clave] = $('f_' + k).value;
-      $('e_' + k).textContent = ''; $('f_' + k).classList.remove('malo');
+      const k = a + '-' + c.clave, el = $('f_' + k);
+      if (!el) continue;
+      datos.por_activo[a][c.clave] = el.value;
+      $('e_' + k).textContent = ''; el.classList.remove('malo');
     }
   }
-  $('guardar').disabled = true; msg($('msgAjustes'), 'guardando…', 'yendo');
+  boton.disabled = true; msg(caja, 'guardando…', 'yendo');
   const r = await api('/api/ajustes', datos);
-  $('guardar').disabled = false;
+  boton.disabled = false;
   if (!r) return;
-  msg($('msgAjustes'), r.msg, r.ok);
-  if (r.ok) { ajustesGuardados = r.ajustes; llenarForm(r.ajustes); }
-  else {
-    let primero = null;
-    for (const [k, t] of Object.entries(r.errores || {})) {
-      $('e_' + k).textContent = t; $('f_' + k).classList.add('malo'); primero = primero || k;
-    }
-    const el = primero && $('f_' + primero);
-    if (el) {                                       // si el campo malo está plegado (Avanzado o un activo), se abre
-      for (let c = el.closest('details'); c; c = c.parentElement && c.parentElement.closest('details')) c.open = true;
-      el.focus();
-    }
+  msg(caja, r.msg, r.ok);
+  if (r.ok) { ajustesGuardados = r.ajustes; llenarForm(r.ajustes); return; }
+  let primero = null;
+  for (const [k, t] of Object.entries(r.errores || {})) {   // llegan como "BTC.delta"
+    const e = $('e_' + idc(k)), f = $('f_' + idc(k));
+    if (e) e.textContent = t;
+    if (f) f.classList.add('malo');
+    primero = primero || idc(k);
   }
-};
+  const el = primero && $('f_' + primero);
+  if (el) {                       // si el campo malo está plegado (Avanzado o una cripto), se abre
+    for (let c = el.closest('details'); c; c = c.parentElement && c.parentElement.closest('details')) c.open = true;
+    el.focus();
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+}
+
+// Encender una cripto pone dinero real en juego, así que pide un segundo clic;
+// apagarla es inmediato (una operación abierta se sigue cuidando igual).
+let confSw = {};
+async function alternarActivo(a) {
+  const campo = $('f_activos'), b = $('sw_' + a), caja = $('msgSw_' + a);
+  if (!campo || !b) return;
+  const lista = campo.value.split(',').map(x => x.trim().toUpperCase()).filter(Boolean);
+  const i = lista.indexOf(a), encender = i < 0;
+  if (encender && !confSw[a]) {
+    b.classList.add('pide'); b.textContent = 'Confirmar';
+    confSw[a] = setTimeout(() => { confSw[a] = null; b.classList.remove('pide'); pintarSw(a, false); }, 6000);
+    return;
+  }
+  clearTimeout(confSw[a]); confSw[a] = null; b.classList.remove('pide');
+  if (encender) lista.push(a); else lista.splice(i, 1);
+  if (!lista.length) {
+    msg(caja, 'Tiene que quedar al menos una cripto encendida.', false);
+    return pintarSw(a, !encender);
+  }
+  campo.value = lista.join(',');
+  b.disabled = true;
+  await guardarAjustes(b, caja);
+  b.disabled = false;
+  refrescar();
+}
+
+function pintarSw(a, on) {
+  const b = $('sw_' + a);
+  if (!b || confSw[a]) return;        // esperando el segundo clic: no le pises el texto
+  b.dataset.on = on ? '1' : '0';
+  b.textContent = on ? 'Operando' : 'Parada';
+  b.title = on ? `${a} está operando. Pulsa para pararla.` : `${a} no opera. Pulsa para encenderla.`;
+}
+
+$('guardar').onclick = () => guardarAjustes($('guardar'), $('msgAjustes'));
 $('deshacer').onclick = () => { llenarForm(ajustesGuardados); $('msgAjustes').textContent = ''; $('msgAjustes').className = 'msg'; };
 
 // reiniciar borra la cuenta de resultados: se confirma, y el historial se archiva, no se pierde
