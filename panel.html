@@ -209,14 +209,32 @@ html{scroll-behavior:smooth}
 .crip > summary:hover .fl{color:var(--claro)}
 .crip.off > summary h2{color:var(--gris)}
 .apagado{font-size:10.5px;color:var(--tenue);border:1px solid var(--linea);border-radius:3px;padding:1px 6px}
-/* interruptor de cada cripto, en su cabecera */
-.sw{padding:3px 11px;border-radius:var(--r-s);border:1px solid var(--linea-2);background:var(--n0);
-  color:var(--gris);font:inherit;font-size:11.5px;letter-spacing:.03em;cursor:pointer;
-  transition:color var(--t),border-color var(--t),background var(--t)}
-.sw:hover:not(:disabled){color:var(--claro);border-color:var(--gris)}
-.sw[data-on="1"]{color:var(--claro);background:var(--n2)}
-.sw.pide{border-color:var(--baja);color:var(--baja)}
+/* punto verde: esta cripto tiene una operación abierta ahora mismo */
+.punto{display:none;width:7px;height:7px;flex:0 0 auto;margin-left:7px;border-radius:50%;
+  background:var(--sube);box-shadow:0 0 0 3px var(--sube-f)}
+.punto.si{display:inline-block}
+
+/* interruptor de cada cripto: verde operando, rojo parada */
+.sw{display:inline-flex;align-items:center;gap:8px;padding:0;border:0;background:none;
+  font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.sw .pista{position:relative;width:34px;height:19px;flex:0 0 auto;border-radius:10px;
+  background:var(--baja-f);border:1px solid var(--baja);
+  transition:background 180ms var(--sal),border-color 180ms var(--sal)}
+.sw .bola{position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;
+  background:var(--baja);transition:transform 180ms var(--sal),background 180ms var(--sal)}
+.sw .et{font-size:11.5px;letter-spacing:.03em;color:var(--baja);white-space:nowrap;
+  transition:color 180ms var(--sal)}
+.sw[aria-checked="true"] .pista{background:var(--sube-f);border-color:var(--sube)}
+.sw[aria-checked="true"] .bola{transform:translateX(15px);background:var(--sube)}
+.sw[aria-checked="true"] .et{color:var(--sube)}
+.sw:hover .pista{box-shadow:0 0 0 3px rgba(255,255,255,.06)}
+.sw:focus-visible{outline:2px solid var(--gris);outline-offset:3px;border-radius:4px}
+/* esperando el segundo clic para encender: ni verde ni rojo todavía */
+.sw.pide .pista{background:var(--avisa-f);border-color:var(--avisa)}
+.sw.pide .bola{background:var(--avisa);transform:translateX(7.5px)}
+.sw.pide .et{color:var(--avisa)}
 .sw:disabled{opacity:.5;cursor:default}
+@media(prefers-reduced-motion:reduce){.sw .bola,.sw .pista,.sw .et{transition:none}}
 .crip .cuerpo,.crip .lectura,.crip .ajcrip{margin-top:12px}
 /* los ajustes de esa cripto, justo debajo de su gráfico */
 .ajcrip{border-top:1px solid var(--linea);padding-top:12px}
@@ -932,8 +950,8 @@ function armarCarteles(lista, encendidos) {
     <summary>
      <div class="titulo" style="margin:0">
       ${FLECHA}
-      <h2>${a}<span class="act">bloque en vivo</span></h2><span id="gTicker_${a}" class="num tic"></span>
-      <button class="sw" id="sw_${a}" data-sw="${a}" type="button">–</button>
+      <h2>${a}<span class="punto" id="pt_${a}" title="${a} tiene una operación abierta"></span><span class="act">bloque en vivo</span></h2><span id="gTicker_${a}" class="num tic"></span>
+      <button class="sw" id="sw_${a}" data-sw="${a}" type="button" role="switch" aria-checked="false"><span class="pista"><span class="bola"></span></span><span class="et" id="swEt_${a}">–</span></button>
       <span class="msg" id="msgSw_${a}" role="status" aria-live="polite"></span>
       <span class="sp"></span>
       <span id="gLados_${a}" class="lados"></span>
@@ -1134,6 +1152,7 @@ function render(d) {
   const enc = (d.ajustes.activos || '').split(',').filter(Boolean);
   armarCarteles(activos, enc);
   const conDatos = new Set(d.vivo.map(v => v.activo));
+  const operando = new Set(d.abiertas.map(o => o.activo));
   d.vivo.forEach(v => pintarVivo(d, v));
   for (const a of activos) {
     const card = $('card_' + a);
@@ -1141,6 +1160,7 @@ function render(d) {
     const on = enc.includes(a);
     card.classList.toggle('off', !on);
     pintarSw(a, on);
+    $('pt_' + a).classList.toggle('si', operando.has(a));
     if (!conDatos.has(a)) pintarVivo(d, { activo: a, mercado: null });
   }
 
@@ -1299,7 +1319,7 @@ async function alternarActivo(a) {
   const lista = campo.value.split(',').map(x => x.trim().toUpperCase()).filter(Boolean);
   const i = lista.indexOf(a), encender = i < 0;
   if (encender && !confSw[a]) {
-    b.classList.add('pide'); b.textContent = 'Confirmar';
+    b.classList.add('pide'); $('swEt_' + a).textContent = 'Confirmar';
     confSw[a] = setTimeout(() => { confSw[a] = null; b.classList.remove('pide'); pintarSw(a, false); }, 6000);
     return;
   }
@@ -1318,9 +1338,9 @@ async function alternarActivo(a) {
 
 function pintarSw(a, on) {
   const b = $('sw_' + a);
-  if (!b || confSw[a]) return;        // esperando el segundo clic: no le pises el texto
-  b.dataset.on = on ? '1' : '0';
-  b.textContent = on ? 'Operando' : 'Parada';
+  if (!b || confSw[a]) return;        // esperando el segundo clic: no le pises el estado
+  b.setAttribute('aria-checked', on ? 'true' : 'false');
+  $('swEt_' + a).textContent = on ? 'Operando' : 'Parada';
   b.title = on ? `${a} está operando. Pulsa para pararla.` : `${a} no opera. Pulsa para encenderla.`;
 }
 
