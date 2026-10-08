@@ -168,14 +168,60 @@ html{scroll-behavior:smooth}
 .total .v{display:block;font-family:var(--mono);font-size:33px;font-weight:600;letter-spacing:-.035em;
   line-height:1.05;margin:7px 0 4px;color:var(--claro)}
 .total .v.pos{color:var(--sube)}.total .v.neg{color:var(--baja)}
-.lista{margin:16px 0 0;padding:0;border-top:1px solid var(--linea)}
-.lista > div{display:flex;align-items:baseline;justify-content:space-between;gap:14px;
-  padding:10px 0;border-bottom:1px solid var(--linea)}
-.lista > div:last-child{border-bottom:0}
-.lista dt{font-size:12.5px;color:var(--gris)}
-.lista dd{margin:0;text-align:right}
-.lista .v{font-family:var(--mono);font-size:16px;font-weight:500;letter-spacing:-.02em;color:var(--claro)}
-.lista .v.pos{color:var(--sube)}.lista .v.neg{color:var(--baja)}
+/* ---------------------------------------------------------------- marcador en tarjetas */
+.resumen{margin-bottom:18px}
+.filtros{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px}
+.filtros .par{display:inline-flex;align-items:center;gap:9px}
+.filtros .et{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--tenue)}
+.kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media(min-width:720px){.kpis{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.kpi{background:var(--n1);border:1px solid var(--linea);border-radius:var(--r);padding:14px 16px 15px;
+  min-width:0;transition:border-color var(--t)}
+.kpi:hover{border-color:var(--linea-2)}
+.kpi dt{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--tenue)}
+.kpi dd{margin:8px 0 0;font-family:var(--mono);font-size:29px;font-weight:600;letter-spacing:-.035em;
+  line-height:1.05;color:var(--claro);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi dd.pos{color:var(--sube)}.kpi dd.neg{color:var(--baja)}
+.kpi dd .chico{font-size:19px}
+.kpi dd .sep{color:var(--tenue);font-weight:400;margin:0 2px}
+.kpi .nota{margin-top:6px;font-size:11.5px;line-height:1.45;color:var(--gris)}
+.kpi .nota b{font-family:var(--mono);font-weight:600;color:var(--claro)}
+.kpi .nota .pos{color:var(--sube)}.kpi .nota .neg{color:var(--baja)}
+/* la curva ocupa la fila entera: en span 2 dejaba el resto de la fila vacío */
+.kpi.ancha{grid-column:1/-1}
+
+/* curva de la ganancia acumulada, un punto por día */
+.curva{margin:8px -4px 0;min-width:0;position:relative}
+.curva svg{display:block;width:100%;height:auto}
+.curva .nada{padding:14px 4px;font-size:11.5px;color:var(--tenue)}
+.cglobo{position:absolute;pointer-events:none;background:var(--n0);border:1px solid var(--linea-2);
+  border-radius:5px;padding:4px 8px;font-size:11px;color:var(--gris);white-space:nowrap;
+  transform:translate(-50%,-115%);opacity:0;transition:opacity 120ms ease-out}
+.cglobo b{font-family:var(--mono);font-weight:600;margin-left:6px}
+.curva:hover .cglobo{opacity:1}
+/* cuántas ganadas y cuántas perdidas, a escala */
+.reparto{margin-top:10px}
+.rbarra{display:flex;height:7px;gap:2px;border-radius:4px;overflow:hidden;background:var(--n0)}
+.rbarra i{display:block;height:100%;border-radius:3px;transition:width 300ms var(--sal)}
+.rbarra .g{background:var(--sube)}
+.rbarra .p{background:var(--baja)}
+.rpies{display:flex;justify-content:space-between;gap:10px;margin-top:7px;font-size:11.5px;color:var(--gris)}
+.rpies b{font-family:var(--mono);font-weight:600}
+.rpies .g b{color:var(--sube)}.rpies .p b{color:var(--baja)}
+/* cuatro datos en rejilla: ocupan la mitad que seis filas */
+.rejilla{display:grid;grid-template-columns:1fr 1fr;gap:1px;margin-top:16px;
+  background:var(--linea);border:1px solid var(--linea);border-radius:var(--r-s);overflow:hidden}
+.rejilla > div{background:var(--n1);padding:9px 11px}
+.rejilla dt{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--tenue)}
+.rejilla dd{margin:3px 0 0;font-family:var(--mono);font-size:15px;font-weight:600;
+  letter-spacing:-.02em;color:var(--claro)}
+.rejilla dd.pos{color:var(--sube)}.rejilla dd.neg{color:var(--baja)}
+.rejilla dd small{font-family:var(--texto-f,inherit);font-size:10.5px;font-weight:400;color:var(--tenue);margin-left:5px}
+/* el pie: saldo y tiempo encendido */
+.mpie{display:flex;justify-content:space-between;gap:12px;margin-top:14px;padding-top:12px;
+  border-top:1px solid var(--linea);font-size:11.5px;color:var(--gris)}
+.mpie b{display:block;font-family:var(--mono);font-size:14px;font-weight:600;color:var(--claro);margin-top:2px}
+.mpie .der{text-align:right}
 .skel{color:transparent!important;background:linear-gradient(90deg,var(--linea) 25%,var(--linea-2) 50%,var(--linea) 75%);
   background-size:200% 100%;border-radius:4px;animation:sk 1.5s ease-in-out infinite}
 @keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
@@ -447,6 +493,7 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
   </div>
   <div class="nav">
     <p class="rot">Operación</p>
+    <a href="#s-res" data-sec="s-res"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="12" width="4.5" height="8" rx="1"></rect><rect x="9.75" y="7" width="4.5" height="13" rx="1"></rect><rect x="16.5" y="4" width="4.5" height="16" rx="1"></rect></svg><span>Resultado</span></a>
     <a href="#s-bloque" data-sec="s-bloque"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 15l4.5-5 3.5 3L21 5"></path><path d="M3 20h18"></path></svg><span>Bloque</span></a>
     <a href="#s-ops" data-sec="s-ops"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10"></path></svg><span>Operaciones</span></a>
     <a href="#s-log" data-sec="s-log"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"></rect><path d="M7 9l2.5 2.5L7 14M12.5 15h4"></path></svg><span>Registro</span></a>
@@ -477,6 +524,37 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 <main id="contenido">
 <div id="avisos"></div>
 
+<section class="resumen" id="s-res" aria-label="Resultado">
+  <div class="filtros">
+    <span class="par"><span class="et">Periodo</span><span class="segm" id="segPeriodo"></span></span>
+    <span class="par"><span class="et">Cripto</span><span class="segm" id="segStats"></span></span>
+  </div>
+  <dl class="kpis">
+    <div class="kpi"><dt id="sTitulo">Resultado</dt><dd id="sProfit" class="skel">–</dd>
+      <div class="nota" id="sProfitHoy"></div></div>
+    <div class="kpi"><dt>Ganadas / perdidas</dt>
+      <dd><span class="pos" id="sWin">–</span><span class="sep">/</span><span class="neg" id="sLoss">–</span></dd>
+      <div class="reparto">
+        <div class="rbarra" id="sBarra" role="img" aria-label="Reparto de ganadas y perdidas"></div>
+      </div>
+      <div class="nota" id="sRatio"></div></div>
+    <div class="kpi"><dt>Acierto</dt><dd id="sWr" class="skel">–</dd>
+      <div class="nota" id="sEquilibrio"></div></div>
+    <div class="kpi"><dt>Lo ganado</dt><dd class="pos" id="sGanado">–</dd>
+      <div class="nota" id="sGanadoNota"></div></div>
+    <div class="kpi"><dt>Lo perdido</dt><dd class="neg" id="sPerdido">–</dd>
+      <div class="nota" id="sPerdidoNota"></div></div>
+    <div class="kpi"><dt>Racha</dt><dd id="sRacha">–</dd>
+      <div class="nota" id="sRachaNota"></div></div>
+    <div class="kpi"><dt>Peor operación</dt><dd class="neg" id="sPeor">–</dd>
+      <div class="nota" id="sPeorNota"></div></div>
+    <div class="kpi"><dt>Saldo en Kalshi</dt><dd id="sSaldo" class="skel">–</dd>
+      <div class="nota"><span id="sKey"></span> · encendido <b id="sOn">–</b></div></div>
+    <div class="kpi ancha"><dt>Ganancia acumulada<span id="sDias" style="text-transform:none;letter-spacing:0;color:var(--tenue)"></span></dt>
+      <div class="curva" id="sCurva"></div></div>
+  </dl>
+</section>
+
 <div class="tablero">
   <div class="principal">
   <div id="s-bloque"></div>
@@ -500,23 +578,6 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
   </div>
 
   <div class="rail">
-  <aside class="marcador" aria-label="Resultado">
-    <div class="segm" id="segStats" style="margin-bottom:12px"></div>
-    <div class="total">
-      <span class="k" id="sTitulo">Resultado total</span>
-      <span class="v num skel" id="sProfit">–</span>
-      <span class="sub" id="sProfitHoy"></span>
-    </div>
-    <dl class="lista">
-      <div><dt>Operaciones</dt><dd><span class="v num skel" id="sOps">–</span><span class="sub" id="sOpsHoy"></span></dd></div>
-      <div><dt>Ganadas</dt><dd><span class="v num pos skel" id="sWin">–</span><span class="sub" id="sWinMedia"></span></dd></div>
-      <div><dt>Perdidas</dt><dd><span class="v num neg skel" id="sLoss">–</span><span class="sub" id="sLossMedia"></span></dd></div>
-      <div><dt>Acierto</dt><dd><span class="v num skel" id="sWr">–</span><span class="sub">~78% para no perder</span></dd></div>
-      <div><dt>Saldo Kalshi</dt><dd><span class="v num skel" id="sSaldo">–</span><span class="sub" id="sKey"></span></dd></div>
-      <div><dt>Encendido</dt><dd><span class="v num skel" id="sOn" style="font-size:14px">–</span><span class="sub" id="sServer"></span></dd></div>
-    </dl>
-  </aside>
-
   <section class="noticias" aria-label="Próximas noticias">
     <div class="titulo"><h2>Próximas noticias</h2><span class="sp"></span><span class="ayuda">ForexFactory</span></div>
     <div id="noticias"></div>
@@ -571,7 +632,8 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 <script>
 const $ = id => document.getElementById(id);
 let ultimo = null, campos = [], camposActivo = [], activos = [], ajustesGuardados = null;
-let focoStats = 'todo', focoOps = 'todo', cartelesPara = '';
+let focoStats = 'todo', focoOps = 'todo', focoPeriodo = 'total', cartelesPara = '';
+const PERIODOS = [['total', 'Todo'], ['semana', '7 días'], ['hoy', 'Hoy']];
 
 async function api(path, body) {
   const r = await fetch(path, body === undefined ? {} : {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
@@ -739,7 +801,8 @@ function grafico(v, a) {
     for (const p of g.activo) { if (p[1] > mx[1]) mx = p; if (p[1] < mn[1]) mn = p; }
     [[mx, VERDE, -8], [mn, ROJO, 15]].forEach(([p, c, dy]) => {
       if (Math.abs(x(p[0]) - x(ult[0])) < 30) return;
-      const px = Math.min(Math.max(x(p[0]), X0 + 14), X1 - 14), py = ya(p[1]);
+      const px = x(p[0]), py = ya(p[1]);
+      if (px < X0 + 30 || px > X1 - 30) return;        // pegado al borde choca con inicio/cierre
       o.push(`<line x1="${px.toFixed(1)}" y1="${(py + (dy < 0 ? -2 : 2)).toFixed(1)}" x2="${px.toFixed(1)}" y2="${(py + (dy < 0 ? -6 : 6)).toFixed(1)}" stroke="${c}" stroke-width="1" opacity="0.55"></line>`);
       o.push(`<text x="${px.toFixed(1)}" y="${(py + dy).toFixed(1)}" text-anchor="middle" fill="${TENUE}" font-size="10">${p[1] - ref >= 0 ? '+' : ''}${nq(p[1] - ref, dec2(ref))}</text>`);
     });
@@ -1028,6 +1091,22 @@ function pintarVivo(d, v) {
   }
 }
 
+// Todo / 7 días / Hoy
+function segPeriodo() {
+  const caja = $('segPeriodo');
+  if (!caja) return;
+  if (!caja.dataset.listo) {
+    caja.dataset.listo = '1';
+    caja.innerHTML = PERIODOS.map(([v, t]) => `<button type="button" data-v="${v}">${t}</button>`).join('');
+    caja.onclick = ev => {
+      const b = ev.target.closest('button');
+      if (b) { focoPeriodo = b.dataset.v; if (ultimo) render(ultimo); }
+    };
+  }
+  caja.querySelectorAll('button').forEach(b =>
+    b.setAttribute('aria-pressed', String(b.dataset.v === focoPeriodo)));
+}
+
 // Todo / BTC / ETH
 function segmento(id, actual, alElegir) {
   const caja = $(id);
@@ -1088,6 +1167,67 @@ function pintarFiltro(d) {
         `<span>⛔ ${esc(a)}: ${esc(p)}</span>`).join('')}</div>` : '');
 }
 
+// Curva de la ganancia acumulada: un punto por día. Una sola serie, así que no lleva
+// leyenda; el color lo decide el signo, igual que el resto del panel.
+function curvaGanancia(pts) {
+  const caja = $('sCurva');
+  if (!caja) return;
+  if (!pts || pts.length < 2) {
+    caja.innerHTML = `<p class="nada">${pts && pts.length === 1
+      ? 'Un solo día con operaciones: la curva aparece a partir del segundo.'
+      : 'Todavía no hay días cerrados que dibujar.'}</p>`;
+    return;
+  }
+  const W = Math.max(200, Math.round(caja.clientWidth || 260));
+  const H = Math.round(Math.max(64, Math.min(150, W * 0.1)));   // ancha y baja parece una raya
+  const X0 = 2, X1 = W - 2, Y0 = 8, Y1 = H - 8;
+  const vs = pts.map(p => p[1]);
+  let lo = Math.min(0, ...vs), hi = Math.max(0, ...vs);
+  if (hi - lo < 1e-9) { hi += 1; lo -= 1; }
+  const mg = (hi - lo) * 0.12;
+  lo -= mg; hi += mg;
+  const x = i => X0 + (i / (pts.length - 1)) * (X1 - X0);
+  const y = v => Y1 - (v - lo) / (hi - lo) * (Y1 - Y0);
+  const fin = vs[vs.length - 1];
+  const col = fin >= 0 ? VERDE : ROJO;
+  const linea = pts.map((p, i) => `${i ? 'L' : 'M'} ${x(i).toFixed(1)} ${y(p[1]).toFixed(1)}`).join(' ');
+  const base = y(0);
+  const o = [
+    `<defs><linearGradient id="gC" gradientUnits="userSpaceOnUse" x1="0" y1="${Y0}" x2="0" y2="${Y1}">`
+    + `<stop offset="0" stop-color="${col}" stop-opacity="0.22"></stop>`
+    + `<stop offset="1" stop-color="${col}" stop-opacity="0"></stop></linearGradient></defs>`,
+    `<path d="${linea} L ${x(pts.length - 1).toFixed(1)} ${base.toFixed(1)} L ${X0} ${base.toFixed(1)} Z" fill="url(#gC)"></path>`,
+    `<line x1="${X0}" y1="${base.toFixed(1)}" x2="${X1}" y2="${base.toFixed(1)}" stroke="${REJILLA}" stroke-width="1" stroke-dasharray="3 3"></line>`,
+    `<path d="${linea}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>`,
+    `<circle cx="${x(pts.length - 1).toFixed(1)}" cy="${y(fin).toFixed(1)}" r="3.4" fill="${col}"></circle>`,
+    `<g id="cCruz"></g>`];
+  caja.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Ganancia acumulada de los últimos ${pts.length} días con operaciones, de ${usd(vs[0])} a ${usd(fin)}.">${o.join('')}</svg>`
+    + `<div class="cglobo" id="cGlobo"></div>`;
+  // la capa de hover: qué llevabas acumulado cada día
+  if (!caja.dataset.hover) {
+    caja.dataset.hover = '1';
+    caja.addEventListener('pointermove', ev => {
+      const g = $('cGlobo'), cr = $('cCruz'), svg = caja.querySelector('svg');
+      if (!g || !cr || !svg || !caja._pts) return;
+      const r = svg.getBoundingClientRect();
+      const i = Math.round(((ev.clientX - r.left) / r.width) * (caja._pts.length - 1));
+      const p = caja._pts[Math.max(0, Math.min(caja._pts.length - 1, i))];
+      if (!p) return;
+      const px = caja._x(caja._pts.indexOf(p)), py = caja._y(p[1]);
+      cr.innerHTML = `<line x1="${px.toFixed(1)}" y1="${Y0}" x2="${px.toFixed(1)}" y2="${Y1}" stroke="${NEUTRO}" stroke-width="1" stroke-dasharray="2 3" opacity="0.6"></line>`
+        + `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="4" fill="${FONDO}" stroke="${caja._col}" stroke-width="2"></circle>`;
+      g.innerHTML = `${p[0].slice(5).replace('-', '/')}<b class="${clase(p[1])}">${usd(p[1])}</b>`;
+      g.style.left = (px / W * 100) + '%';
+      g.style.top = py + 'px';
+    });
+    caja.addEventListener('pointerleave', () => {
+      const cr = $('cCruz');
+      if (cr) cr.innerHTML = '';
+    });
+  }
+  caja._pts = pts; caja._x = x; caja._y = y; caja._col = col;
+}
+
 function render(d) {
   ultimo = d;
   const pill = $('pill'), btn = $('power');
@@ -1118,20 +1258,71 @@ function render(d) {
   if (!campos.length) { campos = d.campos; camposActivo = d.campos_activo || []; ajustesGuardados = d.ajustes; armarForm(); }
   segmento('segStats', focoStats, x => { focoStats = x; });
   segmento('segOps', focoOps, x => { focoOps = x; });
+  segPeriodo();
+  // el periodo y la cripto se cruzan: cada combinación tiene su propio resumen
   const pa = (d.por_activo || {})[focoStats];
-  const t = focoStats === 'todo' || !pa ? d.total : pa.total;
-  const h = focoStats === 'todo' || !pa ? d.hoy : pa.hoy;
-  $('sTitulo').textContent = focoStats === 'todo' ? 'Resultado total' : 'Resultado ' + focoStats;
-  destellar($('sProfit'), usd(t.usd), 'v num ' + clase(t.usd));
-  $('sProfitHoy').innerHTML = `hoy <span class="${clase(h.usd)}">${usd(h.usd)}</span>`;
-  destellar($('sOps'), String(t.ops), 'v num'); $('sOpsHoy').textContent = `hoy ${h.ops}`;
-  destellar($('sWin'), String(t.ganadas), 'v num pos'); $('sWinMedia').textContent = t.media_ganada != null ? `media ${usd(t.media_ganada)} · hoy ${h.ganadas}` : `hoy ${h.ganadas}`;
-  destellar($('sLoss'), String(t.perdidas), 'v num neg'); $('sLossMedia').textContent = t.media_perdida != null ? `media ${usd(t.media_perdida)} · hoy ${h.perdidas}` : `hoy ${h.perdidas}`;
-  $('sWr').textContent = t.wr == null ? '–' : t.wr + '%';
-  $('sOn').textContent = d.encendido ? dur(d.encendido_s) : 'apagado';
-  $('sServer').textContent = 'servidor: ' + dur(d.servidor_s);
-  destellar($('sSaldo'), d.saldo == null ? '–' : '$' + d.saldo.toFixed(2), 'v num');
+  const fuente = focoStats === 'todo' || !pa ? d : pa;
+  const t = fuente[focoPeriodo] || fuente.total;
+  const comoDije = PERIODOS.find(x => x[0] === focoPeriodo);
+  $('sTitulo').textContent = 'Resultado'
+    + (focoStats === 'todo' ? '' : ' · ' + focoStats)
+    + (focoPeriodo === 'total' ? '' : ' · ' + comoDije[1].toLowerCase());
+
+  destellar($('sProfit'), usd(t.usd), clase(t.usd));
+  $('sProfitHoy').innerHTML = t.ops
+    ? `<b>${t.ops}</b> operación${t.ops === 1 ? '' : 'es'} · media <b class="${clase(t.media)}">${usd(t.media)}</b>`
+    : 'Sin operaciones en este periodo.';
+
+  // ganadas / perdidas, con la barra a escala debajo
+  const tot = t.ganadas + t.perdidas;
+  $('sWin').textContent = String(t.ganadas);
+  $('sLoss').textContent = String(t.perdidas);
+  $('sBarra').innerHTML = tot
+    ? `<i class="g" style="width:${(100 * t.ganadas / tot).toFixed(1)}%"></i><i class="p" style="width:${(100 * t.perdidas / tot).toFixed(1)}%"></i>`
+    : '';
+  $('sRatio').innerHTML = t.ratio == null
+    ? (t.ganadas ? 'Todavía sin ninguna perdida.' : 'Sin datos.')
+    : `Por cada dólar perdido ganas <b class="${t.ratio >= 1 ? 'pos' : 'neg'}">$${t.ratio.toFixed(2)}</b>.`;
+
+  // acierto, y el acierto que hace falta solo para no perder
+  const wr = $('sWr');
+  wr.textContent = t.wr == null ? '–' : t.wr + '%';
+  wr.className = t.wr == null || t.equilibrio == null ? ''
+    : (t.wr >= t.equilibrio ? 'pos' : 'neg');
+  if (t.equilibrio == null) {
+    $('sEquilibrio').textContent = 'Sin operaciones para calcularlo.';
+  } else {
+    const dif = (t.wr - t.equilibrio).toFixed(1);
+    $('sEquilibrio').innerHTML = `Para no perder: <b>${t.equilibrio}%</b> `
+      + `<b class="${dif >= 0 ? 'pos' : 'neg'}">(${dif >= 0 ? '+' : ''}${dif} pts)</b>`
+      + `<br>Entrada media <b>${n(t.entrada_media, 3)}</b>`;
+  }
+
+  $('sGanado').textContent = usd(t.ganado);
+  $('sGanadoNota').innerHTML = t.media_ganada == null ? 'Todavía ninguna ganada.'
+    : `<b>${t.ganadas}</b> ganadas, media <b class="pos">${usd(t.media_ganada)}</b>`;
+  $('sPerdido').textContent = usd(t.perdido);
+  $('sPerdidoNota').innerHTML = t.media_perdida == null ? 'Todavía ninguna perdida.'
+    : `<b>${t.perdidas}</b> perdidas, media <b class="neg">${usd(t.media_perdida)}</b>`;
+
+  const rc = $('sRacha');
+  rc.innerHTML = !t.racha ? '–'
+    : `${Math.abs(t.racha)} <span class="chico">${t.racha > 0 ? 'ganadas' : 'perdidas'}</span>`;
+  rc.className = t.racha > 0 ? 'pos' : t.racha < 0 ? 'neg' : '';
+  $('sRachaNota').innerHTML = t.mejor_racha
+    ? `La más larga: <b>${t.mejor_racha}</b> ganadas seguidas`
+    : 'Sin rachas todavía.';
+
+  $('sPeor').textContent = t.peor == null ? '–' : usd(t.peor);
+  $('sPeorNota').innerHTML = t.mejor == null ? 'Sin operaciones.'
+    : `Mejor <b class="pos">${usd(t.mejor)}</b> · mayor bajón <b class="neg">${usd(t.bajon)}</b>`;
+
+  destellar($('sSaldo'), d.saldo == null ? '–' : '$' + d.saldo.toFixed(2), '');
   $('sKey').textContent = d.conectado ? 'key ' + d.key_id : 'sin API key';
+  $('sOn').textContent = d.encendido ? dur(d.encendido_s) : 'apagado';
+
+  $('sDias').textContent = t.dias ? ` · ${t.dias} día${t.dias === 1 ? '' : 's'} con operaciones` : '';
+  curvaGanancia(t.curva);
 
   // cabecera-instrumento: lo que se mira cada segundo
   const vc = d.vivo.find(v => v.mercado);   // la cabecera enseña el primero; cada tarjeta trae el suyo

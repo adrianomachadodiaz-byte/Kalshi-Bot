@@ -10,7 +10,7 @@ import json
 import os
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -37,7 +37,7 @@ PORT = int(env("PORT", "8080"))
 DATA_DIR = Path(env("DATA_DIR", "/data" if os.environ.get("RAILWAY_ENVIRONMENT") else "datos"))
 REST_URL = env("KALSHI_REST_URL", "https://api.elections.kalshi.com/trade-api/v2")
 INDICE_URL = env("KALSHI_INDICE_URL", INDICE_URL_DEF)    # feed público del índice ({activo} = btc/eth)
-ACTIVOS_VALIDOS = ("BTC", "ETH", "XRP", "DOGE", "HYPE")
+ACTIVOS_VALIDOS = ("BTC", "ETH", "SOL", "XRP", "DOGE", "HYPE")
 CICLO = float(env("CICLO_S", "0.25"))    # valor inicial; manda el del panel (campo "ritmo")
 CICLO_INDICE = float(env("CICLO_INDICE_S", "1.0"))   # el índice avanza cada 2-3 s: pedirlo más rápido es tirar peticiones
 PASO_GRAFICO = 1                         # segundos entre puntos de la serie que dibuja el panel
@@ -51,6 +51,7 @@ DEFECTO_ACTIVO = {
     # arranque: en el panel se cambia uno por uno.
     "BTC": {"delta": 100.0},
     "ETH": {"delta": 3.0},
+    "SOL": {"delta": 0.13},
     "XRP": {"delta": 0.0017},
     "DOGE": {"delta": 0.0001},
     "HYPE": {"delta": 0.1},
@@ -221,7 +222,7 @@ def migrar_ajustes(guardado):
     g["por_activo"] = {}
     for a in ACTIVOS_VALIDOS:
         vals = dict(plano)
-        if a not in ("BTC", "ETH") and "delta" in vals:
+        if a not in ("BTC", "ETH") and "delta" in vals:   # el Delta viejo era de BTC/ETH
             vals["delta"] = defectos_de(a)["delta"]
         g["por_activo"][a] = vals
     for a in ACTIVOS_VALIDOS:            # más viejo aún: había delta_btc / delta_eth
@@ -767,6 +768,7 @@ class Bot:
 
     def _resumen(self, saldo):
         hoy = datetime.now(CDT).strftime("%Y-%m-%d")
+        semana = (datetime.now(CDT) - timedelta(days=6)).strftime("%Y-%m-%d")
         ahora = time.time()
         vivo = []
         for a in list(dict.fromkeys(self.activos + list(self.estado.abiertas))):
@@ -815,9 +817,11 @@ class Bot:
             servidor_s=ahora - self.inicio,
             ritmo=self.ciclo, ritmo_indice=self.ciclo_indice, vuelta_s=round(self.ultima_vuelta, 3),
             encendido_s=(ahora - self.estado.encendido_desde) if self.estado.encendido_desde and not self.estado.pausado else None,
-            total=self.registro.resumen(), hoy=self.registro.resumen(hoy), vivo=vivo,
-            por_activo={a: dict(total=self.registro.resumen(activo=a),
+            total=self.registro.resumen(curva=True), hoy=self.registro.resumen(hoy),
+            semana=self.registro.resumen(desde=semana, curva=True), vivo=vivo,
+            por_activo={a: dict(total=self.registro.resumen(activo=a, curva=True),
                                 hoy=self.registro.resumen(hoy, activo=a),
+                                semana=self.registro.resumen(desde=semana, activo=a, curva=True),
                                 ajustes=(self.ajustes.valores.get("por_activo") or {}).get(a),
                                 encendido=a in self.activos)
                         for a in ACTIVOS_VALIDOS},

@@ -16,7 +16,9 @@ const ok = (c, q) => { console.log((c ? '  BIEN  ' : '  MAL   ') + q); if (!c) f
   console.log('\n1) estado de arranque');
   ok(await txt('BTC') === 'Operando', 'BTC sale como "Operando" (' + await txt('BTC') + ')');
   ok(await txt('HYPE') === 'Parada', 'HYPE sale como "Parada" (' + await txt('HYPE') + ')');
-  ok((await act()) === 'BTC,ETH,XRP,DOGE', 'el campo Cripto arranca con las cuatro: ' + await act());
+  const ini = (await act()).split(',');
+  ok(ini.length >= 2 && !ini.includes('HYPE'),
+     'arranca con varias criptas y HYPE fuera: ' + await act());
 
   console.log('\n2) encender HYPE pide confirmación');
   await p.click('#sw_HYPE');
@@ -38,7 +40,8 @@ const ok = (c, q) => { console.log((c ? '  BIEN  ' : '  MAL   ') + q); if (!c) f
   ok(await txt('BTC') === 'Parada', 'el botón pasa a "Parada" (' + await txt('BTC') + ')');
 
   console.log('\n5) no deja quedarse sin ninguna');
-  for (const a of ['ETH', 'XRP', 'DOGE']) { await p.click('#sw_' + a); await p.waitForTimeout(900); }
+  // apagar todas menos HYPE, que se encendió en el paso 3
+  for (const a of ini) { await p.click('#sw_' + a); await p.waitForTimeout(800); }
   await p.click('#sw_HYPE');
   await p.waitForTimeout(700);
   ok((await act()) === 'HYPE', 'queda solo HYPE: ' + await act());

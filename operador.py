@@ -113,18 +113,78 @@ class Registro:
         self.filas = []
         return n, (copia.name if copia else None)
 
-    def resumen(self, fecha=None, activo=None):
+    def resumen(self, fecha=None, activo=None, curva=False, desde=None):
+        """Las cuentas del panel. `curva` solo para el total: en el resumen de hoy
+        sería un único punto y multiplicaría el tamaño del JSON por nada.
+        `desde` recorta a las operaciones de esa fecha en adelante.
+
+        El panel pide ~20 resúmenes por segundo (3 periodos x 6 criptos), así que el
+        resultado se guarda hasta que cambia el número de operaciones.
+        """
+        sello = (len(self.filas), self.modo)
+        if getattr(self, "_sello", None) != sello:       # entró una operación: a recalcular
+            self._sello, self._cache = sello, {}
+        clave = (fecha, activo, curva, desde)
+        if clave not in self._cache:
+            self._cache[clave] = self._resumen(fecha, activo, curva, desde)
+        return self._cache[clave]
+
+    def _resumen(self, fecha, activo, curva, desde):
         filas = [f for f in self.filas
                  if f.get("modo") == self.modo
                  and (fecha is None or f["fecha"] == fecha)
+                 and (desde is None or f["fecha"] >= desde)
                  and (activo is None or f.get("activo") == activo)]
         pnl = [float(f["pnl_usd"]) for f in filas]
         g = [p for p in pnl if p > 0]
         p_ = [p for p in pnl if p <= 0]
+        # racha: cuántas seguidas, contando desde la última hacia atrás. Positiva si son
+        # ganadas, negativa si son perdidas. Dice más que el porcentaje de acierto solo.
+        racha = 0
+        for x in reversed(pnl):
+            if racha == 0:
+                racha = 1 if x > 0 else -1
+            elif (x > 0) == (racha > 0):
+                racha += 1 if racha > 0 else -1
+            else:
+                break
+        # la mejor racha de ganadas que ha habido, no solo la de ahora
+        mejor_racha, n = 0, 0
+        for x in pnl:
+            n = n + 1 if x > 0 else 0
+            mejor_racha = max(mejor_racha, n)
+        # el bajón más hondo: cuánto se llegó a perder desde el punto más alto.
+        # Es el número que dice si una racha mala te habría dejado sin saldo.
+        acum, techo, bajon = 0.0, 0.0, 0.0
+        for x in pnl:
+            acum += x
+            techo = max(techo, acum)
+            bajon = min(bajon, acum - techo)
+        # acierto mínimo para no perder: en Kalshi, si entras a 0,85 ganas 0,15 cuando
+        # aciertas y pierdes 0,85 cuando fallas, así que el punto de equilibrio es
+        # justo el precio medio de entrada.
+        entradas = [float(f["entrada"]) for f in filas if f.get("entrada") not in (None, "")]
+        # curva de la ganancia acumulada, un punto por día, para dibujarla de un vistazo
+        porDia = {}
+        for f in filas:
+            porDia[f["fecha"]] = porDia.get(f["fecha"], 0.0) + float(f["pnl_usd"])
+        acum, puntos = 0.0, []
+        for d in sorted(porDia):
+            acum += porDia[d]
+            puntos.append([d, round(acum, 2)])
         return dict(ops=len(pnl), ganadas=len(g), perdidas=len(p_), usd=round(sum(pnl), 2),
                     wr=round(100 * len(g) / len(pnl), 1) if pnl else None,
                     media_ganada=round(sum(g) / len(g), 2) if g else None,
-                    media_perdida=round(sum(p_) / len(p_), 2) if p_ else None)
+                    media_perdida=round(sum(p_) / len(p_), 2) if p_ else None,
+                    media=round(sum(pnl) / len(pnl), 3) if pnl else None,
+                    mejor=round(max(pnl), 2) if pnl else None,
+                    peor=round(min(pnl), 2) if pnl else None,
+                    racha=racha, mejor_racha=mejor_racha,
+                    ganado=round(sum(g), 2), perdido=round(sum(p_), 2),
+                    ratio=round(sum(g) / -sum(p_), 2) if p_ and sum(p_) else None,
+                    bajon=round(bajon, 2), entrada_media=round(sum(entradas) / len(entradas), 4) if entradas else None,
+                    equilibrio=round(100 * sum(entradas) / len(entradas), 1) if entradas else None,
+                    dias=len(puntos), curva=puntos[-60:] if curva else [])
 
 
 class Operador:
