@@ -40,8 +40,8 @@ for a in B.ACTIVOS_VALIDOS:                       # un rango donde 0.985 entra
     v["por_activo"][a].update(entrada_min=0.98, entrada_max=0.99, delay=120, exit=0.01)
 
 print("\n1) los tres salen marcados como sin Delta")
-ok(B.SIN_INDICE == ("GOLD", "SILVER", "OIL"), f"SIN_INDICE = {B.SIN_INDICE}")
-for a in ("GOLD", "SILVER", "OIL"):
+ok(B.SIN_INDICE == ("GOLD", "SILVER", "OIL", "NATGAS"), f"SIN_INDICE = {B.SIN_INDICE}")
+for a in ("GOLD", "SILVER", "OIL", "NATGAS"):
     ok(not B.config_de(a, v).usa_delta, f"{a} no usa Delta")
 for a in ("BTC", "ETH", "SOL", "XRP", "DOGE", "HYPE"):
     ok(B.config_de(a, v).usa_delta, f"{a} sí usa Delta")
@@ -61,19 +61,19 @@ ok(btc.entrada(foto(850, 4136.82 + 500)) is not None, "y con Delta de sobra sí 
 
 print("\n4) el bot no le pide a Pyth un feed que no existe")
 bot = B.Bot()
-for a in ("GOLD", "SILVER", "OIL"):
+for a in ("GOLD", "SILVER", "OIL", "NATGAS"):
     ok(bot.precios.get(a) is None, f"{a}: Precios.get devuelve None sin salir a la red")
 ok(bot.precios.nota == "", f"y sin dejar un aviso de error: {bot.precios.nota!r}")
 
 print("\n5) los tres están en las series de Kalshi")
 import kalshi
-for a, serie in [("GOLD", "KXGOLD15M"), ("SILVER", "KXSILVER15M"), ("OIL", "KXWTI15M")]:
+for a, serie in [("GOLD", "KXGOLD15M"), ("SILVER", "KXSILVER15M"), ("OIL", "KXWTI15M"), ("NATGAS", "KXNATGAS15M")]:
     ok(kalshi.SERIES.get(a) == serie, f"{a} -> {kalshi.SERIES.get(a)}")
 
 print("\n6) el panel recibe la lista")
 j = bot._resumen(100.0)
-ok(j.get("sin_indice") == ["GOLD", "SILVER", "OIL"], f"sin_indice = {j.get('sin_indice')}")
-ok(len(j["activos_validos"]) == 9, f"nueve activos: {j['activos_validos']}")
+ok(j.get("sin_indice") == ["GOLD", "SILVER", "OIL", "NATGAS"], f"sin_indice = {j.get('sin_indice')}")
+ok(len(j["activos_validos"]) == 13, f"trece activos: {j['activos_validos']}")
 
 print("\n7) el texto de la configuración lo dice")
 ok("sin Delta" in B.config_de("OIL", v).texto(), B.config_de("OIL", v).texto())

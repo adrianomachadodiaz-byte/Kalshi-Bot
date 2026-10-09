@@ -172,7 +172,36 @@ class Registro:
         for d in sorted(porDia):
             acum += porDia[d]
             puntos.append([d, round(acum, 2)])
+        # lo puesto en juego (entrada x contratos): da la rentabilidad sobre lo invertido
+        def num(x):
+            try:
+                return float(x)
+            except (TypeError, ValueError):
+                return None
+        invertido = sum((num(f.get("entrada")) or 0) * (num(f.get("contratos")) or 0) for f in filas)
+        centavos = [c for c in (num(f.get("pnl_c")) for f in filas) if c is not None]
+        # por lado (YES/NO): cuántas y qué acierto lleva cada uno
+        lados = {}
+        for f, x in zip(filas, pnl):
+            l = lados.setdefault(f.get("lado") or "?", [0, 0])
+            l[0] += 1
+            l[1] += x > 0
+        lados = {k: dict(ops=v[0], wr=round(100 * v[1] / v[0], 1)) for k, v in lados.items()}
+        # cómo cerraron: TP, Exit (stop), al cierre del bloque... (columna "salida")
+        salidas = {}
+        for f in filas:
+            for m in (f.get("salida") or "?").split("+"):
+                salidas[m] = salidas.get(m, 0) + 1
+        mins = [m for m in (num(f.get("min_restantes")) for f in filas) if m is not None]
+        dias_ops = len({f["fecha"] for f in filas})
         return dict(ops=len(pnl), ganadas=len(g), perdidas=len(p_), usd=round(sum(pnl), 2),
+                    invertido=round(invertido, 2),
+                    roi=round(100 * sum(pnl) / invertido, 2) if invertido else None,
+                    c_media=round(sum(centavos) / len(centavos), 2) if centavos else None,
+                    ops_dia=round(len(pnl) / dias_ops, 1) if dias_ops else None,
+                    recuperacion=round(sum(pnl) / -bajon, 2) if bajon < 0 else None,
+                    lados=lados, salidas=salidas,
+                    min_entrada=round(sum(mins) / len(mins), 1) if mins else None,
                     wr=round(100 * len(g) / len(pnl), 1) if pnl else None,
                     media_ganada=round(sum(g) / len(g), 2) if g else None,
                     media_perdida=round(sum(p_) / len(p_), 2) if p_ else None,
@@ -218,11 +247,11 @@ class Operador:
             if self.estado.operado.get(activo) == f.ticker or not self.puede_entrar():
                 return
             # filtro de noticias: si el bloque cierra sobre un dato de alto impacto, no se entra
-            porque = self.filtro.motivo(f.cierre, f.ticker) if self.filtro else None
+            porque = self.filtro.motivo(f.cierre, f.ticker, activo) if self.filtro else None
             if porque != self.bloqueado.get(activo):
                 self.bloqueado[activo] = porque
                 if porque:
-                    log(f"{activo} filtro de noticias: no entro en {f.ticker} · {porque}")
+                    log(f"{activo} filtro: no entro en {f.ticker} · {porque}")
             if porque:
                 return
             est: Estrategia = self.estrategias[activo]

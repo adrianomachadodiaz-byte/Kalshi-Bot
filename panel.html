@@ -173,18 +173,23 @@ html{scroll-behavior:smooth}
 .filtros{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px}
 .filtros .par{display:inline-flex;align-items:center;gap:9px}
 .filtros .et{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--tenue)}
-.kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 @media(min-width:720px){.kpis{grid-template-columns:repeat(4,minmax(0,1fr))}}
-.kpi{background:var(--n1);border:1px solid var(--linea);border-radius:var(--r);padding:14px 16px 15px;
+@media(min-width:1150px){.kpis{grid-template-columns:repeat(7,minmax(0,1fr))}}
+.kpi{background:var(--n1);border:1px solid var(--linea);border-radius:var(--r-s);padding:9px 11px 10px;
   min-width:0;transition:border-color var(--t)}
 .kpi:hover{border-color:var(--linea-2)}
-.kpi dt{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--tenue)}
-.kpi dd{margin:8px 0 0;font-family:var(--mono);font-size:29px;font-weight:600;letter-spacing:-.035em;
+.kpi dt{font-size:9.5px;letter-spacing:.08em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:uppercase;color:var(--tenue)}
+.kpi dd{margin:4px 0 0;font-family:var(--mono);font-size:19px;font-weight:600;letter-spacing:-.035em;
   line-height:1.05;color:var(--claro);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .kpi dd.pos{color:var(--sube)}.kpi dd.neg{color:var(--baja)}
-.kpi dd .chico{font-size:19px}
+.kpi dd .chico{font-size:12px}
 .kpi dd .sep{color:var(--tenue);font-weight:400;margin:0 2px}
-.kpi .nota{margin-top:6px;font-size:11.5px;line-height:1.45;color:var(--gris)}
+.kpi .nota{margin-top:4px;font-size:10.5px;line-height:1.4;color:var(--gris)}
+.kpi .nota + .nota{margin-top:1px}
+.kpi .fila{display:flex;justify-content:space-between;gap:6px;font-size:10.5px;color:var(--gris);line-height:1.5}
+.kpi .fila b{font-family:var(--mono);font-weight:600;color:var(--claro)}
+.kpi .fila b.pos{color:var(--sube)}.kpi .fila b.neg{color:var(--baja)}
 .kpi .nota b{font-family:var(--mono);font-weight:600;color:var(--claro)}
 .kpi .nota .pos{color:var(--sube)}.kpi .nota .neg{color:var(--baja)}
 /* la curva ocupa la fila entera: en span 2 dejaba el resto de la fila vacío */
@@ -240,11 +245,21 @@ html{scroll-behavior:smooth}
 .fbloq span{display:block;margin-top:4px}
 
 /* selector de activo: Todo / BTC / ETH */
-.segm{display:inline-flex;gap:2px;padding:2px;background:var(--n0);border:1px solid var(--linea);border-radius:var(--r-s)}
+.segm{display:inline-flex;flex-wrap:wrap;align-items:center;gap:2px;padding:2px;background:var(--n0);border:1px solid var(--linea);border-radius:var(--r-s)}
 .segm button{padding:3px 10px;border:0;background:transparent;color:var(--gris);font:inherit;font-size:11.5px;
   letter-spacing:.03em;border-radius:3px;cursor:pointer;transition:color var(--t),background var(--t)}
 .segm button:hover{color:var(--claro)}
 .segm button[aria-pressed="true"]{background:var(--n2);color:var(--claro)}
+/* criptos y materias primas por separado: una etiqueta pequeña delante de cada grupo */
+.segm .sgrp{font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--tenue);padding:0 6px 0 9px;
+  border-left:1px solid var(--linea);margin-left:2px;align-self:stretch;display:inline-flex;align-items:center}
+.grupo{display:flex;align-items:center;gap:10px;margin:22px 0 10px;font-size:10.5px;font-weight:500;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--tenue)}
+.grupo::after{content:"";flex:1;height:1px;background:var(--linea)}
+#s-bloque > .grupo:first-child{margin-top:0}
+.grupo + .bloque{margin-top:0}
+.porgrupo{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--tenue);margin:10px 0 2px}
+.porgrupo:first-child{margin-top:0}
 .bloque + .bloque{margin-top:14px}
 .bloque .titulo h2 .act{color:var(--tenue);font-weight:400;margin-left:6px}
 /* cada cripto se pliega con su flechita */
@@ -537,7 +552,7 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 <section class="resumen" id="s-res" aria-label="Resultado">
   <div class="filtros">
     <span class="par"><span class="et">Periodo</span><span class="segm" id="segPeriodo"></span></span>
-    <span class="par"><span class="et">Cripto</span><span class="segm" id="segStats"></span></span>
+    <span class="par"><span class="et">Activo</span><span class="segm" id="segStats"></span></span>
   </div>
   <dl class="kpis">
     <div class="kpi"><dt id="sTitulo">Resultado</dt><dd id="sProfit" class="skel">–</dd>
@@ -558,6 +573,16 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
       <div class="nota" id="sRachaNota"></div></div>
     <div class="kpi"><dt>Peor operación</dt><dd class="neg" id="sPeor">–</dd>
       <div class="nota" id="sPeorNota"></div></div>
+    <div class="kpi"><dt>Profit factor</dt><dd id="sPF">–</dd>
+      <div class="nota" id="sPFNota"></div></div>
+    <div class="kpi"><dt>Máx. bajón</dt><dd class="neg" id="sBajon">–</dd>
+      <div class="nota" id="sBajonNota"></div></div>
+    <div class="kpi"><dt>Rentabilidad</dt><dd id="sRoi">–</dd>
+      <div class="nota" id="sRoiNota"></div></div>
+    <div class="kpi"><dt>Ritmo</dt><dd id="sRitmo">–</dd>
+      <div class="nota" id="sRitmoNota"></div></div>
+    <div class="kpi"><dt>Por lado</dt><div id="sLados" style="margin-top:5px"></div></div>
+    <div class="kpi"><dt>Cómo cierran</dt><div id="sSalidas" style="margin-top:5px"></div></div>
     <div class="kpi"><dt>Saldo en Kalshi</dt><dd id="sSaldo" class="skel">–</dd>
       <div class="nota"><span id="sKey"></span> · encendido <b id="sOn">–</b></div></div>
     <div class="kpi ancha"><dt>Ganancia acumulada<span id="sDias" style="text-transform:none;letter-spacing:0;color:var(--tenue)"></span></dt>
@@ -593,8 +618,8 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
     <div id="noticias"></div>
   </section>
 
-  <section class="noticias" aria-label="Filtro de noticias">
-    <div class="titulo"><h2>Filtro de noticias</h2><span class="sp"></span><span id="fEstado" class="aviso off">–</span></div>
+  <section class="noticias" aria-label="Filtros de entrada">
+    <div class="titulo"><h2>Filtros de entrada</h2><span class="sp"></span><span id="fEstado" class="aviso off">–</span></div>
     <div id="filtro"></div>
   </section>
 
@@ -1019,12 +1044,22 @@ function armarHover(a) {
 // el petróleo. De trazo y en gris, como el resto de los controles del panel.
 const MONEDA = '<circle cx="12" cy="12" r="8.6"></circle>';
 const LINGOTE = '<path d="M3.4 18l2.8-8.4h11.6l2.8 8.4z"></path>';
+const LLAMA = '<path d="M12 3.8c.6 3-2.6 4.6-2.6 7.6a2.6 2.6 0 0 0 5.2.2c1.2 1.1 1.9 2.5 1.9 4a4.5 4.5 0 0 1-9 0c0-4.3 4.5-6.6 4.5-11.8z"></path>';
 const GOTA = '<path d="M12 4.2c3.1 3.6 5 6.2 5 8.7a5 5 0 0 1-10 0c0-2.5 1.9-5.1 5-8.7z"></path>';
 const ICONOS = {
   BTC: [MONEDA, '₿'], ETH: [MONEDA, 'Ξ'], SOL: [MONEDA, 'S'], XRP: [MONEDA, 'X'],
-  DOGE: [MONEDA, 'Ð'], HYPE: [MONEDA, 'H'],
-  GOLD: [LINGOTE, 'Au'], SILVER: [LINGOTE, 'Ag'], OIL: [GOTA, ''],
+  DOGE: [MONEDA, 'Ð'], HYPE: [MONEDA, 'H'], BNB: [MONEDA, 'B'], NEAR: [MONEDA, 'N'], ZEC: [MONEDA, 'Z'],
+  GOLD: [LINGOTE, 'Au'], SILVER: [LINGOTE, 'Ag'], OIL: [GOTA, ''], NATGAS: [LLAMA, ''],
 };
+// nombre que se lee en pantalla (el código interno sigue siendo el de Kalshi/bot)
+const NOMBRES = {GOLD: 'Oro', SILVER: 'Plata', OIL: 'Petróleo', NATGAS: 'Gas natural'};
+const nombre = a => NOMBRES[a] || a;
+// las materias primas son las que no tienen índice público (las manda el bot en sin_indice)
+const esMateria = a => sinIndice.includes(a);
+function porGrupos(lista) {
+  return [['Cripto', lista.filter(a => !esMateria(a))], ['Materias primas', lista.filter(esMateria)]]
+    .filter(([, l]) => l.length);
+}
 
 function icono(a) {
   const [forma, sim] = ICONOS[a] || [MONEDA, (a || '?')[0]];
@@ -1048,14 +1083,14 @@ function armarCarteles(lista, encendidos) {
   for (const a of lista) { delete GS[a]; delete hoverX[a]; }
   const FLECHA = '<svg class="fl" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
     + 'stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>';
-  $('s-bloque').innerHTML = lista.map(a => `
+  const carta = a => `
   <section class="bloque" aria-label="${a}">
   <details class="crip" id="card_${a}" ${encendidos.includes(a) ? 'open' : ''}>
     <summary>
      <div class="titulo" style="margin:0">
       ${FLECHA}
       ${icono(a)}
-      <h2>${a}<span class="punto" id="pt_${a}" title="${a} tiene una operación abierta"></span><span class="act">bloque en vivo</span></h2><span id="gTicker_${a}" class="num tic"></span>
+      <h2>${esc(nombre(a))}<span class="punto" id="pt_${a}" title="${a} tiene una operación abierta"></span><span class="act">bloque en vivo</span></h2><span id="gTicker_${a}" class="num tic"></span>
       <button class="sw" id="sw_${a}" data-sw="${a}" type="button" role="switch" aria-checked="false"><span class="pista"><span class="bola"></span></span><span class="et" id="swEt_${a}">–</span></button>
       <span class="msg" id="msgSw_${a}" role="status" aria-live="polite"></span>
       <span class="sp"></span>
@@ -1085,7 +1120,9 @@ function armarCarteles(lista, encendidos) {
       </div>
     </details>
   </details>
-  </section>`).join('');
+  </section>`;
+  $('s-bloque').innerHTML = porGrupos(lista).map(([g, l]) =>
+    `<h2 class="grupo">${g}</h2>` + l.map(carta).join('')).join('');
   llenarForm(ajustesGuardados);
   $('s-bloque').addEventListener('click', ev => {
     const g = ev.target.closest('[data-guardar]'), h = ev.target.closest('[data-deshacer]');
@@ -1164,7 +1201,9 @@ function segmento(id, actual, alElegir) {
   const clave = ops.join(',');
   if (caja.dataset.ops !== clave) {
     caja.dataset.ops = clave;
-    caja.innerHTML = ops.map(o => `<button type="button" data-v="${o}">${o === 'todo' ? 'Todo' : o}</button>`).join('');
+    const btn = o => `<button type="button" data-v="${o}">${o === 'todo' ? 'Todo' : esc(nombre(o))}</button>`;
+    caja.innerHTML = btn('todo') + porGrupos(activos).map(([g, l]) =>
+      `<span class="sgrp">${g === 'Cripto' ? 'Cripto' : 'Materias'}</span>` + l.map(btn).join('')).join('');
     caja.onclick = ev => {
       const b = ev.target.closest('button');
       if (b) { alElegir(b.dataset.v); if (ultimo) render(ultimo); }
@@ -1180,35 +1219,39 @@ function pintarPorActivo(d) {
   if (!caja) return;
   const pa = d.por_activo || {};
   const enc = (d.ajustes.activos || '').split(',').filter(Boolean);
-  caja.innerHTML = (d.activos_validos || []).map(a => {
+  caja.innerHTML = porGrupos(d.activos_validos || []).map(([g, l]) => `<div class="porgrupo">${g}</div>` + l.map(a => {
     const x = pa[a] || {}, t = x.total || {}, h = x.hoy || {};
     return `<div class="porfila">
-      ${icono(a)}<span class="nom">${esc(a)}</span>
+      ${icono(a)}<span class="nom">${esc(nombre(a))}</span>
       ${enc.includes(a) ? '' : '<span class="apag">apagado</span>'}
       <span class="det">${h.ops || 0} hoy · ${t.ops || 0} en total${t.wr == null ? '' : ' · ' + t.wr + '%'}</span>
       <span class="pnl ${clase(h.usd)}">${usd(h.usd || 0)}</span>
     </div>`;
-  }).join('');
+  }).join('')).join('');
 }
 
 // lateral: qué está haciendo el filtro de noticias
 function pintarFiltro(d) {
   const caja = $('filtro'), et = $('fEstado'), f = d.filtro;
   if (!caja || !f) return;
-  et.className = 'aviso ' + (f.activo ? 'on' : 'off');
-  et.textContent = f.activo ? 'encendido' : 'apagado';
-  if (!f.activo) {
-    caja.innerHTML = '<p class="fnota">Apagado: el bot entra aunque el bloque cierre sobre un dato. Se enciende en Ajustes.</p>';
+  const algo = f.activo || f.horario || f.finde;
+  et.className = 'aviso ' + (algo ? 'on' : 'off');
+  et.textContent = algo ? 'encendido' : 'apagado';
+  if (!algo) {
+    caja.innerHTML = '<p class="fnota">Apagado: el bot entra a cualquier hora y en cualquier día. Se enciende en Ajustes.</p>';
     return;
   }
   const h = f.hoy || {};
   const sinCal = !!d.noticias_error;
+  const reglas = [
+    f.horario ? 'horario (08:00-09:00 y 10:00-10:30 ET · metales/petróleo: Londres, EIA y CME)' : null,
+    f.finde ? 'sin fin de semana en cripto' : null,
+    f.activo ? (sinCal ? 'calendario: no disponible ahora' : `calendario: <b>${f.rojos_hoy}</b> dato${f.rojos_hoy === 1 ? '' : 's'} rojo${f.rojos_hoy === 1 ? '' : 's'} hoy`) : null,
+  ].filter(Boolean);
   caja.innerHTML = `<p class="fnota">
-      ${sinCal
-        ? 'No tengo el calendario ahora mismo, así que <b>solo filtra por hora fija</b> (08:30 / 10:00 / 14:00 ET).<br>'
-        : `<b>${f.rojos_hoy}</b> dato${f.rojos_hoy === 1 ? '' : 's'} de alto impacto hoy.<br>`}
+      ${reglas.join('<br>')}<br>
       Bloques saltados hoy: <b>${f.hoy_total}</b>
-      (${h.hora || 0} por hora fija · ${h.evento || 0} por noticia · ${h.dia || 0} por día cargado).<br>
+      (${h.hora || 0} por horario · ${h.finde || 0} por fin de semana · ${h.evento || 0} por noticia · ${h.dia || 0} por día cargado).<br>
       Esta semana: <b>${f.semana_total}</b>.
     </p>`
     + (Object.keys(f.bloqueado || {}).length
@@ -1366,6 +1409,32 @@ function render(d) {
   $('sPeor').textContent = t.peor == null ? '–' : usd(t.peor);
   $('sPeorNota').innerHTML = t.mejor == null ? 'Sin operaciones.'
     : `Mejor <b class="pos">${usd(t.mejor)}</b> · mayor bajón <b class="neg">${usd(t.bajon)}</b>`;
+
+  // los nuevos: profit factor, bajón, rentabilidad, ritmo, por lado y cómo cierran
+  const pf = $('sPF');
+  pf.textContent = t.ratio == null ? (t.ganadas ? '∞' : '–') : t.ratio.toFixed(2);
+  pf.className = t.ratio == null ? '' : t.ratio >= 1 ? 'pos' : 'neg';
+  $('sPFNota').innerHTML = t.ratio == null ? 'ganado ÷ perdido'
+    : `${t.ratio >= 1.5 ? 'sólido' : t.ratio >= 1 ? 'justo' : 'pierde'} · ganado ÷ perdido`;
+  $('sBajon').textContent = t.bajon ? usd(t.bajon) : '–';
+  $('sBajonNota').innerHTML = t.recuperacion == null ? 'lo más que cayó desde un máximo'
+    : `recuperado <b class="${t.recuperacion >= 1 ? 'pos' : 'neg'}">${t.recuperacion.toFixed(1)}×</b>`;
+  const roi = $('sRoi');
+  roi.textContent = t.roi == null ? '–' : (t.roi >= 0 ? '+' : '') + t.roi.toFixed(1) + '%';
+  roi.className = clase(t.roi);
+  $('sRoiNota').innerHTML = t.invertido ? `sobre <b>$${t.invertido.toFixed(0)}</b> puestos`
+    + (t.c_media == null ? '' : ` · <b class="${clase(t.c_media)}">${t.c_media >= 0 ? '+' : ''}${t.c_media.toFixed(1)}¢</b>/contrato`) : 'sin operaciones';
+  $('sRitmo').innerHTML = t.ops_dia == null ? '–' : `${t.ops_dia} <span class="chico">/día</span>`;
+  $('sRitmoNota').innerHTML = t.dias ? `<b>${t.dias}</b> día${t.dias === 1 ? '' : 's'}`
+    + (t.min_entrada == null ? '' : ` · entra a <b>${t.min_entrada}</b> min del cierre`) : 'sin operaciones';
+  const lados = Object.entries(t.lados || {});
+  $('sLados').innerHTML = lados.length ? lados.map(([l, x]) =>
+    `<div class="fila"><span>${esc(l)} · ${x.ops}</span><b class="${t.equilibrio != null && x.wr >= t.equilibrio ? 'pos' : 'neg'}">${x.wr}%</b></div>`).join('')
+    : '<div class="nota">sin operaciones</div>';
+  const sal = Object.entries(t.salidas || {}).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  $('sSalidas').innerHTML = sal.length ? sal.map(([m, c]) =>
+    `<div class="fila"><span>${esc(m)}</span><b>${c} <span style="color:var(--tenue);font-weight:400">${Math.round(100 * c / t.ops)}%</span></b></div>`).join('')
+    : '<div class="nota">sin operaciones</div>';
 
   destellar($('sSaldo'), d.saldo == null ? '–' : '$' + d.saldo.toFixed(2), '');
   $('sKey').textContent = d.conectado ? 'key ' + d.key_id : 'sin API key';

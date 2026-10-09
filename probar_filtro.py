@@ -21,7 +21,10 @@ def ok(c, q):
 
 
 def ts(h, m, dia=0):
-    base = datetime.now(ET).replace(hour=h, minute=m, second=0, microsecond=0) + timedelta(days=dia)
+    # siempre un día hábil: el horario solo aplica de lunes a viernes y el finde bloquea cripto
+    hoy = datetime.now(ET)
+    hoy -= timedelta(days=max(0, hoy.weekday() - 4))
+    base = hoy.replace(hour=h, minute=m, second=0, microsecond=0) + timedelta(days=dia)
     return base.timestamp()
 
 
@@ -29,7 +32,7 @@ def nuevo(eventos=(), **aj):
     n = B.Noticias()
     n.eventos = list(eventos)
     f = B.FiltroNoticias(n)
-    v = dict(filtro_noticias="si", noticia_horas="08:30,10:00,14:00", noticia_margen=2.0,
+    v = dict(filtro_noticias="si", filtro_horario="si", filtro_finde="si", noticia_margen=2.0,
              noticia_dia_alto=3, noticia_dia_modo="mitad")
     v.update(aj)
     f.aplicar(v)
@@ -41,12 +44,15 @@ def ev(h, m, titulo="Core CPI m/m", imp="High", dia=0):
 
 
 # ---------------------------------------------------------------- 1. horas fijas
-print("\n1) horas fijas (08:30 / 10:00 / 14:00 ET)")
+print("\n1) horario (regla v2: cierres 08:00-09:00 y 10:00-10:30 ET; las 14:00 ya no)")
 f = nuevo()
-for h, m in [(8, 30), (10, 0), (14, 0)]:
-    r = f.motivo(ts(h, m))
-    ok(bool(r), f"bloque que cierra a las {h:02d}:{m:02d} ET bloqueado → {r}")
-ok(f.motivo(ts(11, 15)) is None, "bloque de las 11:15 ET: entra normal")
+for h, m in [(8, 0), (8, 30), (8, 45), (10, 0), (10, 15)]:
+    r = f.motivo(ts(h, m), "", "BTC")
+    ok(bool(r), f"BTC, bloque que cierra a las {h:02d}:{m:02d} ET bloqueado → {r}")
+for h, m in [(9, 0), (10, 30), (14, 0), (11, 15)]:
+    ok(f.motivo(ts(h, m), "", "BTC") is None, f"BTC, bloque de las {h:02d}:{m:02d} ET: entra normal")
+f = nuevo(filtro_horario="no")
+ok(f.motivo(ts(8, 15), "", "BTC") is None, "con el filtro de horario apagado, las 08:15 ET entran")
 
 # ---------------------------------------------------------------- 2. evento rojo
 print("\n2) evento de alto impacto")
@@ -80,12 +86,12 @@ print("\n5) informe de bloques saltados")
 f = nuevo([ev(9, 45)])
 for h, m in [(8, 30), (10, 0), (9, 45), (9, 50)]:
     for _ in range(40):                 # el bot lo pregunta 4 veces por segundo: cada bloque cuenta UNA vez
-        f.motivo(ts(h, m), f"KXBTC15M-{h:02d}{m:02d}")
+        f.motivo(ts(h, m), f"KXBTC15M-{h:02d}{m:02d}", "BTC")
 inf = f.informe()
 print("  ", inf)
-ok(inf["hoy"]["hora"] == 2 and inf["hoy"]["evento"] == 2,
-   f"2 por hora fija y 2 por evento ({inf['hoy']})")
-ok(inf["hoy_total"] == 4 and inf["semana_total"] == 4, "los totales cuadran")
+ok(inf["semana"]["hora"] == 2 and inf["semana"]["evento"] == 2,
+   f"2 por horario y 2 por evento ({inf['semana']})")
+ok(inf["semana_total"] == 4, "los totales cuadran")
 ok(inf["rojos_hoy"] == 1, "cuenta 1 rojo hoy")
 
 # ---------------------------------------------------------------- 6. si el calendario falla, no bloquea

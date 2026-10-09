@@ -10,7 +10,7 @@ import json
 import os
 import threading
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -37,11 +37,13 @@ PORT = int(env("PORT", "8080"))
 DATA_DIR = Path(env("DATA_DIR", "/data" if os.environ.get("RAILWAY_ENVIRONMENT") else "datos"))
 REST_URL = env("KALSHI_REST_URL", "https://api.elections.kalshi.com/trade-api/v2")
 INDICE_URL = env("KALSHI_INDICE_URL", INDICE_URL_DEF)    # feed público del índice ({activo} = btc/eth)
-ACTIVOS_VALIDOS = ("BTC", "ETH", "SOL", "XRP", "DOGE", "HYPE", "GOLD", "SILVER", "OIL")
-# Kalshi liquida estos tres con Pyth, y el precio en vivo de Pyth no es público (sí el de
-# cripto, que sale del feed gratuito de Kalshi). Sin precio del subyacente no hay Delta:
+# primero las criptos y después las materias primas: el panel las muestra en ese orden y por grupos
+ACTIVOS_VALIDOS = ("BTC", "ETH", "SOL", "XRP", "DOGE", "HYPE", "BNB", "NEAR", "ZEC",
+                   "GOLD", "SILVER", "OIL", "NATGAS")
+# Materias primas. Kalshi las liquida con Pyth, y el precio en vivo de Pyth no es público (sí el
+# de cripto, que sale del feed gratuito de Kalshi). Sin precio del subyacente no hay Delta:
 # estos activos entran solo por la ventana y por el precio del contrato.
-SIN_INDICE = ("GOLD", "SILVER", "OIL")
+SIN_INDICE = ("GOLD", "SILVER", "OIL", "NATGAS")
 CICLO = float(env("CICLO_S", "0.25"))    # valor inicial; manda el del panel (campo "ritmo")
 CICLO_INDICE = float(env("CICLO_INDICE_S", "1.0"))   # el índice avanza cada 2-3 s: pedirlo más rápido es tirar peticiones
 PASO_GRAFICO = 1                         # segundos entre puntos de la serie que dibuja el panel
@@ -59,10 +61,14 @@ DEFECTO_ACTIVO = {
     "XRP": {"delta": 0.0017},
     "DOGE": {"delta": 0.0001},
     "HYPE": {"delta": 0.1},
+    "BNB": {"delta": 0.9},      # ~740 $  (precios del índice de Kalshi, 9-oct-2026)
+    "NEAR": {"delta": 0.006},   # ~4.85 $
+    "ZEC": {"delta": 1.45},     # ~1210 $
     # en estos el Delta no se usa; el 0 deja claro en el panel que no filtra nada
     "GOLD": {"delta": 0.0},
     "SILVER": {"delta": 0.0},
     "OIL": {"delta": 0.0},
+    "NATGAS": {"delta": 0.0},
 }
 
 
@@ -87,7 +93,9 @@ CAMPOS_GLOBAL = [
     ("ritmo", "num", 0.25, "Ritmo (s)", "cada cuánto mira el ask", "av"),
     ("ritmo_indice", "num", 1.0, "Ritmo índice (s)", "el feed avanza cada 2-3 s", "av"),
     ("filtro_noticias", "sino", "si", "Filtro de noticias", "no entra si el bloque cierra sobre un dato", ""),
-    ("noticia_horas", "texto", "08:30,10:00,14:00", "Horas fijas (ET)", "bloques que cierran a esa hora", "av"),
+    ("filtro_horario", "sino", "si", "Filtro de horario",
+     "mañana de EE. UU. (cierres 08:00-09:00 y 10:00-10:30 ET) y horas de metales/petróleo", ""),
+    ("filtro_finde", "sino", "si", "Sin fin de semana (cripto)", "no opera cripto sábado ni domingo (UTC)", ""),
     ("noticia_margen", "num", 2.0, "Margen noticia (min)", "después del cierre del bloque", "av"),
     ("noticia_dia_alto", "ent", 3, "Día cargado (eventos)", "desde cuántos rojos se recorta; 0 = nunca", "av"),
     ("noticia_dia_modo", "texto", "mitad", "Día cargado: qué hacer", "mitad = opera uno de cada dos · nada = no opera", "av"),
@@ -199,8 +207,6 @@ def validar(crudo):
         err["noticia_dia_alto"] = "entre 0 y 20 eventos"
     if v["noticia_dia_modo"] not in ("mitad", "nada"):
         err["noticia_dia_modo"] = "escribe mitad o nada"
-    if FiltroNoticias.leer_horas(v["noticia_horas"]) is None:
-        err["noticia_horas"] = "horas tipo 08:30,10:00 separadas por comas"
 
     # los errores solo molestan si ese activo está encendido: uno apagado con ajustes
     # raros no bloquea el guardado, y así no se pierde su configuración
@@ -487,52 +493,95 @@ class Noticias:
         return [e for e in self.eventos if e["impacto"] == "High"]
 
 
+class Ventana:
+    """Una franja en la hora LOCAL de un mercado (ET o Londres). Bloquea el bloque si su
+    CIERRE cae en [inicio, inicio + duración). Se convierte con zoneinfo: nunca horas fijas
+    sobre UTC, que en las semanas del cambio de horario fallarían."""
+
+    def __init__(self, nombre, zona, hora, minuto, duracion, activos, dias=range(5)):
+        self.nombre, self.zona = nombre, zona
+        self.hora, self.minuto, self.duracion = hora, minuto, duracion
+        self.activos, self.dias = set(activos), set(dias)
+
+    def cubre(self, activo, cierre_utc):
+        if activo not in self.activos:
+            return False
+        loc = cierre_utc.astimezone(self.zona)
+        if loc.weekday() not in self.dias:
+            return False
+        ini = loc.replace(hour=self.hora, minute=self.minuto, second=0, microsecond=0)
+        return ini <= loc < ini + timedelta(minutes=self.duracion)
+
+
+ET_ZONA = ZoneInfo("America/New_York")
+LON_ZONA = ZoneInfo("Europe/London")
+CRIPTOS = tuple(a for a in ACTIVOS_VALIDOS if a not in SIN_INDICE)
+# materias primas con horario de CME (pausa diaria y fin de semana)
+CME = ("GOLD", "SILVER", "OIL", "NATGAS")
+# Especificación "regla_horarios_v2" (9-oct-2026). Lo medido: 40 días de BTC+ETH, 3.175 ops.
+# Lo de metales y petróleo NO está medido (no hay datos grabados): es provisional.
+VENTANAS = [
+    # medido en cripto; se extiende a las materias primas porque son datos macro de EE. UU.
+    Ventana("ET 08:00-09:00", ET_ZONA, 8, 0, 60, ACTIVOS_VALIDOS),
+    Ventana("ET 10:00-10:30", ET_ZONA, 10, 0, 30, ACTIVOS_VALIDOS),
+    # NO medido: referencias de Londres e inventarios de petróleo
+    Ventana("LON 12:00-12:30 (LBMA plata)", LON_ZONA, 12, 0, 30, ["SILVER"]),
+    Ventana("LON 10:30-11:00 (LBMA oro AM)", LON_ZONA, 10, 30, 30, ["GOLD"]),
+    Ventana("LON 15:00-15:30 (LBMA oro PM)", LON_ZONA, 15, 0, 30, ["GOLD"]),
+    Ventana("ET 10:30-11:00 miércoles (EIA)", ET_ZONA, 10, 30, 30, ["OIL"], dias=[2]),
+]
+
+
+def motivo_horario(activo, cierre):
+    """Por qué el horario no deja entrar en el bloque de `activo` que cierra en `cierre`
+    (epoch), o None. Ventanas por hora de cierre + horario de mercado de CME."""
+    c = datetime.fromtimestamp(cierre, timezone.utc)
+    for v in VENTANAS:
+        if v.cubre(activo, c):
+            return f"horario {v.nombre}"
+    if activo in CME:
+        # el bloque dura de cierre-15 min a cierre; se descarta si toca la pausa de CME
+        # (17:00-18:00 ET), la primera hora tras reabrir (18:00-19:00 ET) o el fin de semana
+        ini = (c - timedelta(minutes=15)).astimezone(ET_ZONA)
+        fin = c.astimezone(ET_ZONA)
+        for t in (ini, fin - timedelta(seconds=1)):
+            wd, hm = t.weekday(), t.hour * 60 + t.minute
+            if wd == 5 or (wd == 4 and hm >= 17 * 60) or (wd == 6 and hm < 19 * 60):
+                return "mercado cerrado: fin de semana de CME (vie 17:00 a dom 18:00 ET + 1 h)"
+            if 17 * 60 <= hm < 19 * 60:
+                return "pausa diaria de CME (17:00-18:00 ET) o primera hora tras reabrir"
+    return None
+
+
 class FiltroNoticias:
-    """No entrar en bloques que cierran encima de un dato de alto impacto.
+    """No entrar en bloques peligrosos. Cuatro reglas, cada una con su interruptor:
 
-    Tres reglas, las del plan:
-      1. el bloque cierra en una hora fija (08:30, 10:00, 14:00 ET)
-      2. hay un evento rojo dentro del bloque, o justo después (el margen)
-      3. el día trae muchos rojos: se opera uno de cada dos bloques, o ninguno
+      1. horario (filtro_horario): ventanas por hora de CIERRE del bloque, en hora local
+         del mercado, y horario de CME para metales/petróleo/gas (ver VENTANAS)
+      2. fin de semana (filtro_finde): no se opera cripto con cierre en sábado o domingo UTC
+      3. calendario (filtro_noticias): hay un evento rojo dentro del bloque o justo después
+      4. calendario (filtro_noticias): el día trae muchos rojos -> uno de cada dos, o ninguno
 
-    No adivina nada: el calendario se publica con semanas de antelación. Si el
-    calendario no se pudo leer, el filtro NO bloquea (mejor operar que quedarse
-    parado por un fallo de red).
+    Las del calendario no adivinan nada: si el calendario no se pudo leer, NO bloquean.
     """
 
     ET = ZoneInfo("America/New_York")
 
     def __init__(self, noticias: "Noticias"):
         self.n = noticias
-        self.activo = True
-        self.horas = [(8, 30), (10, 0), (14, 0)]
+        self.activo = True           # reglas del calendario (3 y 4)
+        self.horario = True          # regla 1
+        self.finde = True            # regla 2
         self.margen = 120.0          # segundos después del cierre que siguen contando
         self.dia_alto = 3            # desde cuántos rojos el día se considera cargado
         self.dia_modo = "mitad"
-        self.saltados = {}           # "YYYY-MM-DD" -> {"hora": n, "evento": n, "dia": n}
+        self.saltados = {}           # "YYYY-MM-DD" -> {"hora": n, "finde": n, "evento": n, "dia": n}
         self.vistos = set()          # tickers ya contados, para no sumar el mismo bloque mil veces
-
-    @staticmethod
-    def leer_horas(txt):
-        """'08:30,10:00' -> [(8,30),(10,0)]. None si está mal escrito."""
-        fuera = []
-        for t in str(txt or "").split(","):
-            t = t.strip()
-            if not t:
-                continue
-            try:
-                h, m = t.split(":")
-                h, m = int(h), int(m)
-            except ValueError:
-                return None
-            if not (0 <= h < 24 and 0 <= m < 60):
-                return None
-            fuera.append((h, m))
-        return fuera
 
     def aplicar(self, v):
         self.activo = v["filtro_noticias"] == "si"
-        self.horas = self.leer_horas(v["noticia_horas"]) or []
+        self.horario = v.get("filtro_horario", "si") == "si"
+        self.finde = v.get("filtro_finde", "si") == "si"
         self.margen = v["noticia_margen"] * 60.0
         self.dia_alto = v["noticia_dia_alto"]
         self.dia_modo = v["noticia_dia_modo"]
@@ -541,13 +590,17 @@ class FiltroNoticias:
         d = datetime.fromtimestamp(cierre, self.ET).date()
         return [e for e in self.n.altos() if datetime.fromtimestamp(e["ts"], self.ET).date() == d]
 
-    def motivo(self, cierre, ticker=""):
+    def motivo(self, cierre, ticker="", activo=None):
         """Texto del porqué no se entra en el bloque que cierra en `cierre`, o None si se puede."""
+        t = datetime.fromtimestamp(cierre, self.ET)
+        if self.finde and activo in CRIPTOS and datetime.fromtimestamp(cierre, timezone.utc).weekday() >= 5:
+            return self._contar(t, "finde", ticker, "fin de semana: no opera cripto sábado ni domingo (UTC)")
+        if self.horario and activo:
+            m = motivo_horario(activo, cierre)
+            if m:
+                return self._contar(t, "hora", ticker, m)
         if not self.activo:
             return None
-        t = datetime.fromtimestamp(cierre, self.ET)
-        if (t.hour, t.minute) in self.horas:
-            return self._contar(t, "hora", ticker, f"el bloque cierra a las {t:%H:%M} ET (hora de datos)")
         for e in self.n.altos():                 # dentro del bloque o justo después
             if cierre - 900 < e["ts"] <= cierre + self.margen:
                 cuando = datetime.fromtimestamp(e["ts"], self.ET)
@@ -567,21 +620,21 @@ class FiltroNoticias:
         # se llama varias veces por segundo mientras dura el bloque: cada bloque
         # (su ticker) cuenta UNA vez, si no el informe daría miles
         d = t.strftime("%Y-%m-%d")
-        c = self.saltados.setdefault(d, {"hora": 0, "evento": 0, "dia": 0})
+        c = self.saltados.setdefault(d, {"hora": 0, "finde": 0, "evento": 0, "dia": 0})
         if ticker not in self.vistos:
             self.vistos.add(ticker)
-            c[clave] += 1
+            c[clave] = c.get(clave, 0) + 1
         return texto
 
     def informe(self):
         """Lo que pidió el plan: cuántos bloques se saltan, por día y por semana, y por qué."""
         dias = sorted(self.saltados)
-        sem = {"hora": 0, "evento": 0, "dia": 0}
+        sem = {"hora": 0, "finde": 0, "evento": 0, "dia": 0}
         for d in dias[-7:]:
             for k in sem:
-                sem[k] += self.saltados[d][k]
-        hoy = self.saltados.get(datetime.now(self.ET).strftime("%Y-%m-%d"), {"hora": 0, "evento": 0, "dia": 0})
-        return dict(activo=self.activo, hoy=hoy, hoy_total=sum(hoy.values()),
+                sem[k] += self.saltados[d].get(k, 0)
+        hoy = self.saltados.get(datetime.now(self.ET).strftime("%Y-%m-%d"), {"hora": 0, "finde": 0, "evento": 0, "dia": 0})
+        return dict(activo=self.activo, horario=self.horario, finde=self.finde, hoy=hoy, hoy_total=sum(hoy.values()),
                     semana=sem, semana_total=sum(sem.values()),
                     rojos_hoy=len(self.altos_del_dia(time.time())))
 
@@ -640,7 +693,7 @@ class Bot:
         for a, c in self.cfgs.items():
             log(f"ajustes {a}: {c.texto()}")
         log("filtro de noticias: " + (
-            f"activo · horas {v['noticia_horas']} · margen {v['noticia_margen']:g} min · "
+            f"activo · horario {v['filtro_horario']} · fin de semana {v['filtro_finde']} · margen {v['noticia_margen']:g} min · "
             f"día cargado desde {v['noticia_dia_alto']} rojos ({v['noticia_dia_modo']})"
             if v["filtro_noticias"] == "si" else "apagado"))
         log(f"ajustes generales: activos {', '.join(activos) or 'ninguno'} · "
