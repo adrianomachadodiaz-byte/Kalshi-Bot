@@ -516,8 +516,12 @@ class Ventana:
 ET_ZONA = ZoneInfo("America/New_York")
 LON_ZONA = ZoneInfo("Europe/London")
 CRIPTOS = tuple(a for a in ACTIVOS_VALIDOS if a not in SIN_INDICE)
-# materias primas con horario de CME (pausa diaria y fin de semana)
-CME = ("GOLD", "SILVER", "OIL", "NATGAS")
+# Materias primas con pausa diaria y fin de semana. Solo oro y plata: comprobado el
+# 9-oct-2026 en el catálogo de Pyth (hermes.pyth.network/v2/price_feeds), los feeds con
+# los que Kalshi liquida el petróleo y el gas son "PYTHOIL 24/7" y "NATGAS 24/7", con
+# horario O,O,O,O,O,O,O (los siete días). Kalshi les daba mercado de 15 min un viernes a
+# las 19:52 ET, con libro, y el filtro los estaba dejando fuera sin motivo.
+CME = ("GOLD", "SILVER")
 # Especificación "regla_horarios_v2" (9-oct-2026). Lo medido: 40 días de BTC+ETH, 3.175 ops.
 # Lo de metales y petróleo NO está medido (no hay datos grabados): es provisional.
 VENTANAS = [

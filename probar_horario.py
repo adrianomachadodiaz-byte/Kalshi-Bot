@@ -56,7 +56,12 @@ caso(17, "GOLD", "2026-10-09 14:15", True, False)      # 15:15 Londres: LBMA PM 
 caso(18, "GOLD", "2026-10-08 21:15", True, False)      # 17:15 ET jueves: pausa CME
 caso(19, "GOLD", "2026-10-08 22:45", True, False)      # 18:45 ET: primera hora tras reabrir
 caso(20, "GOLD", "2026-10-08 23:15", False, False)     # 19:15 ET: ya abierto
-caso(21, "NATGAS", "2026-10-11 21:00", True, False)    # domingo 17:00 ET: cerrado
+# El gas y el petróleo son 24/7 en Pyth ("NATGAS 24/7", horario O,O,O,O,O,O,O), que es la
+# fuente con la que Kalshi los liquida, y Kalshi les da mercado el fin de semana: no se
+# les aplica la pausa de CME, solo a oro y plata.
+caso(21, "NATGAS", "2026-10-11 21:00", False, False)   # domingo 17:00 ET: 24/7, sí opera
+caso(28, "OIL", "2026-10-10 23:00", False, False)      # sábado: 24/7, sí opera
+caso(29, "GOLD", "2026-10-10 23:00", True, False)      # sábado: el oro sí para
 caso(22, "BTC", "2026-10-10 15:00", True, True)        # sábado: finde de cripto
 caso(23, "BTC", "2026-10-11 23:45", True, True)        # domingo
 caso(24, "BTC", "2026-10-12 00:15", False, True)       # lunes 00:15 UTC
