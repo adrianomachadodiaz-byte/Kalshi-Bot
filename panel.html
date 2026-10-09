@@ -303,6 +303,13 @@ html{scroll-behavior:smooth}
 .sw.pide .bola{background:var(--avisa);transform:translateX(7.5px)}
 .sw.pide .et{color:var(--avisa)}
 .sw:disabled{opacity:.5;cursor:default}
+/* por qué este activo no opera ahora aunque esté encendido, y cuánto le falta */
+.cerrado{display:inline-flex;align-items:center;gap:7px;margin-left:9px;padding:2px 9px;
+  border:1px solid var(--linea);border-radius:var(--r-s);background:var(--n0);
+  font-size:11px;color:var(--gris);white-space:nowrap}
+.cerrado b{font-family:var(--mono);font-weight:600;color:var(--claro)}
+.cerrado .pun{width:5px;height:5px;border-radius:50%;background:var(--avisa);flex:0 0 auto}
+@media(max-width:700px){.cerrado{margin-left:0}}
 @media(prefers-reduced-motion:reduce){.sw .bola,.sw .pista,.sw .et{transition:none}}
 .crip .cuerpo,.crip .lectura,.crip .ajcrip{margin-top:12px}
 /* los ajustes de esa cripto, justo debajo de su gráfico */
@@ -1105,6 +1112,7 @@ function armarCarteles(lista, encendidos) {
       ${icono(a)}
       <h2>${esc(nombre(a))}<span class="punto" id="pt_${a}" title="${a} tiene una operación abierta"></span><span class="act">bloque en vivo</span></h2><span id="gTicker_${a}" class="num tic"></span>
       <button class="sw" id="sw_${a}" data-sw="${a}" type="button" role="switch" aria-checked="false"><span class="pista"><span class="bola"></span></span><span class="et" id="swEt_${a}">–</span></button>
+      <span id="cer_${a}"></span>
       <span class="msg" id="msgSw_${a}" role="status" aria-live="polite"></span>
       <span class="sp"></span>
       <span id="gLados_${a}" class="lados"></span>
@@ -1155,7 +1163,8 @@ function pintarVivo(d, v) {
   $('vivo_' + a).innerHTML = v.mercado ? `<tr>
     <td class="num">${Math.floor(v.quedan / 60)}:${String(Math.floor(v.quedan % 60)).padStart(2, '0')}</td><td class="num">${n(v.referencia, decim(v.referencia))}</td><td class="num">${n(v.precio, decim(v.referencia))}</td><td class="ayuda num">${v.indice_s == null ? '–' : Math.max(0, v.indice_s).toFixed(0) + ' s'}</td>
     <td class="num ${clase(v.delta)}">${conDelta(a) ? n(v.delta, dec2(v.referencia)) : '<span class="ayuda" title="sin precio público del subyacente">no usa</span>'}</td><td class="num">${n(v.yes_ask)} / ${n(v.yes_bid)}</td><td class="num">${n(v.no_ask)} / ${n(v.no_bid)}</td>
-    <td>${esc(v.estado)}</td></tr>` : `<tr><td colspan="8" class="vacio">esperando datos…</td></tr>`;
+    <td>${esc(v.estado)}</td></tr>`
+    : `<tr><td colspan="8" class="vacio">${esc(v.estado || 'esperando datos…')}</td></tr>`;
   if (!v.mercado) {
     $('gTicker_' + a).textContent = ''; $('gLados_' + a).innerHTML = '';
     $('gQueda_' + a).textContent = ''; $('gQLab_' + a).hidden = true; $('grafico_' + a).innerHTML = '';
@@ -1355,6 +1364,7 @@ function render(d) {
   if (d.conectado && !d.encendido) av.push(['warn grande', 'El bot está APAGADO: no va a abrir ninguna operación.']);
   if (d.limite_diario) av.push(['warn', 'Se alcanzó el límite del día: no abre operaciones nuevas hasta mañana (CDT).']);
   if (d.aviso_precio) av.push(['warn', 'Precio del índice: ' + d.aviso_precio + '.']);
+  if (d.aviso_saldo) av.push(['warn', 'Saldo justo: ' + d.aviso_saldo + '.']);
   if (d.abiertas.length) av.push(['on', 'Operación abierta: ' + d.abiertas.map(o => `${o.activo} ${o.lado} ${o.contratos} a ${n(o.entrada)} → TP ${n(o.objetivo)}`).join(' · ')]);
   if (d.pendientes) av.push(['off', `${d.pendientes} operación(es) cerrando: esperando el resultado oficial de Kalshi.`]);
   $('avisos').innerHTML = av.map(([c, t]) => `<div class="aviso ${c}">${esc(t)}</div>`).join('');
@@ -1481,6 +1491,7 @@ function render(d) {
   const conDatos = new Set(d.vivo.map(v => v.activo));
   const operando = new Set(d.abiertas.map(o => o.activo));
   d.vivo.forEach(v => pintarVivo(d, v));
+  pintarHorarios(d);
   for (const a of activos) {
     const card = $('card_' + a);
     if (!card) continue;
@@ -1665,6 +1676,29 @@ async function alternarActivo(a) {
   await guardarAjustes(b, caja);
   b.disabled = false;
   refrescar();
+}
+
+// "cerrado · abre dom 19:00 · faltan 2 d 1 h", al lado del interruptor
+function pintarHorarios(d) {
+  const h = d.horario || {};
+  for (const a of activos) {
+    const caja = $('cer_' + a);
+    if (!caja) continue;
+    const x = h[a];
+    if (!x) { caja.innerHTML = ''; continue; }
+    const corto = /fin de semana/.test(x.motivo) ? 'fin de semana'
+      : /pausa diaria/.test(x.motivo) ? 'pausa de CME'
+      : x.motivo.replace(/^horario /, '');
+    let cola = '';
+    if (x.abre) {
+      const f = new Date(x.abre * 1000);
+      const cuando = f.toLocaleString('es', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+      const falta = x.abre - Date.now() / 1000;
+      cola = ` · abre <b>${esc(cuando)}</b>` + (falta > 0 ? ` · faltan <b>${dur(falta)}</b>` : '');
+    }
+    caja.innerHTML = `<span class="cerrado" title="${esc(x.motivo)}"><i class="pun"></i>`
+      + `${esc(corto)}${cola}</span>`;
+  }
 }
 
 function pintarSw(a, on) {

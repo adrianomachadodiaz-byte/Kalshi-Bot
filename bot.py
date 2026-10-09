@@ -553,6 +553,36 @@ def motivo_horario(activo, cierre):
     return None
 
 
+_CACHE_HUECO = {}
+
+
+def proximo_hueco(activo, desde=None):
+    """(motivo, epoch) del próximo bloque en el que el horario SÍ deja entrar.
+
+    Si ahora mismo se puede, devuelve (None, None). Los bloques cierran en los múltiplos
+    de 15 min, así que se prueban uno a uno hasta cuatro días por delante; pasado eso se
+    devuelve el motivo sin hora, que es mejor que mentir con una fecha inventada.
+    """
+    ahora = desde if desde is not None else time.time()
+    bloque = int(ahora // 900) * 900 + 900            # el cierre del bloque en curso
+    clave = (activo, bloque)
+    if clave in _CACHE_HUECO:
+        return _CACHE_HUECO[clave]
+    motivo = motivo_horario(activo, bloque)
+    salida = (None, None)
+    if motivo:
+        salida = (motivo, None)
+        for i in range(1, 4 * 96 + 1):                # cuatro días de bloques
+            t = bloque + i * 900
+            if motivo_horario(activo, t) is None:
+                salida = (motivo, t - 900)            # se puede entrar ya durante ese bloque
+                break
+    if len(_CACHE_HUECO) > 400:
+        _CACHE_HUECO.clear()
+    _CACHE_HUECO[clave] = salida
+    return salida
+
+
 class FiltroNoticias:
     """No entrar en bloques peligrosos. Cuatro reglas, cada una con su interruptor:
 
@@ -742,6 +772,16 @@ class Bot:
     def paso(self, activo):
         m = self.mercados.get(activo)
         if not m:
+            # Sin mercado no hay foto, y sin foto procesar() nunca se llama: una operación
+            # abierta cuyo bloque ya venció se quedaba ahí para siempre (pasaba con el oro
+            # el viernes a las 17:00 ET, y con cualquier activo tras reiniciar el bot).
+            op = self.estado.abiertas.get(activo)
+            if op and time.time() >= op.cierre:
+                with self.op.lock:
+                    if self.estado.abiertas.get(activo) is op:
+                        log(f"{activo} el mercado está cerrado y el bloque de la operación abierta "
+                            f"ya venció: la paso a cobrar")
+                        self.op._bloque_cerrado(activo)
             return
         t = m["ticker"]
         if self.visto.get(activo) != t:
@@ -830,6 +870,28 @@ class Bot:
         with self.op.lock:
             return self._resumen(saldo)
 
+    def _horarios(self):
+        """Por activo: si el horario no le deja entrar ahora, por qué y cuándo podrá."""
+        if not self.filtro.activo or not self.filtro.horario:
+            return {}
+        fuera = {}
+        for a in ACTIVOS_VALIDOS:
+            motivo, abre = proximo_hueco(a)
+            if motivo:
+                fuera[a] = dict(motivo=motivo, abre=abre)
+        return fuera
+
+    def _aviso_saldo(self, saldo):
+        """El bot reserva un contrato por activo encendido. Si el saldo no llega, sigue
+        operando de uno en uno, pero conviene verlo arriba y no enterrado en el registro."""
+        if saldo is None or not self.ej:
+            return ""
+        necesario = sum(c.contratos for a, c in self.cfgs.items() if a in self.activos)
+        if saldo >= necesario - 1e-6:
+            return ""
+        return (f"hacen falta {necesario:g} $ para los {len(self.activos)} activos encendidos "
+                f"y hay {saldo:.2f} $: algunas entradas se quedarán fuera")
+
     def _resumen(self, saldo):
         hoy = datetime.now(CDT).strftime("%Y-%m-%d")
         semana = (datetime.now(CDT) - timedelta(days=6)).strftime("%Y-%m-%d")
@@ -839,6 +901,12 @@ class Bot:
             f, cfg = self.vista.get(a), self.cfgs.get(a)
             op = self.estado.abiertas.get(a)
             fila = dict(activo=a)
+            if not f:
+                # sin bloque abierto: que la tarjeta lo diga en vez de quedarse muda
+                porque = motivo_horario(a, ahora) if a in SIN_INDICE else None
+                fila["estado"] = (porque or "sin bloque abierto ahora mismo")
+                if op:
+                    fila["estado"] += f" · queda una operación abierta de {op.abiertos():g} contratos"
             if f:
                 quedan = max(0, f.cierre - ahora)
                 if op:
@@ -878,6 +946,8 @@ class Bot:
             encendido=not self.estado.pausado, conectado=bool(self.ej),
             key_id=(self.key_id[:4] + "…" + self.key_id[-4:]) if len(self.key_id) > 8 else ("configurada" if self.key_id else ""),
             saldo=saldo, limite_diario=self.op.limite_diario(), aviso_precio=self.precios.nota,
+            aviso_saldo=self._aviso_saldo(saldo),
+            horario=self._horarios(),
             servidor_s=ahora - self.inicio,
             ritmo=self.ciclo, ritmo_indice=self.ciclo_indice, vuelta_s=round(self.ultima_vuelta, 3),
             encendido_s=(ahora - self.estado.encendido_desde) if self.estado.encendido_desde and not self.estado.pausado else None,
