@@ -3,6 +3,7 @@
 No habla con Kalshi directamente: usa un ejecutor (simulado o real, ver ejecutores.py).
 """
 import csv
+import heapq
 import json
 import os
 import threading
@@ -23,7 +24,7 @@ LOGS = deque(maxlen=500)   # últimas líneas, para el panel
 
 
 def log(msg):
-    linea = f"[{datetime.now(CDT):%Y-%m-%d %H:%M:%S} CDT] {msg}"
+    linea = f"[{datetime.now(CDT):%Y-%m-%d %I:%M:%S %p} CDT] {msg}"   # 12 horas
     print(linea, flush=True)
     LOGS.append(linea)
 
@@ -194,6 +195,31 @@ class Registro:
                 salidas[m] = salidas.get(m, 0) + 1
         mins = [m for m in (num(f.get("min_restantes")) for f in filas) if m is not None]
         dias_ops = len({f["fecha"] for f in filas})
+        # operaciones simultáneas: cuántas había abiertas a la vez (entrada -> salida)
+        tramos = []
+        for f in filas:
+            try:
+                ini = datetime.strptime(f"{f['fecha']} {f['hora_entrada']}", "%Y-%m-%d %H:%M:%S").timestamp()
+            except (KeyError, ValueError):
+                continue
+            fin = None
+            if f.get("hora_salida"):
+                try:
+                    fin = datetime.strptime(f"{f['fecha']} {f['hora_salida']}", "%Y-%m-%d %H:%M:%S").timestamp()
+                except ValueError:
+                    fin = None
+            if fin is None or fin < ini:        # sin hora de salida (o pasó de medianoche): hasta el cierre
+                fin = ini + 60 * (num(f.get("min_restantes")) or 15)
+            tramos.append((ini, max(fin, ini + 1)))
+        a_la_vez, abiertas = [], []              # al entrar cada una, cuántas había abiertas contándola
+        for ini, fin in sorted(tramos):
+            while abiertas and abiertas[0] <= ini:
+                heapq.heappop(abiertas)
+            heapq.heappush(abiertas, fin)
+            a_la_vez.append(len(abiertas))
+        simul_max = max(a_la_vez) if a_la_vez else None
+        simul_media = round(sum(a_la_vez) / len(a_la_vez), 1) if a_la_vez else None
+        simul_pct = round(100 * sum(1 for x in a_la_vez if x > 1) / len(a_la_vez)) if a_la_vez else None
         return dict(ops=len(pnl), ganadas=len(g), perdidas=len(p_), usd=round(sum(pnl), 2),
                     invertido=round(invertido, 2),
                     roi=round(100 * sum(pnl) / invertido, 2) if invertido else None,
@@ -201,6 +227,7 @@ class Registro:
                     ops_dia=round(len(pnl) / dias_ops, 1) if dias_ops else None,
                     recuperacion=round(sum(pnl) / -bajon, 2) if bajon < 0 else None,
                     lados=lados, salidas=salidas,
+                    simul_max=simul_max, simul_media=simul_media, simul_pct=simul_pct,
                     min_entrada=round(sum(mins) / len(mins), 1) if mins else None,
                     wr=round(100 * len(g) / len(pnl), 1) if pnl else None,
                     media_ganada=round(sum(g) / len(g), 2) if g else None,

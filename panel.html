@@ -175,7 +175,7 @@ html{scroll-behavior:smooth}
 .filtros .et{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--tenue)}
 .kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 @media(min-width:720px){.kpis{grid-template-columns:repeat(4,minmax(0,1fr))}}
-@media(min-width:1150px){.kpis{grid-template-columns:repeat(7,minmax(0,1fr))}}
+@media(min-width:1150px){.kpis{grid-template-columns:repeat(5,minmax(0,1fr))}}
 .kpi{background:var(--n1);border:1px solid var(--linea);border-radius:var(--r-s);padding:9px 11px 10px;
   min-width:0;transition:border-color var(--t)}
 .kpi:hover{border-color:var(--linea-2)}
@@ -533,7 +533,7 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 <header class="consola">
   <span id="pill" class="pill off">cargando</span>
   <span class="sp"></span>
-  <div class="lecturas" id="instr" hidden>
+  <div class="lecturas" id="instr" hidden style="display:none">
     <div><span class="k" id="hQuien">Delta</span><span class="v num" id="hDelta">–</span></div>
     <div><span class="k">Queda</span><span class="v num chico" id="hQueda">–</span></div>
   </div>
@@ -581,6 +581,8 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
       <div class="nota" id="sRoiNota"></div></div>
     <div class="kpi"><dt>Ritmo</dt><dd id="sRitmo">–</dd>
       <div class="nota" id="sRitmoNota"></div></div>
+    <div class="kpi"><dt>Simultáneas</dt><dd id="sSimul">–</dd>
+      <div class="nota" id="sSimulNota"></div></div>
     <div class="kpi"><dt>Por lado</dt><div id="sLados" style="margin-top:5px"></div></div>
     <div class="kpi"><dt>Cómo cierran</dt><div id="sSalidas" style="margin-top:5px"></div></div>
     <div class="kpi"><dt>Saldo en Kalshi</dt><dd id="sSaldo" class="skel">–</dd>
@@ -606,9 +608,12 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 </section>
 
 <section class="seccion panel" id="s-log" aria-label="Registro">
-  <div class="titulo"><h2>Registro</h2><span class="sp"></span>
+  <details class="plegable" id="plegLog">
+  <summary><h2>Registro</h2><span class="ayuda num" id="logUltimo" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span></summary>
+  <div class="titulo" style="margin-top:10px"><span class="sp"></span>
     <label style="display:flex;align-items:center;gap:7px;margin:0;cursor:pointer"><input type="checkbox" id="auto" checked style="width:auto;margin:0;accent-color:var(--gris)">seguir los nuevos</label></div>
   <div id="logs" tabindex="0"></div>
+  </details>
 </section>
   </div>
 
@@ -1040,6 +1045,14 @@ function armarHover(a) {
   cont.addEventListener('pointerleave', () => { hoverX[a] = null; dibujarCruz(a); });
 }
 
+// "14:05:09" -> "2:05:09 PM"
+function h12(hms) {
+  const m = /^(\d{1,2}):(\d{2})(:\d{2})?$/.exec(hms || '');
+  if (!m) return hms || '';
+  const h = +m[1];
+  return `${h % 12 || 12}:${m[2]}${m[3] || ''} ${h < 12 ? 'AM' : 'PM'}`;
+}
+
 // Un icono por activo: moneda para las criptos, lingote para los metales, gota para
 // el petróleo. De trazo y en gris, como el resto de los controles del panel.
 const MONEDA = '<circle cx="12" cy="12" r="8.6"></circle>';
@@ -1085,7 +1098,7 @@ function armarCarteles(lista, encendidos) {
     + 'stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>';
   const carta = a => `
   <section class="bloque" aria-label="${a}">
-  <details class="crip" id="card_${a}" ${encendidos.includes(a) ? 'open' : ''}>
+  <details class="crip" id="card_${a}">
     <summary>
      <div class="titulo" style="margin:0">
       ${FLECHA}
@@ -1427,6 +1440,10 @@ function render(d) {
   $('sRitmo').innerHTML = t.ops_dia == null ? '–' : `${t.ops_dia} <span class="chico">/día</span>`;
   $('sRitmoNota').innerHTML = t.dias ? `<b>${t.dias}</b> día${t.dias === 1 ? '' : 's'}`
     + (t.min_entrada == null ? '' : ` · entra a <b>${t.min_entrada}</b> min del cierre`) : 'sin operaciones';
+  $('sSimul').innerHTML = t.simul_media == null ? '–'
+    : `${t.simul_media} <span class="chico">de media</span>`;
+  $('sSimulNota').innerHTML = t.simul_max == null ? 'operaciones abiertas a la vez'
+    : `máx. <b>${t.simul_max}</b> a la vez · <b>${t.simul_pct}%</b> entró con otra abierta`;
   const lados = Object.entries(t.lados || {});
   $('sLados').innerHTML = lados.length ? lados.map(([l, x]) =>
     `<div class="fila"><span>${esc(l)} · ${x.ops}</span><b class="${t.equilibrio != null && x.wr >= t.equilibrio ? 'pos' : 'neg'}">${x.wr}%</b></div>`).join('')
@@ -1445,8 +1462,8 @@ function render(d) {
 
   // cabecera-instrumento: lo que se mira cada segundo
   const vc = d.vivo.find(v => v.mercado);   // la cabecera enseña el primero; cada tarjeta trae el suyo
-  $('instr').hidden = !vc;
-  if (vc) {
+  $('instr').hidden = true;     // la cabecera ya no enseña el Delta de una sola cripto
+  if (false && vc) {
     const dl = $('hDelta');
     // con cinco criptos hace falta decir de cuál es este Delta
     $('hQuien').textContent = vc.activo;
@@ -1476,10 +1493,11 @@ function render(d) {
 
   const box = $('logs'), abajo = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
   box.textContent = d.logs.join('\n') || 'sin mensajes todavía';
+  $('logUltimo').textContent = d.logs.length ? d.logs[d.logs.length - 1] : '';
   if ($('auto').checked && abajo) box.scrollTop = box.scrollHeight;
 
   const ops = focoOps === 'todo' ? d.operaciones : d.operaciones.filter(r => r.activo === focoOps);
-  $('ops').innerHTML = ops.length ? ops.map(r => `<tr><td class="num">${r.fecha} ${r.hora_entrada}</td><td>${r.activo}</td><td>${r.lado}</td>
+  $('ops').innerHTML = ops.length ? ops.map(r => `<tr><td class="num">${r.fecha} ${h12(r.hora_entrada)}</td><td>${r.activo}</td><td>${r.lado}</td>
     <td class="num">${r.entrada}</td><td>${r.salida}</td><td class="num">${r.precio_salida}</td><td class="num">${r.contratos}</td>
     <td class="${r.resultado === 'GANA' ? 'pos' : 'neg'}">${r.resultado === 'GANA' ? 'ganada' : 'perdida'}</td>
     <td class="num ${clase(+r.pnl_usd)}">${usd(+r.pnl_usd)}</td></tr>`).join('')
