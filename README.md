@@ -43,6 +43,13 @@ Todo se maneja desde el panel (el dominio de Railway, con tu clave `ACCESS_TOKEN
   próximos eventos de impacto alto y medio del USD, con cuánto falta, la hora, el pronóstico y el dato anterior.
   Se pide cada 20 minutos en un hilo aparte: si falla, el panel lo dice y el bot sigue igual. Se apaga con
   `NOTICIAS=0`; con `NOTICIAS_MONEDAS` cambias las divisas (por defecto `USD`).
+- **Horario de Kalshi** (oro, plata, petróleo y gas): si el mercado está abierto o cerrado, con una **cuenta
+  regresiva** que baja cada segundo hasta que vuelve a abrir (o hasta que cierra, si está abierto), cuándo cerró y
+  una línea de tiempo de hace 6 h a dentro de 30 h con los tramos abiertos y las pausas diarias. No supone horarios:
+  sale de los bloques que Kalshi ya tiene creados por delante (unas 30 h), pedidos cada 2 minutos en un hilo aparte
+  y sin clave. Con el mercado cerrado, la tarjeta de ese activo enseña la cuenta atrás en grande, el primer bloque,
+  cuánto dura la sesión siguiente y, si el filtro de horario hace esperar más, desde cuándo entra el bot. La
+  cabecera dice de un vistazo cuántas materias primas están abiertas. Se apaga con `HORARIO_KALSHI=0`.
 - **Registro**: los últimos mensajes del bot (entradas, TP, stops, errores), se actualizan cada segundo.
 - **Operaciones**: las últimas 50 y un botón para bajarlas todas en CSV.
 - **Ajustes**: contratos, Delta, Delay, rango de entrada, TP, Exit, BreakEven, límites del día y deslizamiento.
@@ -82,6 +89,7 @@ El panel manda: lo que guardes ahí gana sobre estas variables. Sirven solo como
 | `KALSHI_INDICE_URL` | URL del feed del índice (por defecto el público de Kalshi; `{activo}` se cambia por btc/eth) |
 | `ACTIVOS`, `DELTA`, `DELAY`, `ENTRADA_MIN`, `ENTRADA_MAX`, `TP`, `EXIT`, `CONTRATOS`, `BREAKEVEN`, `MAX_PERDIDA_DIA`, `META_GANANCIA_DIA`, `DESLIZ_ENTRADA` | Ajustes iniciales (los mismos del panel) |
 | `NOTICIAS` | `0` apaga el calendario de ForexFactory |
+| `HORARIO_KALSHI` | `0` apaga la lectura del horario de las materias primas (y su cuenta regresiva) |
 | `NOTICIAS_MONEDAS` | Divisas del calendario, separadas por coma (por defecto `USD`) |
 | `NOTICIAS_URL` | Feed del calendario (por defecto el público semanal de ForexFactory) |
 | `DATA_DIR` | Carpeta del Volume (por defecto `/data`) |

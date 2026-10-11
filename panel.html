@@ -1232,10 +1232,18 @@ function pintarVivo(d, v) {
     : `<tr><td colspan="8" class="vacio">${esc(v.estado || 'esperando datos…')}</td></tr>`;
   if (!v.mercado) {
     $('gTicker_' + a).textContent = ''; $('gLados_' + a).innerHTML = '';
-    $('gQueda_' + a).textContent = ''; $('gQLab_' + a).hidden = true; $('grafico_' + a).innerHTML = '';
+    $('gQueda_' + a).textContent = ''; $('gQLab_' + a).hidden = true;
+    const espera = panelCerrado(d, a);
+    $('grafico_' + a).innerHTML = espera;
+    $('grafico_' + a).parentElement.classList.toggle('solo', !!espera);
     $('medidor_' + a).innerHTML = ''; $('gPie_' + a).innerHTML = '';
+    const k = (d.mercados || {})[a];
+    if (k && k.estado === 'cerrado')
+      $('vivo_' + a).innerHTML = `<tr><td colspan="8" class="vacio">Kalshi no tiene bloques de ${esc(nombre(a))} ahora mismo`
+        + (k.abre ? `: el primero abre ${esc(cuandoTxt(k.abre))}.` : '.') + '</td></tr>';
     return;
   }
+  $('grafico_' + a).parentElement.classList.remove('solo');
   $('gTicker_' + a).textContent = v.mercado;
   $('gQueda_' + a).textContent = Math.floor(v.quedan / 60) + ':' + String(Math.floor(v.quedan % 60)).padStart(2, '0');
   $('gQLab_' + a).hidden = false;
@@ -1254,7 +1262,12 @@ function pintarVivo(d, v) {
       + 'y ese precio no es público: aquí no hay gráfico ni Delta.<br>'
       + 'Entra solo por la ventana y por el precio del contrato.</p>';
     $('medidor_' + a).innerHTML = v.grafico ? medidor(v.grafico) : '';
-    $('gPie_' + a).innerHTML = razon(v, d);
+    // abierto: hasta cuándo, para no llevarse la sorpresa del cierre del viernes
+    const k = (d.mercados || {})[a];
+    const cierre = k && k.estado === 'abierto' && k.cierra
+      ? `<div class="razon">Kalshi cierra ${esc(nombre(a))} ${esc(cuandoTxt(k.cierra))} · faltan&nbsp;`
+        + `<b class="num" data-hasta="${k.cierra}">${cuenta(k.cierra - ahoraS())}</b></div>` : '';
+    $('gPie_' + a).innerHTML = razon(v, d) + cierre;
   } else if (v.grafico && v.grafico.activo && v.grafico.activo.length > 1) {
     $('grafico_' + a).innerHTML = grafico(v, a);
     armarHover(a);
@@ -1409,6 +1422,7 @@ function curvaGanancia(pts) {
 
 function render(d) {
   ultimo = d;
+  if (d.ahora) desfase = d.ahora - Date.now() / 1000;
   const pill = $('pill'), btn = $('power');
   if (!d.conectado) { pill.textContent = 'sin API key'; pill.className = 'pill warn'; }
   else if (d.encendido) { pill.textContent = 'encendido'; pill.className = 'pill on'; }
@@ -1582,6 +1596,7 @@ function render(d) {
   $('opsCuenta').textContent = ops.length
     ? (totOps > ops.length ? `últimas ${ops.length} de ${totOps}` : `${totOps} en total`) : '';
 
+  pintarHorarioK(d);
   pintarNoticias(d);
   pintarFiltro(d);
   pintarPorActivo(d);
@@ -1607,6 +1622,7 @@ function render(d) {
   ke.textContent = d.conectado ? `Conectada · key ${d.key_id} · saldo ${d.saldo == null ? '–' : '$' + d.saldo.toFixed(2)}` : 'No conectada';
 
   document.querySelectorAll('.skel').forEach(e => e.classList.remove('skel'));
+  tic();
 }
 
 // pre = "" para los ajustes de toda la cuenta, "BTC." o "ETH." para los de un activo
@@ -1743,12 +1759,164 @@ async function alternarActivo(a) {
   refrescar();
 }
 
+// ---- horario de Kalshi: cuenta atrás de las materias primas ----
+// Las horas llegan del servidor en epoch; el reloj de este equipo puede ir unos segundos
+// desfasado, así que la cuenta se hace con la hora del servidor.
+let desfase = 0;
+const ahoraS = () => Date.now() / 1000 + desfase;
+const dos = x => String(x).padStart(2, '0');
+const hora12 = ts => new Date(ts * 1000).toLocaleTimeString('es', { hour: 'numeric', minute: '2-digit', hour12: true });
+// "hoy 5:00 p. m.", "mañana 5:15 p. m.", "vie 11:00 p. m."
+function cuandoTxt(ts) {
+  if (!ts) return '–';
+  const f = new Date(ts * 1000), hoy = new Date(ahoraS() * 1000);
+  const dia = x => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const dd = Math.round((dia(f) - dia(hoy)) / 864e5);
+  const pre = dd === 0 ? 'hoy' : dd === 1 ? 'mañana' : dd === -1 ? 'ayer'
+    : f.toLocaleDateString('es', { weekday: 'short' }).replace('.', '');
+  return pre + ' ' + hora12(ts);
+}
+function partes(s) {
+  s = Math.max(0, Math.floor(s));
+  return { d: Math.floor(s / 86400), h: Math.floor(s % 86400 / 3600), m: Math.floor(s % 3600 / 60), s: s % 60 };
+}
+// "1 d 02:14:09" o "02:14:09"
+function cuenta(s) {
+  const p = partes(s);
+  return (p.d ? p.d + ' d ' : '') + dos(p.h) + ':' + dos(p.m) + ':' + dos(p.s);
+}
+function relojGrande(s) {
+  if (s <= 0) return '<span class="rg"><b>abriendo…</b></span>';
+  const p = partes(s);
+  return (p.d ? [[p.d, p.d === 1 ? 'día' : 'días']] : []).concat([[dos(p.h), 'h'], [dos(p.m), 'min'], [dos(p.s), 's']])
+    .map(([v, u]) => `<span class="rg"><b>${v}</b><small>${u}</small></span>`).join('');
+}
+// todo lo que lleva data-hasta se pone al día cada segundo, sin esperar al servidor
+function tic() {
+  const t = ahoraS();
+  document.querySelectorAll('[data-hasta]').forEach(el => {
+    const falta = +el.dataset.hasta - t;
+    if (el.dataset.forma === 'grande') el.innerHTML = relojGrande(falta);
+    else el.textContent = falta > 0 ? cuenta(falta) : 'ya';
+  });
+}
+setInterval(tic, 1000);
+
+// De hace 6 h a dentro de 30 h: verde donde Kalshi tiene bloques, rayado donde aún no
+// los ha creado (no se sabe), y una marca blanca en "ahora".
+function lineaTiempo(x) {
+  const t = ahoraS(), ini = t - 6 * 3600, fin = t + 30 * 3600;
+  const pct = v => (Math.max(ini, Math.min(fin, v)) - ini) / (fin - ini) * 100;
+  const tramos = (x.tramos || []).filter(([a, c]) => c > ini && a < fin);
+  const seg = tramos.map(([a, c]) => {
+    // lo ya pasado, más tenue
+    const corte = Math.min(c, t), o = [];
+    if (corte > a) o.push(`<i class="ya" style="left:${pct(a).toFixed(2)}%;width:${(pct(corte) - pct(a)).toFixed(2)}%"></i>`);
+    const a2 = Math.max(a, t);
+    if (c > a2) o.push(`<i style="left:${pct(a2).toFixed(2)}%;width:${(pct(c) - pct(a2)).toFixed(2)}%"></i>`);
+    return o.join('');
+  }).join('');
+  const nd = x.horizonte && x.horizonte < fin
+    ? `<i class="nd" style="left:${pct(x.horizonte).toFixed(2)}%;right:0" title="Kalshi aún no ha creado estos bloques"></i>` : '';
+  const marcas = [];
+  const m = new Date(ini * 1000); m.setHours(24, 0, 0, 0);
+  for (; m.getTime() / 1000 < fin; m.setDate(m.getDate() + 1)) {
+    const p = pct(m.getTime() / 1000);
+    if (p > 5 && p < 95) marcas.push(`<span class="hk-dia" style="left:${p.toFixed(2)}%">`
+      + `${esc(m.toLocaleDateString('es', { weekday: 'short' }).replace('.', ''))}</span>`);
+  }
+  const txt = tramos.length
+    ? 'Abierto en Kalshi: ' + tramos.map(([a, c]) => cuandoTxt(a) + ' a ' + cuandoTxt(c)).join(', ')
+    : 'Sin bloques en Kalshi en estas horas';
+  return `<div class="hk-linea" role="img" aria-label="${esc(txt)}" title="${esc(txt)}">`
+    + `<div class="hk-pista">${seg}${nd}</div><b class="hk-ahora" style="left:${pct(t).toFixed(2)}%"></b>${marcas.join('')}</div>`;
+}
+
+// lateral: oro, plata, petróleo y gas, con su cuenta atrás
+function pintarHorarioK(d) {
+  const caja = $('horarioK');
+  if (!caja) return;
+  const mk = d.mercados || {};
+  const lista = (d.sin_indice || []).filter(a => a in mk);
+  if (!lista.length) return;
+  const filas = lista.map(a => {
+    const x = mk[a];
+    if (!x) return `<div class="hk-fila"><div class="hk-cab">${icono(a)}<span class="nom">${esc(nombre(a))}</span>`
+      + `<span class="sp"></span><span class="ayuda">${d.mercados_error ? 'sin respuesta de Kalshi' : 'leyendo…'}</span></div></div>`;
+    const abierto = x.estado === 'abierto', hasta = abierto ? x.cierra : x.abre;
+    const sub = abierto
+      ? (x.cierra ? 'cierra ' + cuandoTxt(x.cierra) : 'abierto al menos hasta ' + cuandoTxt(x.horizonte))
+      : (x.abre ? 'abre ' + cuandoTxt(x.abre) : 'Kalshi aún no ha publicado cuándo vuelve')
+        + (x.desde ? ' · cerró ' + cuandoTxt(x.desde) : '');
+    return `<div class="hk-fila ${abierto ? 'abierto' : 'cerrado-k'}">
+      <div class="hk-cab">${icono(a)}<span class="nom">${esc(nombre(a))}</span>
+        <span class="hk-est">${abierto ? 'abierto' : 'cerrado'}</span><span class="sp"></span>
+        ${hasta ? `<span class="hk-cuenta"><small>${abierto ? 'cierra en' : 'abre en'}</small>`
+          + `<b data-hasta="${hasta}">${cuenta(hasta - ahoraS())}</b></span>` : ''}</div>
+      <div class="hk-sub">${esc(sub)}</div>
+      ${lineaTiempo(x)}
+    </div>`;
+  });
+  caja.innerHTML = filas.join('')
+    + `<p class="hk-nota">Sale de los bloques que Kalshi ya tiene creados (unas 30 h por delante). Rayado: todavía no existen.</p>`;
+
+  // cabecera: cuántas están abiertas y, si ninguna, cuándo vuelve la primera
+  const hm = $('hMat'), vals = lista.map(a => mk[a]).filter(Boolean);
+  if (!vals.length) { hm.style.display = 'none'; return; }
+  hm.style.display = '';
+  const abiertas = vals.filter(x => x.estado === 'abierto').length;
+  const prox = Math.min(...vals.filter(x => x.estado !== 'abierto' && x.abre).map(x => x.abre));
+  hm.className = 'pill solo-pc ' + (abiertas ? 'on' : 'warn');
+  hm.innerHTML = abiertas
+    ? `materias primas: ${abiertas} de ${vals.length} abiertas`
+    : 'materias primas cerradas' + (isFinite(prox) ? ` · abren en <b data-hasta="${prox}">${cuenta(prox - ahoraS())}</b>` : '');
+}
+
+// dentro de la tarjeta de una materia prima, cuando Kalshi no tiene bloque abierto
+function panelCerrado(d, a) {
+  const x = (d.mercados || {})[a];
+  if (!x || x.estado !== 'cerrado') return '';
+  const t = ahoraS();
+  const prog = x.abre && x.desde ? Math.max(0, Math.min(1, (t - x.desde) / (x.abre - x.desde))) : null;
+  // la sesión que empieza al reabrir: hasta cuándo dura, si Kalshi ya lo sabe
+  const sig = (x.tramos || []).find(([ini]) => x.abre && ini >= x.abre);
+  const finSesion = sig && sig[1] < (x.horizonte || 0) ? sig[1] : null;
+  const bot = (d.horario || {})[a];          // el filtro de horario del bot puede esperar más
+  const botAbre = bot && bot.abre && x.abre && bot.abre > x.abre + 60 ? bot.abre : null;
+  const datos = [
+    ['Cerró', cuandoTxt(x.desde)],
+    ['Vuelve', x.abre ? cuandoTxt(x.abre) : 'sin fecha todavía'],
+    ['Primer bloque', x.abre ? hora12(x.abre) + ' – ' + hora12(x.abre + 900) : '–'],
+    ['Sesión siguiente', finSesion ? 'hasta ' + cuandoTxt(finSesion) : x.abre ? 'más de un día seguido' : '–'],
+  ];
+  if (x.desde && x.abre) datos.push(['Tiempo cerrado', dur(x.abre - x.desde)]);
+  if (botAbre) datos.push(['El bot entra desde', cuandoTxt(botAbre) + ' (filtro de horario)']);
+  return `<div class="espera">
+    <div>
+      <span class="k">${x.abre ? 'El mercado de ' + esc(nombre(a)) + ' vuelve en' : 'Mercado cerrado en Kalshi'}</span>
+      <div class="esp-reloj" ${x.abre ? `data-hasta="${x.abre}" data-forma="grande"` : ''}>${x.abre ? relojGrande(x.abre - t) : '<span class="rg"><b>—</b></span>'}</div>
+      ${prog == null ? '' : `<div class="esp-barra" role="img" aria-label="Ha pasado el ${Math.round(prog * 100)} % del cierre"><i style="width:${(prog * 100).toFixed(1)}%"></i></div>
+      <div class="esp-pies"><span>cerró <b>${esc(cuandoTxt(x.desde))}</b></span><span>${Math.round(prog * 100)} % del cierre</span><span>abre <b>${esc(cuandoTxt(x.abre))}</b></span></div>`}
+    </div>
+    <dl class="esp-datos">${datos.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
+    <div class="esp-linea"><span class="k">Próximas horas en Kalshi</span>${lineaTiempo(x)}</div>
+  </div>`;
+}
+
 // "cerrado · abre dom 19:00 · faltan 2 d 1 h", al lado del interruptor
 function pintarHorarios(d) {
-  const h = d.horario || {};
+  const h = d.horario || {}, mk = d.mercados || {};
   for (const a of activos) {
     const caja = $('cer_' + a);
     if (!caja) continue;
+    const k = mk[a];
+    if (k && k.estado === 'cerrado') {       // Kalshi no tiene bloques: manda su horario
+      caja.innerHTML = `<span class="cerrado" title="Kalshi no tiene bloques de ${esc(nombre(a))} abiertos ahora mismo">`
+        + `<i class="pun"></i>${k.abre ? '<span class="solo-pc">mercado cerrado ·</span>' : 'mercado cerrado'}`
+        + (k.abre ? ` abre <b>${esc(cuandoTxt(k.abre))}</b> · faltan <b data-hasta="${k.abre}">${cuenta(k.abre - ahoraS())}</b>` : '')
+        + '</span>';
+      continue;
+    }
     const x = h[a];
     if (!x) { caja.innerHTML = ''; continue; }
     const corto = /fin de semana/.test(x.motivo) ? 'fin de semana'
@@ -1756,10 +1924,9 @@ function pintarHorarios(d) {
       : x.motivo.replace(/^horario /, '');
     let cola = '';
     if (x.abre) {
-      const f = new Date(x.abre * 1000);
-      const cuando = f.toLocaleString('es', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
-      const falta = x.abre - Date.now() / 1000;
-      cola = ` · abre <b>${esc(cuando)}</b>` + (falta > 0 ? ` · faltan <b>${dur(falta)}</b>` : '');
+      const falta = x.abre - ahoraS();
+      cola = ` · entra <b>${esc(cuandoTxt(x.abre))}</b>`
+        + (falta > 0 ? ` · faltan <b data-hasta="${x.abre}">${cuenta(falta)}</b>` : '');
     }
     caja.innerHTML = `<span class="cerrado" title="${esc(x.motivo)}"><i class="pun"></i>`
       + `${esc(corto)}${cola}</span>`;
