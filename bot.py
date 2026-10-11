@@ -493,6 +493,72 @@ class Noticias:
         return [e for e in self.eventos if e["impacto"] == "High"]
 
 
+class HorarioKalshi:
+    """Cuándo abre y cierra Kalshi cada materia prima, sacado de sus propios mercados.
+
+    Kalshi crea los bloques de 15 min con ~30 h de antelación, así que la lista de bloques
+    ya dice cuándo vuelve el mercado tras el fin de semana o la pausa diaria, sin suponer
+    horarios (medido el 11-oct-2026: el petróleo cerró el sábado 00:00 ET y vuelve el
+    domingo 18:00 ET; oro y plata cierran el viernes 17:00 ET y vuelven el domingo 18:15 ET).
+    Se pide en un hilo aparte cada 2 min con un cliente propio, sin clave: si falla, el panel
+    no enseña la cuenta atrás y el bot sigue igual.
+    """
+
+    CADA = 120
+    ATRAS = 4 * 86400      # cuánto mirar hacia atrás: tiene que pasar del fin de semana entero
+
+    def __init__(self, activos):
+        self.activos = list(activos)
+        self.k = Kalshi(REST_URL)
+        self.tramos = {}       # activo -> [(inicio, fin)] con mercado abierto, bloques seguidos unidos
+        self.error = ""
+        if env("HORARIO_KALSHI", "1") != "0":
+            threading.Thread(target=self._bucle, daemon=True).start()
+
+    def _bucle(self):
+        while True:
+            for a in self.activos:
+                try:
+                    self.tramos[a] = self.unir(self.k.bloques(a, time.time() - self.ATRAS))
+                    self.error = ""
+                except Exception as e:  # noqa: BLE001
+                    self.error = str(e)[:120]
+                    log_cada(f"horario{a}", f"{a} no pude leer el horario de Kalshi: {self.error}", 900)
+            time.sleep(self.CADA)
+
+    @staticmethod
+    def unir(bloques):
+        tramos = []
+        for ini, fin in bloques:
+            if tramos and ini <= tramos[-1][1] + 1:
+                tramos[-1][1] = max(tramos[-1][1], fin)
+            else:
+                tramos.append([ini, fin])
+        return [tuple(t) for t in tramos]
+
+    def de(self, activo, ahora=None):
+        """Lo que enseña el panel de un activo, o None si todavía no se leyó.
+
+        abre / cierra / desde son epoch. cierra = None si el tramo abierto llega hasta el
+        último bloque que Kalshi tiene creado: no se sabe aún cuándo cierra.
+        """
+        tramos = self.tramos.get(activo)
+        if tramos is None:
+            return None
+        ahora = ahora or time.time()
+        horizonte = tramos[-1][1] if tramos else None
+        fuera = dict(estado="cerrado", desde=None, abre=None, cierra=None, horizonte=horizonte,
+                     tramos=[list(t) for t in tramos if t[1] > ahora - 6 * 3600][:16])
+        for ini, fin in tramos:
+            if ini <= ahora < fin:
+                fuera.update(estado="abierto", desde=ini, cierra=fin if fin < horizonte else None)
+                return fuera
+        antes = [fin for ini, fin in tramos if fin <= ahora]
+        despues = [ini for ini, fin in tramos if ini > ahora]
+        fuera.update(desde=antes[-1] if antes else None, abre=despues[0] if despues else None)
+        return fuera
+
+
 class Ventana:
     """Una franja en la hora LOCAL de un mercado (ET o Londres). Bloquea el bloque si su
     CIERRE cae en [inicio, inicio + duración). Se convierte con zoneinfo: nunca horas fijas
@@ -690,6 +756,7 @@ class Bot:
         self.precios = Precios(self)
         self.noticias = Noticias()
         self.filtro = FiltroNoticias(self.noticias)
+        self.horario_k = HorarioKalshi(SIN_INDICE)
         self.op = Operador({}, None, self.estado, self.registro, 1)
         self.activos, self.cfgs = [], {}
         self.aplicar(self.ajustes.valores)
@@ -907,7 +974,11 @@ class Bot:
             fila = dict(activo=a)
             if not f:
                 # sin bloque abierto: que la tarjeta lo diga en vez de quedarse muda
-                porque = motivo_horario(a, ahora) if a in SIN_INDICE else None
+                porque = None
+                if a in SIN_INDICE:
+                    hk = self.horario_k.de(a, ahora)
+                    porque = ("mercado cerrado en Kalshi" if hk and hk["estado"] == "cerrado"
+                              else motivo_horario(a, ahora))
                 fila["estado"] = (porque or "sin bloque abierto ahora mismo")
                 if op:
                     fila["estado"] += f" · queda una operación abierta de {op.abiertos():g} contratos"
@@ -952,6 +1023,9 @@ class Bot:
             saldo=saldo, limite_diario=self.op.limite_diario(), aviso_precio=self.precios.nota,
             aviso_saldo=self._aviso_saldo(saldo),
             horario=self._horarios(),
+            mercados={a: self.horario_k.de(a, ahora) for a in SIN_INDICE},
+            mercados_error=self.horario_k.error,
+            ahora=ahora,
             servidor_s=ahora - self.inicio,
             ritmo=self.ciclo, ritmo_indice=self.ciclo_indice, vuelta_s=round(self.ultima_vuelta, 3),
             encendido_s=(ahora - self.estado.encendido_desde) if self.estado.encendido_desde and not self.estado.pausado else None,

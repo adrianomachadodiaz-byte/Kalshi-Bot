@@ -181,6 +181,23 @@ class Kalshi:
         cierre, m = min(abiertos, key=lambda x: x[0])
         return self._info_mercado(m)
 
+    def bloques(self, activo, desde):
+        """[(apertura, cierre)] de todos los bloques de la serie que cierran después de `desde`
+        (epoch), ya pasados, abiertos y los que Kalshi tiene creados por delante (unas 30 h).
+        De ahí sale cuándo cerró el mercado, cuándo vuelve a abrir y las pausas que vienen."""
+        params = {"series_ticker": SERIES[activo], "min_close_ts": int(desde), "limit": 1000}
+        fuera = []
+        for _ in range(5):
+            d = self._pedir("GET", "/markets", params, firmar=False)
+            for m in d.get("markets", []):
+                a, c = epoch(m.get("open_time")), epoch(m.get("close_time"))
+                if a and c and c > a:
+                    fuera.append((a, c))
+            if not d.get("cursor") or not d.get("markets"):
+                break
+            params["cursor"] = d["cursor"]
+        return sorted(set(fuera))
+
     @staticmethod
     def _info_mercado(m):
         rangos = [(float(r["start"]), float(r["end"]), float(r["step"])) for r in m.get("price_ranges") or []]

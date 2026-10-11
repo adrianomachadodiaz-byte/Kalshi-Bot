@@ -309,7 +309,7 @@ html{scroll-behavior:smooth}
   font-size:11px;color:var(--gris);white-space:nowrap}
 .cerrado b{font-family:var(--mono);font-weight:600;color:var(--claro)}
 .cerrado .pun{width:5px;height:5px;border-radius:50%;background:var(--avisa);flex:0 0 auto}
-@media(max-width:700px){.cerrado{margin-left:0}}
+@media(max-width:700px){.cerrado{margin-left:0;white-space:normal;flex-wrap:wrap;row-gap:0}}
 @media(prefers-reduced-motion:reduce){.sw .bola,.sw .pista,.sw .et{transition:none}}
 .crip .cuerpo,.crip .lectura,.crip .ajcrip{margin-top:12px}
 /* los ajustes de esa cripto, justo debajo de su gráfico */
@@ -457,6 +457,64 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 @keyframes gira{to{transform:rotate(360deg)}}
 .pie{margin-top:26px;padding-top:14px;border-top:1px solid var(--linea);font-size:11px;color:var(--tenue)}
 
+/* ---------------------------------------------------------------- horario de Kalshi */
+/* materias primas: si el mercado está abierto o cerrado, y cuánto falta para que cambie */
+#s-horario{scroll-margin-top:calc(var(--cabeza) + 18px)}
+.hk-fila{padding:12px 0 4px;border-top:1px solid var(--linea)}
+.hk-fila:first-child{border-top:0;padding-top:0}
+.hk-cab{display:flex;align-items:center;gap:8px}
+.hk-cab .ico{width:16px;height:16px;margin-right:0}
+.hk-cab .nom{font-size:13px;font-weight:500;color:var(--claro)}
+.hk-est{font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;padding:1px 7px;border-radius:999px;
+  border:1px solid var(--linea-2);color:var(--gris)}
+.abierto .hk-est{color:var(--sube);border-color:rgba(47,224,122,.4);background:var(--sube-f)}
+.cerrado-k .hk-est{color:var(--avisa);border-color:rgba(240,180,41,.4);background:var(--avisa-f)}
+.hk-cuenta{display:flex;flex-direction:column;align-items:flex-end;line-height:1.15}
+.hk-cuenta small{font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--tenue)}
+.hk-cuenta b{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:15px;font-weight:600;
+  letter-spacing:-.02em;color:var(--claro)}
+.cerrado-k .hk-cuenta b{color:var(--avisa)}
+.hk-sub{margin:3px 0 10px 24px;font-size:11.5px;color:var(--gris)}
+/* línea de tiempo: de hace 6 h a dentro de 30 h; verde = hay bloques en Kalshi */
+.hk-linea{position:relative;margin-left:24px;padding-bottom:17px}
+.hk-pista{position:relative;height:7px;border-radius:4px;background:var(--n0);border:1px solid var(--linea);overflow:hidden}
+.hk-pista i{position:absolute;top:0;bottom:0;background:var(--sube);opacity:.5}
+.hk-pista i.nd{background:repeating-linear-gradient(-45deg,transparent 0 3px,rgba(255,255,255,.1) 3px 5px);opacity:1}
+.hk-pista i.ya{opacity:.22}
+.hk-ahora{position:absolute;top:-3px;height:13px;width:2px;margin-left:-1px;border-radius:1px;
+  background:var(--claro);box-shadow:0 0 0 2px var(--n1)}
+.hk-dia{position:absolute;top:12px;transform:translateX(-50%);font-size:9.5px;letter-spacing:.05em;color:var(--tenue);white-space:nowrap}
+.hk-dia::before{content:"";position:absolute;left:50%;top:-13px;width:1px;height:9px;background:var(--linea-2)}
+.hk-nota{font-size:11px;color:var(--tenue);margin:6px 0 0}
+
+/* tarjeta de una materia prima con el mercado cerrado: la cuenta atrás manda */
+.espera{display:grid;grid-template-columns:minmax(0,1fr);gap:18px 28px;padding:14px 2px 2px}
+@media(min-width:900px){.espera{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr)}}
+.esp-reloj{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;margin:9px 0 16px}
+.rg{display:inline-flex;align-items:baseline}
+.rg b{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:42px;font-weight:600;
+  letter-spacing:-.045em;line-height:1;color:var(--claro)}
+.rg small{font-size:11px;letter-spacing:.05em;color:var(--tenue);margin-left:4px}
+.esp-barra{height:6px;border-radius:3px;background:var(--n0);border:1px solid var(--linea);overflow:hidden}
+.esp-barra i{display:block;height:100%;border-radius:3px;background:var(--avisa);opacity:.7;transition:width 600ms var(--sal)}
+.esp-pies{display:flex;justify-content:space-between;gap:10px;margin-top:7px;font-size:10.5px;color:var(--tenue)}
+.esp-pies b{color:var(--gris);font-weight:500}
+.esp-datos{margin:0;display:grid;grid-template-columns:1fr 1fr;gap:1px;align-self:start;
+  background:var(--linea);border:1px solid var(--linea);border-radius:var(--r-s);overflow:hidden}
+.esp-datos > div{background:var(--n1);padding:9px 11px;min-width:0}
+.esp-datos > div:last-child:nth-child(odd){grid-column:1/-1}
+.esp-datos dt{font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--tenue)}
+.esp-datos dd{margin:3px 0 0;font-family:var(--mono);font-size:12.5px;color:var(--claro)}
+.esp-linea{grid-column:1/-1}
+.esp-linea .k{display:block;margin-bottom:8px}
+.esp-linea .hk-linea{margin-left:0}
+/* sin bloque no hay columna de al lado: la cuenta atrás ocupa todo el ancho */
+.cuerpo.solo{display:block}
+.cuerpo.solo .aparte{display:none}
+/* cabecera: las materias primas de un vistazo */
+#hMat{border-bottom-width:1px}
+#hMat b{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:600;color:var(--claro)}
+
 /* ---------------------------------------------------------------- responsive */
 @media(min-width:1600px){
   .tablero{grid-template-columns:minmax(0,1fr) 360px;gap:22px}
@@ -507,6 +565,7 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
   .bloque,.marcador,.grid2 > div{padding:14px 14px 16px}
   .wrap{margin:0 -14px;padding:0 14px}
   .total .v{font-size:29px}
+  .rg b{font-size:32px}
   #logs{max-height:200px}
   .solo-pc{display:none}
   .pie{margin-bottom:8px}
@@ -539,6 +598,7 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 
 <header class="consola">
   <span id="pill" class="pill off">cargando</span>
+  <a id="hMat" class="pill solo-pc" href="#s-horario" hidden title="Horario de Kalshi de las materias primas"></a>
   <span class="sp"></span>
   <div class="lecturas" id="instr" hidden style="display:none">
     <div><span class="k" id="hQuien">Delta</span><span class="v num" id="hDelta">–</span></div>
@@ -625,6 +685,11 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
   </div>
 
   <div class="rail">
+  <section class="noticias" id="s-horario" aria-label="Horario de Kalshi">
+    <div class="titulo"><h2>Horario de Kalshi</h2><span class="sp"></span><span class="ayuda">materias primas · tu hora</span></div>
+    <div id="horarioK"><p class="ayuda" style="margin:0">Leyendo los bloques de Kalshi…</p></div>
+  </section>
+
   <section class="noticias" aria-label="Próximas noticias">
     <div class="titulo"><h2>Próximas noticias</h2><span class="sp"></span><span class="ayuda">ForexFactory</span></div>
     <div id="noticias"></div>
