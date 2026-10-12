@@ -244,18 +244,46 @@ class EjecutorReal:
             return None
         if entrada is None:
             entrada = ask
-        # Red de seguridad: un precio de entrada fuera del EntryRange significa que algo se contabilizó mal.
-        # Antes que abrir con un TP disparatado, se avisa y se revisa la posición a mano.
         tope_entrada = (cfg.entrada_max + self.desliz) if cruza else cfg.entrada_max
-        if not (cfg.entrada_min - 0.05 <= entrada <= tope_entrada + 1e-9):
-            avisar("error", activo, f"ATENCIÓN: el precio de entrada que devolvió Kalshi ({entrada:.3f}) está fuera de "
-                   f"{cfg.entrada_min - 0.05:.2f}-{tope_entrada:.2f}. No abro la operación; revisa la posición a mano.")
-            return None
-        # average_fee_paid es por contrato (NightShark lo multiplica por la cantidad)
-        op = nueva_operacion(activo, f, lado, entrada, llenos, cfg, comision, m["exchange_index"])
+        if cfg.entrada_min - 0.05 <= entrada <= tope_entrada + 1e-9:
+            # average_fee_paid es por contrato (NightShark lo multiplica por la cantidad)
+            op = nueva_operacion(activo, f, lado, entrada, llenos, cfg, comision, m["exchange_index"])
+        else:
+            op = self._entrada_a_precio_raro(activo, f, lado, ask, entrada, llenos, cfg, comision, m, tope_entrada)
+            if op is None:
+                return None
         if llenos < n:
             avisar("parcial", activo, f"entrada parcial: {llenos:g} de {n:g} contratos (no había más a ese precio)")
         self._poner_tp(op)
+        return op
+
+    def _entrada_a_precio_raro(self, activo, f, lado, ask, entrada, llenos, cfg, comision, m, tope):
+        """La orden se llenó, pero a un precio fuera del rango de entrada.
+
+        Pasa cuando el mercado se mueve de golpe entre la foto y la orden: la orden dice "hasta 0.99" y
+        Kalshi la llena al precio que haya en ese instante (12-oct-2026, EUR/USD: en una caída de 0.98 a
+        0.42 en una décima de segundo, se compró a 0.42). Antes no se apuntaba: la posición quedaba en
+        Kalshi sin que el bot la vigilara ni la contara, y además el bot compraba otra encima.
+
+        Ahora, si la posición en Kalshi lo confirma, se apunta: el coste es el pagado de verdad (las
+        cuentas cuadran con Kalshi) y el objetivo, el que se quería (con `ask`), así sale igual que habría
+        salido. Si no se puede confirmar, se hace lo de antes: no se apunta y se avisa para revisarla.
+        """
+        rango = f"{cfg.entrada_min - 0.05:.2f}-{tope:.2f}"
+        try:
+            pos, _ = self.k.posicion(f.ticker, m["exchange_index"])
+            confirmada = (pos > 0) == (lado == "yes") and abs(pos) >= llenos - 1e-6
+        except Exception as e:  # noqa: BLE001
+            log(f"{activo} no pude ver la posición para confirmar la entrada a {entrada:.3f}: {e}")
+            confirmada = False
+        if not confirmada:
+            avisar("error", activo, f"ATENCIÓN: Kalshi dice que la entrada se llenó a {entrada:.3f} (fuera de {rango}) "
+                   f"y no puedo confirmar la posición. No la apunto; revísala a mano.")
+            return None
+        op = nueva_operacion(activo, f, lado, ask, llenos, cfg, comision, m["exchange_index"])   # sale como se planeó
+        op.entrada = round(entrada, 4)                                                          # cuesta lo que costó
+        avisar("raro", activo, f"la entrada se llenó a {entrada:.3f} en vez de a {ask:.3f} (el mercado se movió de "
+               f"golpe al mandar la orden). Está confirmada en Kalshi: la apunto y la vigilo como siempre.")
         return op
 
     def _descansar_y_cerrar(self, activo, f, oid, lado, m, n):

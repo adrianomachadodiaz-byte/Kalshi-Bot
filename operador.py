@@ -65,7 +65,7 @@ def avisar(tipo, activo, texto):
     """Algo que el usuario tiene que saber (falta de saldo, entrada parcial, orden rechazada, un
     error del bot): sale en la campanita del panel y en el registro.
 
-    tipo: "saldo", "parcial", "rechazo", "precio" o "error". Lo mismo repetido en menos de 10 min no
+    tipo: "saldo", "parcial", "rechazo", "precio", "raro" (entrada llenada a otro precio) o "error". Lo mismo repetido en menos de 10 min no
     crea otra notificación: se suma a la que hay (veces) y no vuelve a contar como nueva.
     """
     log(f"{activo + ' ' if activo else ''}{texto}")

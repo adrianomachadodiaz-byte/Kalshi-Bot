@@ -526,6 +526,7 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 .cm-item.parcial .cm-pun{background:#6a95f2}
 .cm-item.rechazo .cm-pun,.cm-item.error .cm-pun{background:var(--baja)}
 .cm-item.precio .cm-pun{background:#c08cf0}
+.cm-item.raro .cm-pun{background:#29a9e6}
 .cm-cuerpo{min-width:0;flex:1}
 .cm-tit{display:flex;align-items:baseline;gap:7px;font-size:12px;color:var(--claro);font-weight:500}
 .cm-tit .ayuda{margin-left:auto;white-space:nowrap}
@@ -2400,7 +2401,7 @@ $('calAdelante').addEventListener('click', () => moverMes(1));
 // El número rojo cuenta las que llegaron después de la última vez que se marcaron como leídas
 // (se recuerda en este navegador). Repetidas en menos de 10 min vienen juntas, con "×N".
 const TIPOS_AVISO = { saldo: 'Sin saldo', parcial: 'Entrada parcial', rechazo: 'Orden rechazada',
-  precio: 'Sin precio', error: 'Error del bot' };
+  precio: 'Sin precio', raro: 'Precio inesperado', error: 'Error del bot' };
 let avisoVisto = 0;
 try { avisoVisto = +localStorage.getItem('kbot.avisoVisto') || 0; } catch (e) { /* sin almacenamiento */ }
 function haceTxt(ts) {
