@@ -34,17 +34,11 @@ const ok = (c, q) => { console.log((c ? '  BIEN  ' : '  MAL   ') + q); if (!c) f
   await p.waitForTimeout(500);
   ok(await T('sProfit') === '+$' + d.hoy.usd.toFixed(2), 'hoy: ' + await T('sProfit'));
 
-  console.log('\n3) el periodo y la cripto se cruzan');
-  await p.click('#segStats button[data-v="SOL"]');
-  await p.waitForTimeout(500);
-  ok(await T('sProfit') === '+$' + d.por_activo.SOL.hoy.usd.toFixed(2),
-     'SOL hoy: ' + await T('sProfit'));
-  ok((await T('sTitulo')).includes('SOL') && (await T('sTitulo')).includes('hoy'),
-     'el título dice las dos cosas: "' + await T('sTitulo') + '"');
+  console.log('\n3) los recuadros son de toda la cuenta: ya no hay selector de activo encima');
+  ok(await p.$('#segStats') === null, 'no está el selector de activo');
   await p.click('#segPeriodo button[data-v="total"]');
   await p.waitForTimeout(500);
-  ok(await T('sProfit') === '+$' + d.por_activo.SOL.total.usd.toFixed(2),
-     'SOL todo: ' + await T('sProfit'));
+  ok(await T('sProfit') === '+$' + d.total.usd.toFixed(2), 'vuelve al total: ' + await T('sProfit'));
 
   console.log('\n4) la curva se dibuja y responde al ratón');
   ok(await p.$('#sCurva svg path') !== null, 'hay curva dibujada');

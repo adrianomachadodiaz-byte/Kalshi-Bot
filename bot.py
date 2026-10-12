@@ -1037,11 +1037,10 @@ class Bot:
             encendido_s=(ahora - self.estado.encendido_desde) if self.estado.encendido_desde and not self.estado.pausado else None,
             total=self.registro.resumen(curva=True), hoy=self.registro.resumen(hoy),
             semana=self.registro.resumen(desde=semana, curva=True), vivo=vivo,
-            por_activo={a: dict(total=self.registro.resumen(activo=a, curva=True),
+            # por activo, lo que enseña el lateral "Por activo" y los ajustes de cada tarjeta
+            por_activo={a: dict(total=self.registro.resumen(activo=a),
                                 hoy=self.registro.resumen(hoy, activo=a),
-                                semana=self.registro.resumen(desde=semana, activo=a, curva=True),
-                                ajustes=(self.ajustes.valores.get("por_activo") or {}).get(a),
-                                encendido=a in self.activos)
+                                ajustes=(self.ajustes.valores.get("por_activo") or {}).get(a))
                         for a in ACTIVOS_VALIDOS},
             abiertas=[dict(activo=o.activo, lado=o.lado.upper(), contratos=o.abiertos(), entrada=o.entrada,
                            objetivo=o.objetivo, ticker=o.ticker) for o in self.estado.abiertas.values()],

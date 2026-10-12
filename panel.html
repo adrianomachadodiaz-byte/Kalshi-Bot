@@ -158,7 +158,7 @@ html{scroll-behavior:smooth}
 .filtros{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px}
 .filtros .par{display:inline-flex;align-items:center;gap:9px}
 .filtros .et{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--tenue)}
-/* 16 cuadros + la curva (que vale por dos) = 18: con 6 columnas son 3 filas justas */
+/* 15 cuadros + la curva (que vale por tres) = 18: con 6 columnas son 3 filas justas */
 .kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
 @media(min-width:720px){.kpis{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media(min-width:1150px){.kpis{grid-template-columns:repeat(6,minmax(0,1fr))}}
@@ -178,8 +178,9 @@ html{scroll-behavior:smooth}
 .kpi .fila b.pos{color:var(--sube)}.kpi .fila b.neg{color:var(--baja)}
 .kpi .nota b{font-family:var(--mono);font-weight:600;color:var(--claro)}
 .kpi .nota .pos{color:var(--sube)}.kpi .nota .neg{color:var(--baja)}
-/* la curva vale por dos cuadros: con 6 columnas cierra la tercera fila sin huecos */
-.kpi.ancha{grid-column:span 2}
+/* la curva vale por tres cuadros: con 6 columnas cierra la tercera fila sin huecos */
+.kpi.ancha{grid-column:span 3}
+@media(max-width:1149px){.kpi.ancha{grid-column:span 2}}
 
 /* curva de la ganancia acumulada, un punto por día, con sus datos debajo */
 .curva{margin:5px -4px 0;min-width:0;position:relative}
@@ -213,8 +214,18 @@ html{scroll-behavior:smooth}
 .porfila .apag{font-size:10.5px;color:var(--tenue);border:1px solid var(--linea);border-radius:3px;padding:0 5px}
 .fnota{font-size:11.5px;color:var(--gris);line-height:1.5}
 .fnota b{color:var(--claro);font-weight:500}
-.fbloq{margin-top:9px;padding-top:9px;border-top:1px solid var(--linea);font-size:11.5px;color:var(--avisa-t,var(--gris))}
-.fbloq span{display:block;margin-top:4px}
+/* filtros de entrada: las reglas en lista corta y dos cifras */
+.freglas{margin:0;padding:0;list-style:none;font-size:11px;line-height:1.45;color:var(--gris)}
+.freglas li{display:flex;gap:7px}
+.freglas li::before{content:"";width:4px;height:4px;margin-top:6px;border-radius:50%;background:var(--sube);flex:none}
+.freglas b{color:var(--claro);font-weight:600}
+.fcifras{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:9px}
+.fcifras > div{display:flex;align-items:baseline;gap:6px;padding:5px 9px;border:1px solid var(--linea);border-radius:var(--r-s);background:var(--n0)}
+.fcifras b{font-size:14px;font-weight:600;color:var(--claro)}
+.fcifras span{font-size:10.5px;color:var(--tenue)}
+.fbloq{margin-top:8px;padding-top:8px;border-top:1px solid var(--linea);font-size:10.5px;line-height:1.4;color:var(--gris)}
+.fbloq span{display:block;margin-top:3px}
+.fbloq b{color:var(--avisa);font-weight:500}
 
 /* selector del periodo: Todo / 7 días / Hoy */
 .segm{display:inline-flex;flex-wrap:wrap;align-items:center;gap:2px;padding:2px;background:var(--n0);border:1px solid var(--linea);border-radius:var(--r-s)}
@@ -223,7 +234,6 @@ html{scroll-behavior:smooth}
 .segm button:hover{color:var(--claro)}
 .segm button[aria-pressed="true"]{background:var(--n2);color:var(--claro)}
 /* selector de activo en dos grupos: cada uno en su cajita con su nombre, y un icono en cada botón */
-.filtros .par.ancho{flex-wrap:wrap;align-items:center}
 .selector{display:inline-flex;flex-wrap:wrap;align-items:stretch;gap:8px}
 .sgrupo{display:inline-flex;flex-wrap:wrap;align-items:center;gap:2px;padding:3px;
   background:var(--n0);border:1px solid var(--linea);border-radius:11px;transition:border-color var(--t)}
@@ -248,7 +258,6 @@ html{scroll-behavior:smooth}
 .casi{display:inline-flex;align-items:center;gap:5px;margin-left:7px;padding:1px 7px;border-radius:999px;
   font-size:10.5px;color:var(--avisa);background:var(--avisa-f);border:1px solid rgba(240,180,41,.35)}
 .casi::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
-.kpi dd.avisa{color:var(--avisa)}
 #caidas .ico{width:14px;height:14px;margin-right:6px;vertical-align:-2px}
 .marca-min{position:absolute;top:-3px;width:2px;height:10px;border-radius:1px;background:var(--avisa);
   transform:translateX(-1px);transition:left var(--t)}
@@ -439,15 +448,9 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 .avanzado summary::before{content:"";width:5px;height:5px;border-right:1.4px solid currentColor;
   border-bottom:1.4px solid currentColor;transform:rotate(-45deg);transition:transform var(--t)}
 .avanzado[open] summary::before{transform:rotate(45deg)}
-/* bloque plegado: el resumen ya dice lo importante */
-.plegable > summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px}
-.plegable > summary::-webkit-details-marker{display:none}
-.plegable > summary::after{content:"";width:6px;height:6px;margin-left:auto;flex:none;
-  border-right:1.4px solid var(--tenue);border-bottom:1.4px solid var(--tenue);
-  transform:rotate(45deg) translate(-2px,-2px);transition:transform var(--t)}
-.plegable[open] > summary::after{transform:rotate(-135deg)}
-.plegable > summary:hover::after{border-color:var(--claro)}
-.plegable > summary .aviso{margin:0;padding:4px 10px;font-size:12px;flex:1;min-width:0}
+/* una etiqueta de estado dentro de una cabecera: sin el margen de los avisos sueltos, alineada */
+.titulo .aviso{margin:0;padding:3px 10px;font-size:11.5px}
+.titulo .aviso.ancho{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .estado-guardado{display:inline-flex;align-items:center;gap:6px;font-size:12.5px}
 .estado-guardado::before{content:"";width:12px;height:12px;border-radius:50%;flex:none}
 .estado-guardado.ok{color:var(--sube)}
@@ -471,9 +474,13 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 .plegar:hover{color:var(--claro);border-color:var(--linea-2)}
 .plegar svg{transition:transform 160ms var(--sal)}
 .plegar[aria-expanded="true"] svg{transform:rotate(90deg)}
-/* plegado: del recuadro solo queda la cabecera */
-section.plegado > :not(.titulo):not(.filtros):not(.ab-t){display:none}
-section.plegado > .titulo,section.plegado > .filtros,section.plegado > .ab-t{margin-bottom:0}
+/* plegado: del recuadro solo queda la cabecera, y de la cabecera se van los botones e iconos
+   (lo marcado con pl-oculta); lo que resume el recuadro se queda a la vista */
+.plegado:not(.grupo) > :not(.titulo):not(.filtros):not(.ab-t){display:none}
+.plegado:not(.grupo) > .titulo,.plegado:not(.grupo) > .filtros,.plegado:not(.grupo) > .ab-t{margin-bottom:0}
+.plegado .pl-oculta{display:none}
+/* "seguir los nuevos" del registro (sin display en línea: si no, al plegar no se escondía) */
+.seguir{display:flex;align-items:center;gap:7px;margin:0;cursor:pointer}
 .grupo.plegado + .rejilla-b{display:none}
 .grupo .plegar{margin-right:-2px}
 
@@ -650,8 +657,8 @@ section.plegado > .titulo,section.plegado > .filtros,section.plegado > .ab-t{mar
 
 <section class="resumen" id="s-res" aria-label="Resultado" data-pleg="res">
   <div class="filtros">
-    <span class="par"><span class="et">Periodo</span><span class="segm" id="segPeriodo"></span></span>
-    <span class="par ancho"><span class="et">Activo</span><span class="selector" id="segStats"></span></span>
+    <h2>Resultado</h2>
+    <span class="par pl-oculta"><span class="et">Periodo</span><span class="segm" id="segPeriodo"></span></span>
   </div>
   <dl class="kpis">
     <div class="kpi"><dt id="sTitulo">Resultado</dt><dd id="sProfit" class="skel">–</dd>
@@ -684,8 +691,6 @@ section.plegado > .titulo,section.plegado > .filtros,section.plegado > .ab-t{mar
       <div class="nota" id="sSimulNota"></div></div>
     <div class="kpi"><dt>Por lado</dt><div id="sLados" style="margin-top:5px"></div></div>
     <div class="kpi"><dt>Cómo cierran</dt><div id="sSalidas" style="margin-top:5px"></div></div>
-    <div class="kpi"><dt>Casi pierden</dt><dd id="sCasi">–</dd>
-      <div class="nota" id="sCasiNota"></div></div>
     <div class="kpi"><dt>Saldo en Kalshi</dt><dd id="sSaldo" class="skel">–</dd>
       <div class="nota"><span id="sKey"></span> · encendido <b id="sOn">–</b></div></div>
     <div class="kpi ancha"><dt>Ganancia acumulada<span id="sDias" style="text-transform:none;letter-spacing:0;color:var(--tenue)"></span></dt>
@@ -701,9 +706,9 @@ section.plegado > .titulo,section.plegado > .filtros,section.plegado > .ab-t{mar
   <div id="s-bloque"></div>
 
 <section class="seccion panel" id="s-ops" aria-label="Operaciones" data-pleg="ops">
-  <div class="titulo"><h2>Operaciones</h2><span class="selector" id="segOps"></span><span id="opsCuenta" class="ayuda"></span>
-    <span class="sp"></span><a href="/operaciones.csv">bajar todas (CSV)</a>
-    <button id="reiniciar" class="b-ghost chico">Reiniciar resultados</button>
+  <div class="titulo"><h2>Operaciones</h2><span class="selector pl-oculta" id="segOps"></span><span id="opsCuenta" class="ayuda pl-oculta"></span>
+    <span class="sp"></span><a href="/operaciones.csv" class="pl-oculta">bajar todas (CSV)</a>
+    <button id="reiniciar" class="b-ghost chico pl-oculta">Reiniciar resultados</button>
     <span id="msgReiniciar" class="msg" role="status" aria-live="polite"></span></div>
   <div class="wrap"><table>
     <thead><tr><th scope="col">Fecha (CDT)</th><th scope="col">Activo</th><th scope="col">Lado</th><th scope="col">Entrada</th><th scope="col">Salida</th><th scope="col">Precio salida</th><th scope="col" title="Lo más bajo que llegó el bid de su lado mientras estuvo abierta">Más bajo</th><th scope="col">Contratos</th><th scope="col">Resultado</th><th scope="col">$</th></tr></thead>
@@ -712,13 +717,10 @@ section.plegado > .titulo,section.plegado > .filtros,section.plegado > .ab-t{mar
   <div class="row" style="margin-top:10px"><button type="button" class="b-ghost chico" data-vertodas="ops" hidden></button></div>
 </section>
 
-<section class="seccion panel" id="s-log" aria-label="Registro">
-  <details class="plegable" id="plegLog">
-  <summary><h2>Registro</h2><span class="ayuda num" id="logUltimo" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span></summary>
-  <div class="titulo" style="margin-top:10px"><span class="sp"></span>
-    <label style="display:flex;align-items:center;gap:7px;margin:0;cursor:pointer"><input type="checkbox" id="auto" checked style="width:auto;margin:0;accent-color:var(--gris)">seguir los nuevos</label></div>
+<section class="seccion panel" id="s-log" aria-label="Registro" data-pleg="log" data-pleg-cerrado>
+  <div class="titulo"><h2>Registro</h2><span class="ayuda num" id="logUltimo" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+    <label class="pl-oculta seguir"><input type="checkbox" id="auto" checked style="width:auto;margin:0;accent-color:var(--gris)">seguir los nuevos</label></div>
   <div id="logs" tabindex="0"></div>
-  </details>
 </section>
 
 <section class="seccion panel" id="s-caidas" aria-label="Las que más bajaron" data-pleg="caidas">
@@ -761,10 +763,9 @@ section.plegado > .titulo,section.plegado > .filtros,section.plegado > .ab-t{mar
 
 <section class="seccion" id="s-ajustes" aria-label="Ajustes y API">
   <div class="grid2">
-    <div>
-      <details class="plegable">
-      <summary><h2>Ajustes generales</h2><span id="resumenAjustes" class="aviso off">cargando</span></summary>
-      <p class="ayuda" style="margin:12px 0 10px">Valen para todas las criptos. Los de cada una están debajo de su gráfico. Se aplican al guardar, sin reiniciar.</p>
+    <div data-pleg="ajustes" data-pleg-cerrado>
+      <div class="titulo"><h2>Ajustes generales</h2><span id="resumenAjustes" class="aviso off ancho">cargando</span></div>
+      <p class="ayuda" style="margin:0 0 10px">Valen para todas las criptos. Los de cada una están debajo de su gráfico. Se aplican al guardar, sin reiniciar.</p>
       <div class="form" id="form"></div>
       <details id="bloqueAv" class="avanzado" hidden>
         <summary>Avanzado</summary>
@@ -772,16 +773,13 @@ section.plegado > .titulo,section.plegado > .filtros,section.plegado > .ab-t{mar
       </details>
 
       <div class="row"><button class="b-main" id="guardar">Guardar ajustes</button><button class="b-ghost" id="deshacer">Deshacer</button><span id="msgAjustes" class="msg" role="status" aria-live="polite"></span></div>
-      </details>
     </div>
-    <div>
-      <details class="plegable">
-      <summary><h2>API de Kalshi</h2><span id="keyEstado" class="aviso off">cargando</span></summary>
-      <label style="margin-top:14px;display:block">API key ID<input id="keyId" autocomplete="off" spellcheck="false" placeholder="a1b2c3d4-…"></label>
+    <div data-pleg="api" data-pleg-cerrado>
+      <div class="titulo"><h2>API de Kalshi</h2><span id="keyEstado" class="aviso off ancho">cargando</span></div>
+      <label style="display:block">API key ID<input id="keyId" autocomplete="off" spellcheck="false" placeholder="a1b2c3d4-…"></label>
       <label style="margin-top:11px">Private key (.pem completo)<textarea id="pem" spellcheck="false" placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;…&#10;-----END RSA PRIVATE KEY-----"></textarea></label>
       <p class="ayuda" style="margin:9px 0 0">Se crean en kalshi.com → Account → API Keys. La private key no se vuelve a mostrar después de guardarla.</p>
       <div class="row"><button class="b-main" id="guardarKey">Guardar y probar</button><span id="msgKey" class="msg" role="status" aria-live="polite"></span></div>
-      </details>
     </div>
   </div>
 </section>
@@ -792,7 +790,7 @@ section.plegado > .titulo,section.plegado > .filtros,section.plegado > .ab-t{mar
 <script>
 const $ = id => document.getElementById(id);
 let ultimo = null, campos = [], camposActivo = [], activos = [], ajustesGuardados = null;
-let focoStats = 'todo', focoOps = 'todo', focoPeriodo = 'total', cartelesPara = '';
+let focoOps = 'todo', focoPeriodo = 'total', cartelesPara = '';
 let sinIndice = [];          // materias primas y divisas: operan sin Delta
 let divisas = [];            // EUR/USD, GBP/USD...: tercer grupo del panel
 const conDelta = a => !sinIndice.includes(a);
@@ -1513,7 +1511,9 @@ function pintarPorActivo(d) {
   // apagados y sin ninguna operación no tienen nada que contar: van todos juntos en una línea
   const mudo = a => !enc.includes(a) && !((pa[a] || {}).total || {}).ops;
   caja.innerHTML = porGrupos(d.activos_validos || []).map(([g, l]) => {
-    const filas = l.filter(a => !mudo(a)).map(a => {
+    // dentro de cada grupo, arriba el que más operaciones lleva (a igualdad, el orden de siempre)
+    const ops = a => ((pa[a] || {}).total || {}).ops || 0;
+    const filas = l.filter(a => !mudo(a)).sort((x, y) => ops(y) - ops(x)).map(a => {
       const x = pa[a] || {}, t = x.total || {}, h = x.hoy || {};
       return `<div class="porfila">
         ${icono(a)}<span class="nom">${esc(nombre(a))}</span>
@@ -1542,19 +1542,21 @@ function pintarFiltro(d) {
   const h = f.hoy || {};
   const sinCal = !!d.noticias_error;
   const reglas = [
-    f.horario ? 'horario (08:00-09:00 y 10:00-10:30 ET · metales/petróleo: Londres, EIA y CME)' : null,
-    f.finde ? 'sin fin de semana en cripto' : null,
-    f.activo ? (sinCal ? 'calendario: no disponible ahora' : `calendario: <b>${f.rojos_hoy}</b> dato${f.rojos_hoy === 1 ? '' : 's'} rojo${f.rojos_hoy === 1 ? '' : 's'} hoy`) : null,
+    f.horario ? 'Horario: 08:00-09:00 y 10:00-10:30 ET (metales y petróleo: Londres, EIA y CME)' : null,
+    f.finde ? 'Sin fin de semana en cripto' : null,
+    f.activo ? (sinCal ? 'Calendario: no disponible ahora' : `Calendario: <b>${f.rojos_hoy}</b> dato${f.rojos_hoy === 1 ? '' : 's'} rojo${f.rojos_hoy === 1 ? '' : 's'} hoy`) : null,
   ].filter(Boolean);
-  caja.innerHTML = `<p class="fnota">
-      ${reglas.join('<br>')}<br>
-      Bloques saltados hoy: <b>${f.hoy_total}</b>
-      (${h.hora || 0} por horario · ${h.finde || 0} por fin de semana · ${h.evento || 0} por noticia · ${h.dia || 0} por día cargado).<br>
-      Esta semana: <b>${f.semana_total}</b>.
-    </p>`
-    + (Object.keys(f.bloqueado || {}).length
-      ? `<div class="fbloq">${Object.entries(f.bloqueado).map(([a, p]) =>
-        `<span>⛔ ${esc(a)}: ${esc(p)}</span>`).join('')}</div>` : '');
+  const detalle = `${h.hora || 0} por horario · ${h.finde || 0} por fin de semana · ${h.evento || 0} por noticia · ${h.dia || 0} por día cargado`;
+  // los bloqueados ahora mismo, una línea por motivo: con 21 activos, uno por línea era una lista larguísima
+  const porMotivo = {};
+  for (const [a, p] of Object.entries(f.bloqueado || {})) (porMotivo[p] = porMotivo[p] || []).push(nombre(a));
+  caja.innerHTML = `<ul class="freglas">${reglas.map(r => `<li>${r}</li>`).join('')}</ul>
+    <div class="fcifras" title="Hoy: ${esc(detalle)}">
+      <div><b class="num">${f.hoy_total}</b><span>saltados hoy</span></div>
+      <div><b class="num">${f.semana_total}</b><span>esta semana</span></div>
+    </div>`
+    + (Object.keys(porMotivo).length ? `<div class="fbloq">${Object.entries(porMotivo).map(([p, l]) =>
+      `<span><b>${esc(l.join(', '))}</b>: ${esc(p)}</span>`).join('')}</div>` : '');
 }
 
 // Debajo de la curva: el mejor y el peor día, cuántos días cerraron en verde y el máximo
@@ -1672,17 +1674,12 @@ function render(d) {
   sinIndice = d.sin_indice || [];
   divisas = d.divisas || [];
   if (!campos.length) { campos = d.campos; camposActivo = d.campos_activo || []; ajustesGuardados = d.ajustes; armarForm(); }
-  segmento('segStats', focoStats, x => { focoStats = x; });
   segmento('segOps', focoOps, x => { focoOps = x; });
   segPeriodo();
-  // el periodo y la cripto se cruzan: cada combinación tiene su propio resumen
-  const pa = (d.por_activo || {})[focoStats];
-  const fuente = focoStats === 'todo' || !pa ? d : pa;
-  const t = fuente[focoPeriodo] || fuente.total;
+  // los recuadros de información son de toda la cuenta; el periodo elige todo, 7 días u hoy
+  const t = d[focoPeriodo] || d.total;
   const comoDije = PERIODOS.find(x => x[0] === focoPeriodo);
-  $('sTitulo').textContent = 'Resultado'
-    + (focoStats === 'todo' ? '' : ' · ' + focoStats)
-    + (focoPeriodo === 'total' ? '' : ' · ' + comoDije[1].toLowerCase());
+  $('sTitulo').textContent = 'Resultado' + (focoPeriodo === 'total' ? '' : ' · ' + comoDije[1].toLowerCase());
 
   destellar($('sProfit'), usd(t.usd), clase(t.usd));
   $('sProfitHoy').innerHTML = t.ops
@@ -1762,21 +1759,6 @@ function render(d) {
   $('sSalidas').innerHTML = sal.length ? sal.map(([m, c]) =>
     `<div class="fila"><span>${esc(m)}</span><b>${c} <span style="color:var(--tenue);font-weight:400">${Math.round(100 * c / t.ops)}%</span></b></div>`).join('')
     : '<div class="nota">sin operaciones</div>';
-
-  // ganadas que casi fueron perdidas (solo las medidas: las de antes no traen el dato)
-  const cm = +d.ajustes.casi_margen || 0, cs = $('sCasi');
-  cs.innerHTML = t.casi_de ? `${t.casi} <span class="chico">de ${t.casi_de}</span>` : '–';
-  cs.className = t.casi ? 'avisa' : '';
-  // el ejemplo: la que más bajó de las que casi pierden (del activo elegido); el resto está en
-  // "Las que más bajaron", más abajo
-  const peorCasi = (d.caidas || []).find(r => r.casi && (focoStats === 'todo' || r.activo === focoStats));
-  $('sCasiNota').innerHTML = t.casi_de
-    ? `ganadas que bajaron a <b>${n(cm, 2)}</b> o menos del stop`
-      + (t.casi ? ` · <b>${Math.round(100 * t.casi / t.casi_de)}%</b>` : '')
-      + (peorCasi ? `<br>la que más: <b>${esc(nombre(peorCasi.activo))}</b> ${esc(peorCasi.fecha.slice(5).replace('-', '/'))} `
-        + `${h12(peorCasi.hora_min || peorCasi.hora_entrada)} bajó a <b class="neg">${n(+peorCasi.bid_min, 3)}</b> `
-        + `y terminó en <b class="pos">${n(+peorCasi.precio_salida, 3)}</b>` : '')
-    : 'se mide desde esta versión del bot';
 
   destellar($('sSaldo'), d.saldo == null ? '–' : '$' + d.saldo.toFixed(2), '');
   $('sKey').textContent = d.conectado ? 'key ' + d.key_id : 'sin API key';
@@ -1965,6 +1947,8 @@ async function guardarAjustes(boton, caja) {
   const el = primero && $('f_' + primero);
   if (el) {                       // si el campo malo está plegado (Avanzado o una cripto), se abre
     for (let c = el.closest('details'); c; c = c.parentElement && c.parentElement.closest('details')) c.open = true;
+    const caja = el.closest('[data-pleg]');                       // y si su recuadro está plegado, se despliega
+    if (caja && estaPlegado(caja.dataset.pleg)) plegar(caja.dataset.pleg, false);
     el.focus();
     el.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
@@ -2223,33 +2207,45 @@ $('guardarKey').onclick = async () => {
   refrescar();
 };
 
-// ---- plegar secciones: una flechita en la cabecera de cada recuadro ----
-// Lo que se deja plegado se recuerda en este navegador (si no se puede guardar, todo abre desplegado).
+// ---- plegar recuadros: una flechita a la izquierda de la cabecera de cada uno ----
+// Cada recuadro abre como viene (desplegado, o plegado si lleva data-pleg-cerrado: Registro y
+// Ajustes) hasta que se toca; lo que se toca se recuerda en este navegador, si se puede guardar.
 const PLEGADOS = 'kbot.plegados';
-let plegados = new Set();
-try { plegados = new Set(JSON.parse(localStorage.getItem(PLEGADOS) || '[]')); } catch (e) { /* sin almacenamiento */ }
+let plegados = {};                      // id -> true plegado / false desplegado
+try {
+  const g = JSON.parse(localStorage.getItem(PLEGADOS) || '{}');
+  // la primera versión guardaba solo la lista de los plegados
+  plegados = Array.isArray(g) ? Object.fromEntries(g.map(id => [id, true])) : g;
+} catch (e) { /* sin almacenamiento */ }
+function estaPlegado(id) {
+  if (id in plegados) return plegados[id];
+  const el = document.querySelector(`[data-pleg="${id}"]`);
+  return !!(el && el.hasAttribute('data-pleg-cerrado'));
+}
 function botonPlegar(id) {
-  return `<button type="button" class="plegar" data-plegar="${id}" aria-expanded="${!plegados.has(id)}" `
+  return `<button type="button" class="plegar" data-plegar="${id}" aria-expanded="${!estaPlegado(id)}" `
     + `title="Plegar o desplegar"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" `
     + `stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></button>`;
 }
 function pintarPlegado(id) {
-  const abierto = !plegados.has(id);
+  const abierto = !estaPlegado(id);
   document.querySelectorAll(`[data-pleg="${id}"]`).forEach(el => el.classList.toggle('plegado', !abierto));
   document.querySelectorAll(`[data-plegar="${id}"]`).forEach(b => b.setAttribute('aria-expanded', String(abierto)));
+}
+function plegar(id, si) {
+  plegados[id] = si;
+  try { localStorage.setItem(PLEGADOS, JSON.stringify(plegados)); } catch (e) { /* sin almacenamiento */ }
+  pintarPlegado(id);
 }
 document.addEventListener('click', ev => {
   const b = ev.target.closest('[data-plegar]');
   if (!b) return;
   ev.preventDefault(); ev.stopPropagation();
-  const id = b.dataset.plegar;
-  if (plegados.has(id)) plegados.delete(id); else plegados.add(id);
-  try { localStorage.setItem(PLEGADOS, JSON.stringify([...plegados])); } catch (e) { /* sin almacenamiento */ }
-  pintarPlegado(id);
+  plegar(b.dataset.plegar, !estaPlegado(b.dataset.plegar));
   if (ultimo) render(ultimo);           // lo que se despliega se mide y se dibuja con su ancho
 });
-// las secciones fijas llevan el botón al principio de su cabecera
-document.querySelectorAll('section[data-pleg]').forEach(s => {
+// los recuadros fijos llevan el botón al principio de su cabecera
+document.querySelectorAll('[data-pleg]').forEach(s => {
   const cab = s.querySelector(':scope > .titulo, :scope > .filtros');
   if (cab) cab.insertAdjacentHTML('afterbegin', botonPlegar(s.dataset.pleg));
   pintarPlegado(s.dataset.pleg);

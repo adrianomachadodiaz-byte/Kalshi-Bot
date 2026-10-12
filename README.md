@@ -55,16 +55,19 @@ Todo se maneja desde el panel (el dominio de Railway, con tu clave `ACCESS_TOKEN
   de dinero: una línea "NO ENTRÓ por falta de saldo" en el registro y un aviso arriba durante 15 minutos.
 - **Las que más bajaron** (debajo del Registro): las operaciones ordenadas por lo más bajo que llegó su bid
   después de entrar, de la que más bajó a la que menos, con la hora a la que tocó ese mínimo (columna
-  `hora_min` del CSV), cuánto bajó desde la entrada y cómo terminó. El cuadro **Casi pierden** enseña la que
-  más bajó de las que acabaron ganando. Las tablas largas enseñan las primeras filas y un botón "ver todas".
-- **Plegar**: cada recuadro (Resultado, Operaciones abiertas, Operaciones, cada grupo de bloques y los del
-  lateral) tiene una flechita para plegarlo. Lo plegado se recuerda en ese navegador.
+  `hora_min` del CSV), cuánto bajó desde la entrada y cómo terminó. Las tablas largas enseñan las primeras
+  filas y un botón "ver todas".
+- **Plegar**: cada recuadro (Resultado, Operaciones abiertas, Operaciones, Registro, Las que más bajaron, cada
+  grupo de bloques, los del lateral y los dos de Ajustes) tiene una flechita a la izquierda para plegarlo; plegado
+  esconde también los botones de su cabecera. Registro y Ajustes arrancan plegados. Lo que se toca se recuerda en
+  ese navegador.
+- **Por activo** (lateral): dentro de cada grupo, arriba el que más operaciones lleva.
 - **Activos**: tres grupos, cada uno con su sección. **Cripto** (BTC, ETH, SOL, XRP, DOGE, HYPE, BNB, NEAR, ZEC),
   con Delta. **Materias primas** (oro, plata, petróleo, gas natural, cobre, platino, paladio) y **divisas**
   (EUR/USD, GBP/USD, USD/JPY, AUD/USD, USD/CAD), sin Delta: Kalshi las liquida con Pyth, y la API de Pyth solo
   da los precios con clave (responde 401; comprobado el 11-oct-2026). Esas entran solo por la ventana y por el
   precio del contrato. Cobre, platino y paladio llevan la misma regla de horario que el oro (pausa de CME). Las
-  divisas viven en el shard 0 de Kalshi: usan el saldo principal y no se les pasa saldo de otro shard. Todos
+  divisas viven en el shard 0 de Kalshi y el resto en el 2 (ver "Saldo por shard"). Todos
   arrancan apagados; ninguno de los nuevos tiene backtest.
 - **Horario de Kalshi** (materias primas y divisas): si el mercado está abierto o cerrado, con una **cuenta
   regresiva** que baja cada segundo hasta que vuelve a abrir (o hasta que cierra, si está abierto), cuándo cerró y
@@ -74,12 +77,12 @@ Todo se maneja desde el panel (el dominio de Railway, con tu clave `ACCESS_TOKEN
   cuánto dura la sesión siguiente y, si el filtro de horario hace esperar más, desde cuándo entra el bot. La
   cabecera dice de un vistazo cuántas materias primas están abiertas. Se apaga con `HORARIO_KALSHI=0`.
 - **Registro**: los últimos mensajes del bot (entradas, TP, stops, errores), se actualizan cada segundo.
-- **Operaciones**: las últimas 50 y un botón para bajarlas todas en CSV. La columna **Más bajo** dice hasta dónde
-  bajó el bid de su lado mientras estuvo abierta (se mira con las mismas fotos que vigilan el stop). Una ganada que
-  llegó a quedar a 0.05 o menos del stop (sin stop: de 0.50) lleva la etiqueta **casi pierde**, y el cuadro
-  **Casi pierden** de Resultado las cuenta. El margen se cambia en Ajustes → Avanzado. Las operaciones de antes de
-  esta versión no traen el dato. En el CSV van como columnas nuevas `bid_min` y `stop`; un CSV viejo se pone al día
-  solo al arrancar, sin perder filas.
+- **Operaciones**: las últimas 15 (con "ver todas", hasta 120) y un botón para bajarlas todas en CSV. La columna
+  **Más bajo** dice hasta dónde bajó el bid de su lado mientras estuvo abierta (se mira con las mismas fotos que
+  vigilan el stop). Una ganada que llegó a quedar a 0.05 o menos del stop (sin stop: de 0.50) lleva la etiqueta
+  **casi pierde**. El margen se cambia en Ajustes → Avanzado. Las operaciones de antes de esta versión no traen el
+  dato. En el CSV van como columnas nuevas `bid_min`, `stop` y `hora_min`; un CSV viejo se pone al día solo al
+  arrancar, sin perder filas.
 - **Ajustes**: contratos, Delta, Delay, rango de entrada, TP, Exit, BreakEven, límites del día y deslizamiento.
   Se aplican al instante al guardar (sin reiniciar) y revisa que tengan sentido (por ejemplo, entrada máxima + TP ≤ 0.99).
 - **API de Kalshi**: pegas la API key ID y la private key; el bot las prueba pidiendo tu saldo y solo las guarda si Kalshi las acepta.

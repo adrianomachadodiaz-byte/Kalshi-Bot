@@ -275,10 +275,7 @@ class Registro:
         simul_max = max(a_la_vez) if a_la_vez else None
         simul_media = round(sum(a_la_vez) / len(a_la_vez), 1) if a_la_vez else None
         simul_pct = round(100 * sum(1 for x in a_la_vez if x > 1) / len(a_la_vez)) if a_la_vez else None
-        # ganadas que casi fueron perdidas: solo cuentan las que ya traen bid_min
-        medidas = [f for f in filas if f.get("resultado") == "GANA" and num(f.get("bid_min")) is not None]
-        casi = sum(1 for f in medidas if casi_pierde(f, self.casi_margen))
-        return dict(casi=casi, casi_de=len(medidas),ops=len(pnl), ganadas=len(g), perdidas=len(p_), usd=round(sum(pnl), 2),
+        return dict(ops=len(pnl), ganadas=len(g), perdidas=len(p_), usd=round(sum(pnl), 2),
                     invertido=round(invertido, 2),
                     roi=round(100 * sum(pnl) / invertido, 2) if invertido else None,
                     c_media=round(sum(centavos) / len(centavos), 2) if centavos else None,
