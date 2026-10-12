@@ -1047,6 +1047,7 @@ class Bot:
                            objetivo=o.objetivo, ticker=o.ticker) for o in self.estado.abiertas.values()],
             pendientes=len(self.estado.pendientes),
             operaciones=filas[-120:][::-1], logs=list(operador.LOGS)[-250:],
+            caidas=self.registro.caidas(),
             ajustes=self.ajustes.valores,
             noticias=self.noticias.proximas(), noticias_error=self.noticias.error,
             filtro=dict(self.filtro.informe(),

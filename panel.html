@@ -249,6 +249,7 @@ html{scroll-behavior:smooth}
   font-size:10.5px;color:var(--avisa);background:var(--avisa-f);border:1px solid rgba(240,180,41,.35)}
 .casi::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
 .kpi dd.avisa{color:var(--avisa)}
+#caidas .ico{width:14px;height:14px;margin-right:6px;vertical-align:-2px}
 .marca-min{position:absolute;top:-3px;width:2px;height:10px;border-radius:1px;background:var(--avisa);
   transform:translateX(-1px);transition:left var(--t)}
 .m-min{margin-top:4px;font-size:11px;color:var(--gris)}
@@ -391,7 +392,6 @@ tbody tr:last-child td{border-bottom:0}
 tbody tr{transition:background var(--t)}
 tbody tr:hover{background:rgba(255,255,255,.04)}
 .vacio{color:var(--tenue)}
-.alto-tope{max-height:300px;overflow-y:auto;overscroll-behavior:contain}
 
 /* ---------------------------------------------------------------- registro */
 /* calendario económico */
@@ -647,7 +647,6 @@ section.plegado > .titulo,section.plegado > .filtros,section.plegado > .ab-t{mar
 
 <main id="contenido">
 <div id="avisos"></div>
-<section id="abiertas" class="abiertas" aria-label="Operaciones abiertas" data-pleg="abiertas" hidden></section>
 
 <section class="resumen" id="s-res" aria-label="Resultado" data-pleg="res">
   <div class="filtros">
@@ -694,6 +693,9 @@ section.plegado > .titulo,section.plegado > .filtros,section.plegado > .ab-t{mar
   </dl>
 </section>
 
+<!-- operaciones abiertas: debajo de los recuadros de información -->
+<section id="abiertas" class="abiertas" aria-label="Operaciones abiertas" data-pleg="abiertas" hidden></section>
+
 <div class="tablero">
   <div class="principal">
   <div id="s-bloque"></div>
@@ -703,10 +705,11 @@ section.plegado > .titulo,section.plegado > .filtros,section.plegado > .ab-t{mar
     <span class="sp"></span><a href="/operaciones.csv">bajar todas (CSV)</a>
     <button id="reiniciar" class="b-ghost chico">Reiniciar resultados</button>
     <span id="msgReiniciar" class="msg" role="status" aria-live="polite"></span></div>
-  <div class="wrap alto-tope"><table>
+  <div class="wrap"><table>
     <thead><tr><th scope="col">Fecha (CDT)</th><th scope="col">Activo</th><th scope="col">Lado</th><th scope="col">Entrada</th><th scope="col">Salida</th><th scope="col">Precio salida</th><th scope="col" title="Lo más bajo que llegó el bid de su lado mientras estuvo abierta">Más bajo</th><th scope="col">Contratos</th><th scope="col">Resultado</th><th scope="col">$</th></tr></thead>
     <tbody id="ops"></tbody>
   </table></div>
+  <div class="row" style="margin-top:10px"><button type="button" class="b-ghost chico" data-vertodas="ops" hidden></button></div>
 </section>
 
 <section class="seccion panel" id="s-log" aria-label="Registro">
@@ -716,6 +719,16 @@ section.plegado > .titulo,section.plegado > .filtros,section.plegado > .ab-t{mar
     <label style="display:flex;align-items:center;gap:7px;margin:0;cursor:pointer"><input type="checkbox" id="auto" checked style="width:auto;margin:0;accent-color:var(--gris)">seguir los nuevos</label></div>
   <div id="logs" tabindex="0"></div>
   </details>
+</section>
+
+<section class="seccion panel" id="s-caidas" aria-label="Las que más bajaron" data-pleg="caidas">
+  <div class="titulo"><h2>Las que más bajaron</h2>
+    <span class="ayuda">después de entrar, de la que más bajó a la que menos · <span class="casi" style="margin-left:0">casi pierde</span> = ganó habiendo llegado cerca del stop</span></div>
+  <div class="wrap"><table>
+    <thead><tr><th scope="col">Fecha (CDT)</th><th scope="col">Activo</th><th scope="col">Lado</th><th scope="col">Entrada</th><th scope="col">Más bajo</th><th scope="col">A las</th><th scope="col">Bajó</th><th scope="col">Terminó</th><th scope="col">Resultado</th><th scope="col">$</th></tr></thead>
+    <tbody id="caidas"></tbody>
+  </table></div>
+  <div class="row" style="margin-top:10px"><button type="button" class="b-ghost chico" data-vertodas="caidas" hidden></button></div>
 </section>
   </div>
 
@@ -1076,6 +1089,45 @@ function pintarNoticias(d) {
       <span class="que">${esc(e.titulo)}<small>${esc(e.moneda)} · ${esc(hora)}${det ? ' · ' + esc(det) : ''}</small></span>
     </div>`;
   }).join('');
+}
+
+// Las tablas largas enseñan las primeras filas y un botón "ver todas" que las despliega enteras
+// (sin barra de desplazamiento dentro). Vuelve a recogerlas el mismo botón.
+const POCAS = { ops: 15, caidas: 10 };
+const verTodas = {};
+function recortar(id, filas) {
+  const b = document.querySelector(`[data-vertodas="${id}"]`);
+  const sobran = filas.length - POCAS[id];
+  if (b) {
+    b.hidden = sobran <= 0;
+    b.textContent = verTodas[id] ? 'ver menos' : `ver todas (${filas.length})`;
+  }
+  return verTodas[id] || sobran <= 0 ? filas : filas.slice(0, POCAS[id]);
+}
+document.addEventListener('click', ev => {
+  const b = ev.target.closest('[data-vertodas]');
+  if (!b) return;
+  verTodas[b.dataset.vertodas] = !verTodas[b.dataset.vertodas];
+  if (ultimo) render(ultimo);
+});
+
+// Las que más bajaron después de entrar: el bid más bajo primero (el bot ya las manda ordenadas).
+// Dice cuándo tocó ese mínimo y cómo terminó: así se ve qué tan cerca estuvo cada una de perder.
+function pintarCaidas(d) {
+  const filas = d.caidas || [], ver = recortar('caidas', filas);
+  $('caidas').innerHTML = filas.length ? ver.map(r => {
+    const bajo = +r.bid_min, ent = +r.entrada, gana = r.resultado === 'GANA';
+    return `<tr><td class="num">${esc(r.fecha)} ${h12(r.hora_entrada)}</td>
+      <td>${icono(r.activo)}${esc(nombre(r.activo))}</td><td>${esc(r.lado)}</td>
+      <td class="num">${n(ent, 3)}</td>
+      <td class="num" style="color:var(${r.casi ? '--avisa' : gana ? '--claro' : '--baja'});font-weight:600">${n(bajo, 3)}</td>
+      <td class="num">${r.hora_min ? h12(r.hora_min) : '–'}</td>
+      <td class="num neg">−${n(Math.max(0, ent - bajo), 3)}</td>
+      <td class="num">${esc(r.salida)} ${n(+r.precio_salida, 3)}</td>
+      <td class="${gana ? 'pos' : 'neg'}">${gana ? 'ganada' : 'perdida'}${r.casi ? '<span class="casi">casi pierde</span>' : ''}</td>
+      <td class="num ${clase(+r.pnl_usd)}">${usd(+r.pnl_usd)}</td></tr>`;
+  }).join('')
+    : `<tr><td colspan="10" class="vacio">Todavía no hay operaciones medidas: se anota lo más bajo de cada una desde esta versión del bot.</td></tr>`;
 }
 
 // misma regla que operador.casi_pierde: una ganada cuyo bid llegó a `margen` o menos del stop
@@ -1715,9 +1767,15 @@ function render(d) {
   const cm = +d.ajustes.casi_margen || 0, cs = $('sCasi');
   cs.innerHTML = t.casi_de ? `${t.casi} <span class="chico">de ${t.casi_de}</span>` : '–';
   cs.className = t.casi ? 'avisa' : '';
+  // el ejemplo: la que más bajó de las que casi pierden (del activo elegido); el resto está en
+  // "Las que más bajaron", más abajo
+  const peorCasi = (d.caidas || []).find(r => r.casi && (focoStats === 'todo' || r.activo === focoStats));
   $('sCasiNota').innerHTML = t.casi_de
     ? `ganadas que bajaron a <b>${n(cm, 2)}</b> o menos del stop`
       + (t.casi ? ` · <b>${Math.round(100 * t.casi / t.casi_de)}%</b>` : '')
+      + (peorCasi ? `<br>la que más: <b>${esc(nombre(peorCasi.activo))}</b> ${esc(peorCasi.fecha.slice(5).replace('-', '/'))} `
+        + `${h12(peorCasi.hora_min || peorCasi.hora_entrada)} bajó a <b class="neg">${n(+peorCasi.bid_min, 3)}</b> `
+        + `y terminó en <b class="pos">${n(+peorCasi.precio_salida, 3)}</b>` : '')
     : 'se mide desde esta versión del bot';
 
   destellar($('sSaldo'), d.saldo == null ? '–' : '$' + d.saldo.toFixed(2), '');
@@ -1758,7 +1816,8 @@ function render(d) {
 
   const ops = focoOps === 'todo' ? d.operaciones : d.operaciones.filter(r => r.activo === focoOps);
   const margen = +d.ajustes.casi_margen || 0;
-  $('ops').innerHTML = ops.length ? ops.map(r => {
+  const opsVer = recortar('ops', ops);          // 15 y "ver todas"; también esconde el botón si no hay
+  $('ops').innerHTML = ops.length ? opsVer.map(r => {
     const casi = casiPierde(r, margen);
     const ref = r.stop !== '' && r.stop != null ? +r.stop : 0.5;
     return `<tr><td class="num">${r.fecha} ${h12(r.hora_entrada)}</td><td>${r.activo}</td><td>${r.lado}</td>
@@ -1772,6 +1831,7 @@ function render(d) {
   const totOps = focoOps === 'todo' ? d.total.ops : (((d.por_activo || {})[focoOps] || {}).total || {}).ops || 0;
   $('opsCuenta').textContent = ops.length
     ? (totOps > ops.length ? `últimas ${ops.length} de ${totOps}` : `${totOps} en total`) : '';
+  pintarCaidas(d);
 
   pintarHorarioK(d);
   pintarNoticias(d);

@@ -18,7 +18,7 @@ from estrategia import BLOQUE, Estrategia, Foto, Operacion
 CDT = ZoneInfo("America/Chicago")
 COLUMNAS = ["fecha", "hora_entrada", "hora_salida", "activo", "mercado", "lado", "entrada", "salida",
             "precio_salida", "contratos", "min_restantes", "delta", "atraso_s", "pnl_c", "pnl_usd", "resultado", "modo",
-            "bid_min", "stop"]
+            "bid_min", "stop", "hora_min"]
 
 
 def casi_pierde(fila, margen):
@@ -97,9 +97,9 @@ class Registro:
                 self.filas = list(lector)
                 cabecera = lector.fieldnames or []
             if cabecera != COLUMNAS:
-                self._reescribir()
+                self._reescribir(cabecera)
 
-    def _reescribir(self):
+    def _reescribir(self, cabecera):
         """CSV con columnas viejas -> columnas de ahora (las nuevas quedan vacías). Sin esto, las
         filas nuevas llevarían más campos que la cabecera y el archivo se leería mal."""
         tmp = self.ruta.with_suffix(".tmp")
@@ -109,7 +109,25 @@ class Registro:
             for f in self.filas:
                 w.writerow({k: f.get(k) or "" for k in COLUMNAS})
         os.replace(tmp, self.ruta)
-        log(f"{self.ruta.name}: columnas puestas al día ({', '.join(COLUMNAS[-2:])} nuevas)")
+        nuevas = [c for c in COLUMNAS if c not in cabecera]
+        log(f"{self.ruta.name}: columnas puestas al día" + (f" ({', '.join(nuevas)} nuevas)" if nuevas else ""))
+
+    def caidas(self, n=60):
+        """Las operaciones que más bajaron después de entrar: el bid más bajo primero. Solo las que
+        traen el dato (las de antes de medirlo no lo tienen)."""
+        def bajo(f):
+            try:
+                return float(f.get("bid_min"))
+            except (TypeError, ValueError):
+                return None
+        sello = (len(self.filas), self.modo, self.casi_margen, n)
+        if getattr(self, "_sello_caidas", None) == sello:      # el panel lo pide cada segundo
+            return self._caidas
+        filas = [f for f in self.filas if f.get("modo") == self.modo and bajo(f) is not None]
+        filas.sort(key=lambda f: (bajo(f), f.get("fecha", ""), f.get("hora_entrada", "")))
+        self._sello_caidas = sello
+        self._caidas = [dict(f, casi=casi_pierde(f, self.casi_margen)) for f in filas[:n]]
+        return self._caidas
 
     def anotar(self, op: Operacion):
         pnl = op.pnl()
@@ -130,7 +148,8 @@ class Registro:
             pnl_c=round(pnl / op.contratos * 100, 2) if op.contratos else 0, pnl_usd=round(pnl, 2),
             resultado="GANA" if pnl > 0 else "PIERDE", modo=self.modo,
             bid_min=round(op.bid_min, 3) if op.bid_min is not None else "",
-            stop=op.stop if op.stop is not None else "")
+            stop=op.stop if op.stop is not None else "",
+            hora_min=hora(op.bid_min_ts).strftime("%H:%M:%S") if op.bid_min_ts else "")
         nuevo = not self.ruta.exists()
         with open(self.ruta, "a", encoding="utf-8", newline="") as fh:
             w = csv.DictWriter(fh, fieldnames=COLUMNAS)
@@ -257,7 +276,7 @@ class Registro:
         simul_media = round(sum(a_la_vez) / len(a_la_vez), 1) if a_la_vez else None
         simul_pct = round(100 * sum(1 for x in a_la_vez if x > 1) / len(a_la_vez)) if a_la_vez else None
         # ganadas que casi fueron perdidas: solo cuentan las que ya traen bid_min
-        medidas = [f for f in filas if f.get("resultado") == "GANA" and f.get("bid_min") not in (None, "")]
+        medidas = [f for f in filas if f.get("resultado") == "GANA" and num(f.get("bid_min")) is not None]
         casi = sum(1 for f in medidas if casi_pierde(f, self.casi_margen))
         return dict(casi=casi, casi_de=len(medidas),ops=len(pnl), ganadas=len(g), perdidas=len(p_), usd=round(sum(pnl), 2),
                     invertido=round(invertido, 2),
@@ -345,7 +364,7 @@ class Operador:
         # lo más bajo que llegó: con las mismas fotos que mira el stop (las que salida() da por buenas)
         bid = f.bid(op.lado)
         if f.valida() and f.ts < op.cierre and bid is not None and (op.bid_min is None or bid < op.bid_min - 1e-9):
-            op.bid_min = bid
+            op.bid_min, op.bid_min_ts = bid, f.ts
             cambio = True                                # se guarda: sobrevive a un reinicio
         if op.abiertos() > 0:
             if not op.saliendo:

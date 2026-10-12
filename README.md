@@ -53,6 +53,10 @@ Todo se maneja desde el panel (el dominio de Railway, con tu clave `ACCESS_TOKEN
   le sobra por encima de lo que necesitan sus propios activos (en las dos direcciones: 0 → 2 y 2 → 0). Si no
   llega para todo, pasa lo que pueda. Solo avisa cuando de verdad **no pudo entrar** en una operación por falta
   de dinero: una línea "NO ENTRÓ por falta de saldo" en el registro y un aviso arriba durante 15 minutos.
+- **Las que más bajaron** (debajo del Registro): las operaciones ordenadas por lo más bajo que llegó su bid
+  después de entrar, de la que más bajó a la que menos, con la hora a la que tocó ese mínimo (columna
+  `hora_min` del CSV), cuánto bajó desde la entrada y cómo terminó. El cuadro **Casi pierden** enseña la que
+  más bajó de las que acabaron ganando. Las tablas largas enseñan las primeras filas y un botón "ver todas".
 - **Plegar**: cada recuadro (Resultado, Operaciones abiertas, Operaciones, cada grupo de bloques y los del
   lateral) tiene una flechita para plegarlo. Lo plegado se recuerda en ese navegador.
 - **Activos**: tres grupos, cada uno con su sección. **Cripto** (BTC, ETH, SOL, XRP, DOGE, HYPE, BNB, NEAR, ZEC),
