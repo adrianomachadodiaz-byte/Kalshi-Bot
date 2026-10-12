@@ -10,6 +10,7 @@ import json
 import os
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from http.cookies import SimpleCookie
@@ -20,11 +21,11 @@ from urllib.parse import parse_qs, urlparse
 import requests
 
 import operador
-from ejecutores import EjecutorReal, log_cada
+from ejecutores import EjecutorReal, avisar_cada, log_cada
 from estrategia import BLOQUE, Config, Estrategia, Foto
 from kalshi import INDICE_URL as INDICE_URL_DEF
 from kalshi import ErrorKalshi, Kalshi, cargar_clave, precio_indice
-from operador import CDT, Estado, Operador, Registro, log
+from operador import CDT, Estado, Operador, Registro, avisar, log
 
 
 def env(nombre, defecto=""):
@@ -384,7 +385,8 @@ class Precios:
 
     def __init__(self, bot):
         self.bot = bot
-        self.s = requests.Session()
+        self.sesiones = {}  # activo -> requests.Session: se piden a la vez en hilos (ver Bot.correr)
+        self.sin_precio = {}  # activo -> desde cuándo no hay precio fresco (para avisar si dura)
         self.cache = {}     # activo -> (ts local, precio, atraso del feed)
         self.series = {}    # activo -> [(epoch, precio)] del último feed leído
         self.ult_ms = {}    # activo -> (marca del archivo, hora local en que la vimos avanzar)
@@ -397,15 +399,29 @@ class Precios:
         return self.cache.get(activo, (0, None, None))[2]
 
     def get(self, activo):
-        """Precio del índice, o None si no hay uno fresco (entonces el bot no opera)."""
+        """Precio del índice, o None si no hay uno fresco (entonces el bot no opera).
+        Un fallo suelto (el feed viene a veces unos segundos tarde) solo va al registro; si un activo
+        lleva más de 30 s seguidos sin precio, se avisa en la campanita."""
         if activo in SIN_INDICE:      # no tienen feed público: ni se pide, para no llenar el log de 404
             return None
+        p = self._get(activo)
+        if p is not None:
+            self.sin_precio.pop(activo, None)
+        else:
+            desde = self.sin_precio.setdefault(activo, time.time())
+            if time.time() - desde > 30:
+                avisar_cada(f"sinprecio{activo}", 600, "precio", activo,
+                            f"lleva más de 30 s sin precio del índice de Kalshi: no abre operaciones ({self.nota})")
+        return p
+
+    def _get(self, activo):
         ahora = time.time()
         ts, p, atraso = self.cache.get(activo, (0.0, None, None))
         if ahora - ts < self.bot.ciclo_indice:     # el archivo solo avanza cada 2-3 s (medido el 30-sep-2026)
             return p
         try:
-            precio, edad, serie = precio_indice(self.s, activo, INDICE_URL)
+            s = self.sesiones.get(activo) or self.sesiones.setdefault(activo, requests.Session())
+            precio, edad, serie = precio_indice(s, activo, INDICE_URL)
         except Exception as e:  # noqa: BLE001
             log_cada(f"indice{activo}", f"{activo} el índice de Kalshi no responde: {e}")
             if p is not None and ahora - ts < 5:   # fallo suelto: vale el último, hasta 5 s
@@ -489,6 +505,16 @@ class Noticias:
                               previsto=str(e.get("forecast") or ""), anterior=str(e.get("previous") or "")))
         fuera.sort(key=lambda x: x["ts"])
         self.eventos, self.error = fuera, ""
+
+    def por_dia(self):
+        """{fecha (hora de Texas): [noticias de ese día]} para los puntitos del calendario. Solo trae la
+        semana que publica ForexFactory (el feed es de la semana en curso)."""
+        fuera = {}
+        for e in self.eventos:
+            t = datetime.fromtimestamp(e["ts"], CDT)
+            fuera.setdefault(t.strftime("%Y-%m-%d"), []).append(
+                dict(titulo=e["titulo"], hora=t.strftime("%H:%M"), impacto=e["impacto"], moneda=e["moneda"]))
+        return fuera
 
     def proximas(self, cuantas=4):
         ahora = time.time()
@@ -754,6 +780,7 @@ class Bot:
     def __init__(self):
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         self.inicio = time.time()
+        operador.cargar_avisos(DATA_DIR)       # las notificaciones de la campanita
         self.estado = Estado(DATA_DIR)
         self.registro = Registro(DATA_DIR, "real")
         self.ajustes = Ajustes(DATA_DIR)
@@ -779,7 +806,10 @@ class Bot:
         key_id, pem = self.claves.leer()
         if key_id and pem:
             ok, msg = self.conectar(key_id, pem)
-            log(f"API key de Kalshi: {msg}")
+            if ok:
+                log(f"API key de Kalshi: {msg}")
+            else:
+                avisar("error", "", f"la API key de Kalshi no funciona: {msg}. Sin ella el bot no opera")
         else:
             log("Falta la API key de Kalshi: ponla en el panel (sección API de Kalshi)")
 
@@ -854,7 +884,9 @@ class Bot:
         return s if self.ej else None
 
     # ------------------------------------------------------------------ ciclo
-    def paso(self, activo):
+    def paso(self, activo, libros=None):
+        """Una vuelta de un activo. `libros`: los libros de todos los activos, pedidos juntos al
+        empezar la vuelta (Bot.correr); si falta el de este, se pide solo."""
         m = self.mercados.get(activo)
         if not m:
             # Sin mercado no hay foto, y sin foto procesar() nunca se llama: una operación
@@ -872,7 +904,7 @@ class Bot:
         if self.visto.get(activo) != t:
             self.visto[activo] = t
             log(f"{activo} nuevo bloque {t} | referencia {m['referencia']} | shard {m['exchange_index']}")
-        libro = self.k.libro(t)
+        libro = (libros or {}).get(t) or self.k.libro(t)
         f = Foto(ts=time.time(), ticker=t, cierre=m["cierre"], referencia=m["referencia"],
                  precio=self.precios.get(activo), atraso=self.precios.atraso(activo), **libro)
         self.vista[activo] = f
@@ -928,23 +960,41 @@ class Bot:
             if res in ("yes", "no"):
                 self.op.liquidar(op, res)
             elif time.time() - op.cierre > 1800:
-                log_cada(f"liq{op.ticker}", f"{op.ticker} lleva 30 min cerrado sin resultado oficial; sigo esperando", 600)
+                avisar_cada(f"liq{op.ticker}", 600, "error", op.activo,
+                            f"{op.ticker} lleva 30 min cerrado sin resultado oficial; sigo esperando")
 
     def correr(self):
         log(f"BOT INICIADO | {'APAGADO' if self.estado.pausado else 'ENCENDIDO'} | datos en {DATA_DIR} | "
             f"una foto cada {self.ciclo:g} s | índice cada {self.ciclo_indice:g} s")
+        hilos = ThreadPoolExecutor(max_workers=len(CRIPTOS) or 1)
         while True:
             t0 = time.time()
             ciclo = self.ciclo                      # se relee cada vuelta: el panel lo cambia en caliente
-            for a in list(dict.fromkeys(self.activos + list(self.estado.abiertas))):
+            lista = list(dict.fromkeys(self.activos + list(self.estado.abiertas)))
+            # Los índices de las criptos se piden a la vez (cada uno a su archivo de S3); antes iban
+            # de uno en uno dentro de la vuelta. Precios.get guarda el resultado y paso() lo reutiliza.
+            pedir = [a for a in lista if a not in SIN_INDICE]
+            try:
+                for _ in hilos.map(self.precios.get, pedir):
+                    pass
+            except Exception as e:  # noqa: BLE001  (si falla aquí, paso() lo vuelve a pedir él solo)
+                log_cada("indices", f"no pude leer los índices a la vez: {e}", 300)
+            # Y los libros de todos los activos, en una sola petición a Kalshi.
+            libros = {}
+            try:
+                tickers = [m["ticker"] for m in (self.mercados.get(a) for a in lista) if m]
+                libros = self.k.libros(tickers) if tickers else {}
+            except Exception as e:  # noqa: BLE001
+                log_cada("libros", f"no pude leer los libros juntos ({e}): los pido uno por uno", 300)
+            for a in lista:
                 try:
-                    self.paso(a)
+                    self.paso(a, libros)
                 except Exception as e:  # noqa: BLE001
-                    log_cada(f"paso{a}", f"{a} error en el ciclo: {e}")
+                    avisar_cada(f"paso{a}", 30, "error", a, f"error en el ciclo: {e}")
             try:
                 self.liquidar()
             except Exception as e:  # noqa: BLE001
-                log_cada("liquidar", f"error al liquidar: {e}")
+                avisar_cada("liquidar", 60, "error", "", f"error al cobrar las operaciones cerradas: {e}")
             tardo = time.time() - t0
             self.ultima_vuelta = tardo              # lo enseña el panel
             time.sleep(max(0.02, ciclo - tardo))
@@ -1046,6 +1096,9 @@ class Bot:
                            objetivo=o.objetivo, ticker=o.ticker) for o in self.estado.abiertas.values()],
             pendientes=len(self.estado.pendientes),
             operaciones=filas[-120:][::-1], logs=list(operador.LOGS)[-250:],
+            avisos=list(operador.AVISOS)[-60:][::-1],     # la campanita: lo más nuevo primero
+            dias=self.registro.dias(),                    # el calendario: resultado de cada día
+            noticias_dias=self.noticias.por_dia(),        # y sus puntitos de noticias
             caidas=self.registro.caidas(),
             ajustes=self.ajustes.valores,
             noticias=self.noticias.proximas(), noticias_error=self.noticias.error,

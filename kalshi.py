@@ -153,7 +153,8 @@ class Kalshi:
                 "KALSHI-ACCESS-TIMESTAMP": ts}
 
     def _pedir(self, metodo, ruta, params=None, cuerpo=None, firmar=None, reintentos=3):
-        url = self.base + ruta + ("?" + urlencode(params) if params else "")
+        # doseq: una lista va como parámetro repetido (tickers=A&tickers=B), que es lo que pide Kalshi
+        url = self.base + ruta + ("?" + urlencode(params, doseq=True) if params else "")
         firmar = self.autenticado if firmar is None else firmar
         for intento in range(reintentos):
             with self.lock:                                  # espacia los pedidos (límite de Kalshi)
@@ -217,7 +218,23 @@ class Kalshi:
     def libro(self, ticker):
         """Mejor bid de cada lado; el ask de un lado es 1 - bid del otro. Lado vacío: bid 0 y ask del otro 1.0."""
         d = self._pedir("GET", f"/markets/{ticker}/orderbook", {"depth": 5}, firmar=False)
-        ob = d.get("orderbook_fp") or d.get("orderbook") or {}
+        return self._libro_de(d.get("orderbook_fp") or d.get("orderbook") or {})
+
+    def libros(self, tickers):
+        """{ticker: libro} de muchos mercados en UNA petición (/markets/orderbooks, hasta 100).
+        Con 21 activos, pedirlos de uno en uno (y espaciados para que Kalshi no corte) hacía que
+        cada vuelta tardara ~1.4 s aunque el ritmo fuera 0.25 s; así es una sola petición."""
+        fuera = {}
+        tickers = list(dict.fromkeys(t for t in tickers if t))
+        for i in range(0, len(tickers), 100):
+            d = self._pedir("GET", "/markets/orderbooks", {"tickers": tickers[i:i + 100]}, firmar=False)
+            for o in d.get("orderbooks") or []:
+                if o.get("ticker"):
+                    fuera[o["ticker"]] = self._libro_de(o.get("orderbook_fp") or o.get("orderbook") or {})
+        return fuera
+
+    @staticmethod
+    def _libro_de(ob):
         yb = mejor_bid(ob.get("yes_dollars") or ob.get("yes"))
         nb = mejor_bid(ob.get("no_dollars") or ob.get("no"))
         return dict(yes_bid=yb if yb is not None else 0.0, no_bid=nb if nb is not None else 0.0,

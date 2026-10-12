@@ -46,6 +46,48 @@ def log(msg):
     LOGS.append(linea)
 
 
+AVISOS = deque(maxlen=150)   # lo que sale en la campanita del panel
+_avisos = dict(ruta=None, id=0, lock=threading.Lock())
+
+
+def cargar_avisos(carpeta: Path):
+    """Las notificaciones sobreviven a un reinicio: van en DATA_DIR/avisos.json."""
+    _avisos["ruta"] = carpeta / "avisos.json"
+    try:
+        for a in json.loads(_avisos["ruta"].read_text(encoding="utf-8")):
+            AVISOS.append(a)
+        _avisos["id"] = max((a["id"] for a in AVISOS), default=0)
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+
+
+def avisar(tipo, activo, texto):
+    """Algo que el usuario tiene que saber (falta de saldo, entrada parcial, orden rechazada, un
+    error del bot): sale en la campanita del panel y en el registro.
+
+    tipo: "saldo", "parcial", "rechazo", "precio" o "error". Lo mismo repetido en menos de 10 min no
+    crea otra notificación: se suma a la que hay (veces) y no vuelve a contar como nueva.
+    """
+    log(f"{activo + ' ' if activo else ''}{texto}")
+    ahora = time.time()
+    with _avisos["lock"]:
+        for a in reversed(AVISOS):
+            if ahora - a["ts"] > 600:
+                break
+            if a["tipo"] == tipo and a["activo"] == activo and a["texto"] == texto:
+                a["veces"] += 1
+                a["ts"] = ahora
+                break
+        else:
+            _avisos["id"] += 1
+            AVISOS.append(dict(id=_avisos["id"], ts=ahora, tipo=tipo, activo=activo or "", texto=texto, veces=1))
+        if _avisos["ruta"]:
+            try:
+                _avisos["ruta"].write_text(json.dumps(list(AVISOS)), encoding="utf-8")
+            except OSError:
+                pass
+
+
 def hora(ts):
     return datetime.fromtimestamp(ts, timezone.utc).astimezone(CDT)
 
@@ -111,6 +153,37 @@ class Registro:
         os.replace(tmp, self.ruta)
         nuevas = [c for c in COLUMNAS if c not in cabecera]
         log(f"{self.ruta.name}: columnas puestas al día" + (f" ({', '.join(nuevas)} nuevas)" if nuevas else ""))
+
+    def dias(self):
+        """{fecha: resumen del día} para el calendario del panel (fecha en hora de Texas, como el resto)."""
+        sello = (len(self.filas), self.modo)
+        if getattr(self, "_sello_dias", None) == sello:          # el panel lo pide cada segundo
+            return self._dias
+        por = {}
+        for f in self.filas:
+            if f.get("modo") != self.modo:
+                continue
+            try:
+                x = float(f["pnl_usd"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            gana = f.get("resultado") == "GANA" if f.get("resultado") else x > 0
+            d = por.setdefault(f["fecha"], dict(usd=0.0, ops=0, ganadas=0, perdidas=0, g=0.0, p=0.0,
+                                                mejor=None, peor=None))
+            d["usd"] += x
+            d["ops"] += 1
+            d["ganadas" if gana else "perdidas"] += 1
+            d["g" if gana else "p"] += x
+            d["mejor"] = x if d["mejor"] is None else max(d["mejor"], x)
+            d["peor"] = x if d["peor"] is None else min(d["peor"], x)
+        self._dias = {k: dict(usd=round(v["usd"], 4), ops=v["ops"], ganadas=v["ganadas"], perdidas=v["perdidas"],
+                              wr=round(100 * v["ganadas"] / v["ops"], 1),
+                              media_ganada=round(v["g"] / v["ganadas"], 4) if v["ganadas"] else None,
+                              media_perdida=round(v["p"] / v["perdidas"], 4) if v["perdidas"] else None,
+                              mejor=v["mejor"], peor=v["peor"])
+                      for k, v in por.items()}
+        self._sello_dias = sello
+        return self._dias
 
     def caidas(self, n=60):
         """Las operaciones que más bajaron después de entrar: el bid más bajo primero. Solo las que

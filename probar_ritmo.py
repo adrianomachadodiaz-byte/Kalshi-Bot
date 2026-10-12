@@ -56,6 +56,13 @@ class Falso(BaseHTTPRequestHandler):
                                             "open_time": iso(CIERRE - 900), "floor_strike": 84450.0,
                                             "exchange_index": 2,
                                             "price_ranges": [{"start": 0, "end": 1, "step": 0.01}]}]})
+        if ruta.endswith("/orderbooks"):              # todos los libros en una petición (Kalshi.libros)
+            contar("orderbooks")
+            time.sleep(LAT_KALSHI)
+            tickers = [p.split("=", 1)[1] for p in self.path.split("?", 1)[-1].split("&") if p.startswith("tickers=")]
+            return self._json({"orderbooks": [{"ticker": t, "orderbook_fp": {"yes_dollars": [["0.74", "100"]],
+                                                                              "no_dollars": [["0.21", "100"]]}}
+                                              for t in tickers]})
         if ruta.endswith("/orderbook"):
             contar("orderbook")
             time.sleep(LAT_KALSHI)
@@ -88,16 +95,16 @@ def medir(ritmo, ritmo_indice, segundos=20.0):
 
     marcas, original = [], b.paso
 
-    def cronometrado(activo):
+    def cronometrado(activo, *resto):          # paso(activo, libros): los libros llegan pedidos juntos
         marcas.append(time.monotonic())
-        return original(activo)
+        return original(activo, *resto)
 
     b.paso = cronometrado
     threading.Thread(target=b.correr, daemon=True).start()
     time.sleep(segundos)
 
     per = sorted(round((marcas[i + 1] - marcas[i]) * 1000) for i in range(len(marcas) - 1))
-    kalshi = CUENTA.get("orderbook", 0) + CUENTA.get("markets", 0)
+    kalshi = CUENTA.get("orderbook", 0) + CUENTA.get("orderbooks", 0) + CUENTA.get("markets", 0)
     return {
         "ritmo pedido (s)": ritmo,
         "ritmo índice pedido (s)": ritmo_indice,

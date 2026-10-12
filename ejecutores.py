@@ -14,7 +14,7 @@ import requests
 
 from estrategia import Config, Foto, Operacion, comision
 from kalshi import ErrorKalshi, Kalshi, ajustar_tick
-from operador import log
+from operador import avisar, log
 
 _ultimo_log = {}
 
@@ -26,6 +26,14 @@ def log_cada(clave, msg, seg=30):
     if time.time() - _ultimo_log.get(clave, 0) >= seg:
         _ultimo_log[clave] = time.time()
         log(msg)
+
+
+def avisar_cada(clave, seg, tipo, activo, texto):
+    """Como avisar() (campanita + registro), pero como mucho una vez cada `seg` segundos por clave:
+    hay fallos que se repiten en cada foto."""
+    if time.time() - _ultimo_log.get(clave, 0) >= seg:
+        _ultimo_log[clave] = time.time()
+        avisar(tipo, activo, texto)
 
 
 def nueva_operacion(activo, f: Foto, lado, entrada, n, cfg: Config, comision_total, shard=None):
@@ -141,7 +149,7 @@ class EjecutorReal:
                 movido += a_pasar
                 falta -= a_pasar
             except Exception as e:  # noqa: BLE001
-                log(f"{activo} no pude pasar saldo del shard {origen} al {shard}: {e}")
+                avisar("saldo", activo, f"no pude pasar saldo del shard {origen} al {shard}: {e}")
             if falta < 0.01:
                 break
         if movido:
@@ -190,7 +198,7 @@ class EjecutorReal:
         """Había entrada y no se pudo por falta de dinero: es lo único que se avisa del saldo
         (el panel lo enseña arriba durante 15 min)."""
         self.sin_saldo[activo] = dict(ts=time.time(), ticker=f.ticker, detalle=detalle)
-        log_cada(f"sinsaldo{f.ticker}", f"{activo} NO ENTRÓ por falta de saldo: {detalle}", 60)
+        avisar_cada(f"sinsaldo{f.ticker}", 60, "saldo", activo, f"NO ENTRÓ por falta de saldo: {detalle}")
 
     def entrar(self, activo, f, lado, ask, n, cfg):
         m = self.info[f.ticker]
@@ -212,7 +220,7 @@ class EjecutorReal:
                 self._sin_saldo(activo, f, "Kalshi rechazó la orden: saldo insuficiente")
                 return None
             if e.status < 500:
-                log_cada(f"entrada{f.ticker}", f"{activo} orden de entrada rechazada: {e}")
+                avisar_cada(f"entrada{f.ticker}", 30, "rechazo", activo, f"Kalshi rechazó la orden de entrada: {e}")
                 return None
             return self._entrada_dudosa(activo, f, lado, ask, cfg, m, e)
         except requests.RequestException as e:
@@ -240,13 +248,13 @@ class EjecutorReal:
         # Antes que abrir con un TP disparatado, se avisa y se revisa la posición a mano.
         tope_entrada = (cfg.entrada_max + self.desliz) if cruza else cfg.entrada_max
         if not (cfg.entrada_min - 0.05 <= entrada <= tope_entrada + 1e-9):
-            log(f"{activo} ATENCIÓN: el precio de entrada que devolvió Kalshi ({entrada:.3f}) está fuera de "
-                f"{cfg.entrada_min - 0.05:.2f}-{tope_entrada:.2f}. No abro la operación; revisa la posición a mano.")
+            avisar("error", activo, f"ATENCIÓN: el precio de entrada que devolvió Kalshi ({entrada:.3f}) está fuera de "
+                   f"{cfg.entrada_min - 0.05:.2f}-{tope_entrada:.2f}. No abro la operación; revisa la posición a mano.")
             return None
         # average_fee_paid es por contrato (NightShark lo multiplica por la cantidad)
         op = nueva_operacion(activo, f, lado, entrada, llenos, cfg, comision, m["exchange_index"])
         if llenos < n:
-            log(f"{activo} entrada parcial: {llenos:g} de {n:g} contratos")
+            avisar("parcial", activo, f"entrada parcial: {llenos:g} de {n:g} contratos (no había más a ese precio)")
         self._poner_tp(op)
         return op
 
@@ -284,8 +292,8 @@ class EjecutorReal:
                 pass
             time.sleep(0.4)
         if not cerrada:
-            log(f"{activo} ATENCIÓN: la orden de entrada {oid} puede seguir abierta en Kalshi; "
-                f"revísala a mano. No abro la operación para no contar mal la posición.")
+            avisar("error", activo, f"ATENCIÓN: la orden de entrada {oid} puede seguir abierta en Kalshi; "
+                   f"revísala a mano. No abro la operación para no contar mal la posición.")
             return None, None, None
         try:                                    # los fills mandan: traen precio medio y comisiones reales
             c, precio, fee = self.k.llenados(oid, lado)
@@ -305,7 +313,7 @@ class EjecutorReal:
         try:
             n, costo = self.k.posicion(f.ticker, m["exchange_index"])
         except Exception as e:  # noqa: BLE001
-            log(f"{activo} no pude ver la posición ({e}); no opero este bloque")
+            avisar("error", activo, f"no pude ver la posición tras una respuesta dudosa ({e}); no opero este bloque")
             self.fondos[f.ticker] = False     # no volver a intentar en este bloque
             return None
         if not n:
@@ -334,7 +342,7 @@ class EjecutorReal:
             op.tp_orden, op.tp_llenos, op.tp_comision = r["order_id"], 0.0, 0.0
             self.revisar(op)
         except Exception as e:  # noqa: BLE001
-            log(f"{op.activo} no pude poner el TP ({e}); lo reintento y mientras tanto lo vigilo con el bid")
+            avisar("error", op.activo, f"no pude poner el TP ({e}); lo reintento y mientras tanto lo vigilo con el bid")
 
     def revisar(self, op: Operacion):
         """¿Se llenó (parte de) la orden del TP? Si falta la orden, se vuelve a poner cada 5 s."""
@@ -393,10 +401,11 @@ class EjecutorReal:
         try:
             r = self.k.crear_orden(op.ticker, libro, precio_yes, n, "immediate_or_cancel", op.shard, reduce_only=True)
         except Exception as e:  # noqa: BLE001
-            log(f"{op.activo} falló la venta ({motivo}): {e}; reintento en el segundo siguiente")
+            avisar_cada(f"venta{op.ticker}", 10, "error", op.activo, f"falló la venta ({motivo}); reintento en el segundo siguiente")
+            log(f"{op.activo} detalle del fallo de la venta: {e}")
             return False
         if r["llenos"] <= 0:
-            log(f"{op.activo} la venta ({motivo}) no se llenó; reintento en el segundo siguiente")
+            avisar_cada(f"venta{op.ticker}", 10, "error", op.activo, f"la venta ({motivo}) no se llenó; reintento en el segundo siguiente")
             return False
         py = r["precio_yes"]
         precio = (py if op.lado == "yes" else 1 - py) if py is not None else precio_lado

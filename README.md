@@ -62,6 +62,19 @@ Todo se maneja desde el panel (el dominio de Railway, con tu clave `ACCESS_TOKEN
   esconde también los botones de su cabecera. Registro y Ajustes arrancan plegados. Lo que se toca se recuerda en
   ese navegador.
 - **Por activo** (lateral): dentro de cada grupo, arriba el que más operaciones lleva.
+- **Pestañas**: los bloques en vivo van en tres pestañas (Cripto, Materias primas, Divisas). Cada una dice
+  cuántas de su grupo operan y, con un punto verde, cuántas operaciones abiertas tiene. Se recuerda la elegida.
+- **Campanita** (arriba a la derecha): avisa cuando el bot no pudo operar o algo le salió mal: falta de saldo,
+  entrada parcial (Kalshi no tenía todos los contratos a ese precio), orden rechazada, un activo más de 30 s sin
+  precio, una venta que no se llenó, el TP que no se pudo poner, la API key que no funciona o un error en el
+  ciclo. El número rojo cuenta las nuevas; lo repetido en 10 min se agrupa (×N). Se guardan en
+  `DATA_DIR/avisos.json`, así que sobreviven a un reinicio.
+- **Calendario**: el resultado de cada día del mes (verde o rojo, más intenso cuanto más), con las operaciones
+  y el acierto, y puntitos en los días con noticias de impacto alto (rojo) o medio (amarillo) de ForexFactory
+  (solo trae la semana en curso). Pulsando un día sale su detalle. Se cambia de mes con las flechas.
+- **Velocidad**: en cada vuelta los libros de todos los activos se piden a Kalshi en una sola petición
+  (`/markets/orderbooks`) y los índices de las criptos se piden a la vez. Con 21 activos la vuelta pasó de ~2 s a
+  ~0.2 s, así que el Ritmo (0.25 s) se cumple de verdad. Si esa petición fallara, el bot pide los libros uno por uno.
 - **Activos**: tres grupos, cada uno con su sección. **Cripto** (BTC, ETH, SOL, XRP, DOGE, HYPE, BNB, NEAR, ZEC),
   con Delta. **Materias primas** (oro, plata, petróleo, gas natural, cobre, platino, paladio) y **divisas**
   (EUR/USD, GBP/USD, USD/JPY, AUD/USD, USD/CAD), sin Delta: Kalshi las liquida con Pyth, y la API de Pyth solo

@@ -250,10 +250,6 @@ html{scroll-behavior:smooth}
 .selector button:hover .ico,.selector button[aria-pressed="true"] .ico{opacity:1}
 .selector button[aria-pressed="true"]{background:var(--n2);color:var(--claro);box-shadow:inset 0 0 0 1px var(--linea-2)}
 @media(max-width:860px){.sgrupo .sgt{width:100%;border-right:0;padding:3px 8px 4px;margin:0}}
-/* cabeza de cada grupo de tarjetas: nombre, cuántas operan y una raya hasta el borde */
-.grupo .gcuenta{font-size:10.5px;letter-spacing:.02em;text-transform:none;font-weight:400;color:var(--gris);
-  padding:1px 8px;border:1px solid var(--linea);border-radius:999px;background:var(--n1)}
-.grupo .gcuenta b{font-family:var(--mono);font-weight:600;color:var(--claro)}
 /* ganó, pero el bid llegó cerca del stop */
 .casi{display:inline-flex;align-items:center;gap:5px;margin-left:7px;padding:1px 7px;border-radius:999px;
   font-size:10.5px;color:var(--avisa);background:var(--avisa-f);border:1px solid rgba(240,180,41,.35)}
@@ -264,10 +260,6 @@ html{scroll-behavior:smooth}
 .m-min{margin-top:4px;font-size:11px;color:var(--gris)}
 .m-min b{font-family:var(--mono);font-weight:600;color:var(--claro)}
 .m-min.cerca b{color:var(--avisa)}
-.grupo{display:flex;align-items:center;gap:10px;margin:22px 0 10px;font-size:10.5px;font-weight:500;
-  letter-spacing:.1em;text-transform:uppercase;color:var(--tenue)}
-.grupo::after{content:"";flex:1;height:1px;background:var(--linea)}
-#s-bloque > .grupo:first-child{margin-top:0}
 /* tarjetas plegadas en rejilla; la abierta (clase la pone el JS al abrirla) a todo lo ancho */
 .rejilla-b{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,400px),1fr));gap:12px;align-items:start}
 .rejilla-b > .bloque{padding:12px 14px;scroll-margin-top:calc(var(--cabeza) + 14px)}
@@ -466,6 +458,81 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
   border-radius:50%;animation:gira 750ms linear infinite;background:none}
 @keyframes gira{to{transform:rotate(360deg)}}
 
+/* ---------------------------------------------------------------- pestañas de los bloques */
+.pestanas{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:12px;
+  padding-bottom:10px;border-bottom:1px solid var(--linea)}
+.pest{display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border:1px solid var(--linea);border-radius:10px;
+  background:var(--n1);color:var(--gris);font:inherit;font-size:12.5px;font-weight:500;cursor:pointer;
+  transition:color var(--t),background var(--t),border-color var(--t)}
+.pest:hover{color:var(--claro);border-color:var(--linea-2)}
+.pest[aria-selected="true"]{color:var(--claro);background:var(--n2);border-color:var(--linea-2);box-shadow:inset 0 -2px 0 var(--claro)}
+.pest .gcuenta{font-size:11px;color:var(--tenue)}
+.pest .gcuenta b{font-family:var(--mono);font-weight:600;color:var(--gris)}
+.pest[aria-selected="true"] .gcuenta b{color:var(--claro)}
+.pest .pab{min-width:17px;height:17px;padding:0 5px;border-radius:999px;background:var(--sube-f);color:var(--sube);
+  border:1px solid rgba(47,224,122,.45);font:600 10px/15px var(--mono);text-align:center}
+.rejilla-b.fuera-pest{display:none}
+.plegado > .pestanas{padding-bottom:0;border-bottom:0}
+
+/* ---------------------------------------------------------------- calendario */
+/* un mes: cada día con lo ganado o perdido (más intenso cuanto más), operaciones y puntitos de noticias */
+.cal-nav{display:inline-flex;align-items:center;gap:6px;margin-left:6px}
+.cal-nav .icono{padding:2px 9px;font-size:14px;line-height:1.2}
+.cal-nav b{min-width:118px;text-align:center;font-size:13px;font-weight:600;color:var(--claro)}
+.cal-sem,.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.cal-sem{margin-bottom:6px}
+.cal-sem span{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--tenue);text-align:center}
+.cal-d{position:relative;min-height:70px;padding:7px 8px 6px;border:1px solid var(--linea);border-radius:var(--r-s);
+  background:var(--n0);cursor:pointer;display:flex;flex-direction:column;gap:2px;text-align:left;font:inherit;color:inherit;
+  transition:border-color var(--t),transform var(--t-rapido)}
+.cal-d:hover{border-color:var(--linea-2)}
+.cal-d.fuera{visibility:hidden}
+.cal-d.futuro{opacity:.55}
+.cal-d.hoy{border-color:var(--gris)}
+.cal-d.sel{border-color:var(--claro);box-shadow:0 0 0 1px var(--claro)}
+.cal-d .n{font:600 11px var(--mono);color:var(--gris)}
+.cal-d.hoy .n{color:var(--claro)}
+.cal-d .u{margin-top:auto;font:600 14px var(--mono);letter-spacing:-.02em}
+.cal-d .o{font-size:10px;color:var(--tenue)}
+.cal-d .pnts{position:absolute;top:8px;right:8px;display:flex;gap:3px}
+.pnt{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--tenue)}
+.pnt.alta{background:var(--baja);box-shadow:0 0 0 2px var(--baja-f)}
+.pnt.media{background:var(--avisa)}
+.cal-pie{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin-top:10px;font-size:11px;color:var(--tenue)}
+.cal-pie > span{display:inline-flex;align-items:center;gap:6px}
+.cal-pie b{color:var(--claro);font-family:var(--mono)}
+.cal-dia{margin-top:12px}
+.cal-dia:empty{display:none}
+.cal-dia h3{margin:0 0 8px;font-size:12.5px;font-weight:600;color:var(--claro)}
+.cal-dia .kpis{grid-template-columns:repeat(auto-fit,minmax(130px,1fr))}
+.cal-dia .ev{padding:6px 0}
+
+/* ---------------------------------------------------------------- campanita */
+/* notificaciones: falta de saldo, entradas parciales, órdenes rechazadas, errores del bot */
+.campana{position:relative}
+.campana .icono{position:relative}
+.campana .cuenta{position:absolute;top:-6px;right:-6px;min-width:17px;height:17px;padding:0 5px;border-radius:999px;
+  background:var(--baja);color:#fff;font:600 10px/17px var(--mono);text-align:center;box-shadow:0 0 0 2px var(--n0)}
+.campana-menu{position:absolute;top:calc(100% + 8px);right:0;z-index:40;width:min(420px,calc(100vw - 24px));
+  background:var(--n1);border:1px solid var(--linea-2);border-radius:var(--r);box-shadow:0 18px 44px -12px rgba(0,0,0,.8)}
+.cm-cab{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--linea)}
+.cm-cab b{font-size:13px;color:var(--claro)}
+.cm-lista{max-height:min(460px,70vh);overflow-y:auto;overscroll-behavior:contain}
+.cm-item{display:flex;gap:10px;padding:10px 14px;border-bottom:1px solid var(--linea)}
+.cm-item:last-child{border-bottom:0}
+.cm-item.nuevo{background:rgba(255,255,255,.035)}
+.cm-item .cm-pun{width:8px;height:8px;margin-top:5px;border-radius:50%;flex:none;background:var(--tenue)}
+.cm-item.saldo .cm-pun{background:var(--avisa)}
+.cm-item.parcial .cm-pun{background:#6a95f2}
+.cm-item.rechazo .cm-pun,.cm-item.error .cm-pun{background:var(--baja)}
+.cm-item.precio .cm-pun{background:#c08cf0}
+.cm-cuerpo{min-width:0;flex:1}
+.cm-tit{display:flex;align-items:baseline;gap:7px;font-size:12px;color:var(--claro);font-weight:500}
+.cm-tit .ayuda{margin-left:auto;white-space:nowrap}
+.cm-tit .veces{font:600 10.5px var(--mono);color:var(--gris)}
+.cm-txt{margin-top:2px;font-size:11.5px;line-height:1.4;color:var(--gris);word-break:break-word}
+.cm-vacio{padding:22px 14px;text-align:center;font-size:12px;color:var(--tenue)}
+
 /* ---------------------------------------------------------------- plegar recuadros */
 /* la flechita de cada cabecera: apunta abajo desplegado y a la derecha plegado */
 .plegar{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;padding:0;flex:none;
@@ -476,13 +543,11 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 .plegar[aria-expanded="true"] svg{transform:rotate(90deg)}
 /* plegado: del recuadro solo queda la cabecera, y de la cabecera se van los botones e iconos
    (lo marcado con pl-oculta); lo que resume el recuadro se queda a la vista */
-.plegado:not(.grupo) > :not(.titulo):not(.filtros):not(.ab-t){display:none}
-.plegado:not(.grupo) > .titulo,.plegado:not(.grupo) > .filtros,.plegado:not(.grupo) > .ab-t{margin-bottom:0}
+.plegado > :not(.titulo):not(.filtros):not(.ab-t){display:none}
+.plegado > .titulo,.plegado > .filtros,.plegado > .ab-t{margin-bottom:0}
 .plegado .pl-oculta{display:none}
 /* "seguir los nuevos" del registro (sin display en línea: si no, al plegar no se escondía) */
 .seguir{display:flex;align-items:center;gap:7px;margin:0;cursor:pointer}
-.grupo.plegado + .rejilla-b{display:none}
-.grupo .plegar{margin-right:-2px}
 
 /* ---------------------------------------------------------------- operaciones abiertas */
 /* arriba del todo, una tarjeta por operación: activo, lado, cómo va y la barra stop-TP */
@@ -645,6 +710,16 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
   <a id="hMat" class="pill solo-pc" href="#s-horario" hidden title="Horario de Kalshi de las materias primas y las divisas"></a>
   <span class="sp"></span>
   <span id="msgPower" class="msg" role="status" aria-live="polite"></span>
+  <div class="campana">
+    <button type="button" class="icono" id="bCampana" aria-label="Notificaciones" aria-expanded="false" aria-haspopup="true" title="Notificaciones">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z"></path><path d="M10 20.5a2.2 2.2 0 0 0 4 0"></path></svg>
+      <span class="cuenta" id="campanaN" hidden></span>
+    </button>
+    <div class="campana-menu" id="campanaMenu" hidden>
+      <div class="cm-cab"><b>Notificaciones</b><span class="sp"></span><button type="button" class="b-ghost chico" id="campanaLeer">marcar como leídas</button></div>
+      <div class="cm-lista" id="campanaLista"></div>
+    </div>
+  </div>
   <button id="cancelar" class="b-ghost" hidden>Cancelar</button>
   <button id="power" class="b-encender" disabled>Encender</button>
   <form method="post" action="/logout" style="margin:0">
@@ -703,7 +778,18 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 
 <div class="tablero">
   <div class="principal">
-  <div id="s-bloque"></div>
+  <div id="s-bloque" data-pleg="bloques"></div>
+
+<section class="seccion panel" id="s-cal" aria-label="Calendario" data-pleg="cal">
+  <div class="titulo"><h2>Calendario</h2>
+    <span class="cal-nav pl-oculta"><button type="button" class="icono" id="calAtras" aria-label="Mes anterior">‹</button><b id="calMes"></b><button type="button" class="icono" id="calAdelante" aria-label="Mes siguiente">›</button></span>
+    <span class="sp"></span><span class="ayuda" id="calTotal"></span></div>
+  <div class="cal-sem"><span>Lun</span><span>Mar</span><span>Mié</span><span>Jue</span><span>Vie</span><span>Sáb</span><span>Dom</span></div>
+  <div class="cal-grid" id="calGrid"></div>
+  <div class="cal-pie"><span><i class="pnt alta"></i>noticia de alto impacto</span><span><i class="pnt media"></i>impacto medio</span>
+    <span class="sp"></span><span id="calResumen"></span></div>
+  <div class="cal-dia" id="calDia"></div>
+</section>
 
 <section class="seccion panel" id="s-ops" aria-label="Operaciones" data-pleg="ops">
   <div class="titulo"><h2>Operaciones</h2><span class="selector pl-oculta" id="segOps"></span><span id="opsCuenta" class="ayuda pl-oculta"></span>
@@ -1212,6 +1298,10 @@ function pintarAbiertas(d) {
       const b = ev.target.closest('[data-ir]');
       const card = b && $('card_' + b.dataset.ir);
       if (!card) return;
+      // su tarjeta puede estar en otra pestaña o con los bloques plegados
+      const panel = card.closest('[data-panel]');
+      if (panel) elegirPestana(panel.dataset.panel, true);
+      if (estaPlegado('bloques')) plegar('bloques', false);
       card.open = true;
       card.closest('.bloque').scrollIntoView({ block: 'start', behavior: 'smooth' });   // con su margen bajo la cabecera
     };
@@ -1312,6 +1402,12 @@ const nombre = a => NOMBRES[a] || a;
 // sin índice público van las materias primas y las divisas; las divisas las manda el bot aparte
 const esDivisa = a => divisas.includes(a);
 const esMateria = a => sinIndice.includes(a) && !esDivisa(a);
+// el icono de cada grupo (selector de Operaciones y pestañas de los bloques)
+const ICO_GRUPO = {
+  Cripto: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="color:#f7931a" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M9.5 8h4a2 2 0 0 1 0 4h-4m0 0h4.5a2 2 0 0 1 0 4H9.5zM11 6v2m0 8v2"></path></svg>',
+  'Materias primas': '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" style="color:#e9c35b" aria-hidden="true"><path d="M3.4 18l2.8-8.4h11.6l2.8 8.4z"></path></svg>',
+  Divisas: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="color:#6a95f2" aria-hidden="true"><rect x="2.6" y="6.2" width="18.8" height="11.6" rx="2.2"></rect><circle cx="12" cy="12" r="2.6"></circle></svg>',
+};
 function porGrupos(lista) {
   return [['Cripto', lista.filter(a => !sinIndice.includes(a))], ['Materias primas', lista.filter(esMateria)],
     ['Divisas', lista.filter(esDivisa)]].filter(([, l]) => l.length);
@@ -1333,6 +1429,13 @@ function icono(a) {
 // Una tarjeta por cripto, con su gráfico y SU configuración dentro. Se arma una sola
 // vez: si se rehiciera en cada refresco se perdería lo que el usuario esté plegando o
 // escribiendo en un campo.
+// enseña el grupo `g` y esconde los demás; `guardar`: recordarla para la próxima vez
+function elegirPestana(g, guardar) {
+  document.querySelectorAll('#s-bloque [data-pest]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.pest === g)));
+  document.querySelectorAll('#s-bloque [data-panel]').forEach(p => p.classList.toggle('fuera-pest', p.dataset.panel !== g));
+  if (guardar) { try { localStorage.setItem('kbot.pestana', g); } catch (e) { /* sin almacenamiento */ } }
+}
+
 function armarCarteles(lista) {
   const clave = lista.join(',');
   if (clave === cartelesPara) return;
@@ -1379,12 +1482,25 @@ function armarCarteles(lista) {
     </details>
   </details>
   </section>`;
-  // plegadas, las tarjetas van en rejilla (dos o tres por fila); la que se abre ocupa la fila entera
-  $('s-bloque').innerHTML = porGrupos(lista).map(([g, l], i) =>
-    `<h2 class="grupo" data-pleg="g-${i}">${botonPlegar('g-' + i)}<span>${g}</span>`
-    + `<span class="gcuenta" id="gc_${i}" data-de="${l.join(',')}"></span></h2>`
-    + `<div class="rejilla-b">${l.map(carta).join('')}</div>`).join('');
-  porGrupos(lista).forEach((_, i) => pintarPlegado('g-' + i));
+  // Una pestaña por grupo (Cripto, Materias primas, Divisas): se ve un grupo a la vez. Plegadas,
+  // las tarjetas van en rejilla (dos o tres por fila); la que se abre ocupa la fila entera.
+  const grupos = porGrupos(lista);
+  $('s-bloque').innerHTML = `<div class="titulo pestanas" role="tablist" aria-label="Grupos de activos">${botonPlegar('bloques')}`
+    + grupos.map(([g, l]) => `<button type="button" role="tab" class="pest" data-pest="${esc(g)}" aria-selected="false">`
+      + `${ICO_GRUPO[g] || ''}<span>${esc(g)}</span><span class="gcuenta" data-de="${l.join(',')}"></span>`
+      + `<span class="pab" data-ab="${l.join(',')}" hidden></span></button>`).join('')
+    + `</div>` + grupos.map(([g, l]) => `<div class="rejilla-b" role="tabpanel" data-panel="${esc(g)}">${l.map(carta).join('')}</div>`).join('');
+  pintarPlegado('bloques');
+  let guardada = '';
+  try { guardada = localStorage.getItem('kbot.pestana') || ''; } catch (e) { /* sin almacenamiento */ }
+  elegirPestana(grupos.some(([g]) => g === guardada) ? guardada : (grupos[0] || [''])[0], false);
+  $('s-bloque').addEventListener('click', ev => {
+    const p = ev.target.closest('[data-pest]');
+    if (!p) return;
+    elegirPestana(p.dataset.pest, true);
+    if (estaPlegado('bloques')) plegar('bloques', false);   // con el recuadro plegado, la pestaña lo abre
+    if (ultimo) render(ultimo);
+  });
   llenarForm(ajustesGuardados);
   // "toggle" no sube por el árbol: se escucha en la fase de captura
   $('s-bloque').addEventListener('toggle', ev => {
@@ -1484,12 +1600,7 @@ function segmento(id, actual, alElegir) {
   if (caja.dataset.ops !== clave) {
     caja.dataset.ops = clave;
     const btn = o => `<button type="button" data-v="${o}">${o === 'todo' ? 'Todo' : icono(o) + esc(nombre(o))}</button>`;
-    // "Todo" va solo; cripto y materias primas, cada una en su cajita con su nombre
-    const ICO_GRUPO = {
-      Cripto: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="color:#f7931a" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M9.5 8h4a2 2 0 0 1 0 4h-4m0 0h4.5a2 2 0 0 1 0 4H9.5zM11 6v2m0 8v2"></path></svg>',
-      'Materias primas': '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" style="color:#e9c35b" aria-hidden="true"><path d="M3.4 18l2.8-8.4h11.6l2.8 8.4z"></path></svg>',
-      Divisas: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="color:#6a95f2" aria-hidden="true"><rect x="2.6" y="6.2" width="18.8" height="11.6" rx="2.2"></rect><circle cx="12" cy="12" r="2.6"></circle></svg>',
-    };
+    // "Todo" va solo; cripto, materias primas y divisas, cada una en su cajita con su nombre
     caja.innerHTML = `<span class="sgrupo">${btn('todo')}</span>` + porGrupos(activos).map(([g, l]) =>
       `<span class="sgrupo" role="group" aria-label="${g}"><span class="sgt">${ICO_GRUPO[g] || ''}${g}</span>`
       + l.map(btn).join('') + '</span>').join('');
@@ -1775,11 +1886,17 @@ function render(d) {
   const operando = new Set(d.abiertas.map(o => o.activo));
   d.vivo.forEach(v => pintarVivo(d, v));
   pintarHorarios(d);
-  // cabeza de cada grupo: cuántas de ese grupo están operando
-  document.querySelectorAll('.grupo .gcuenta').forEach(el => {
+  // cada pestaña: cuántas de su grupo están operando, y un punto verde con las operaciones abiertas
+  document.querySelectorAll('#s-bloque .gcuenta').forEach(el => {
     const de = (el.dataset.de || '').split(',').filter(Boolean);
-    const on = de.filter(a => enc.includes(a)).length;
-    el.innerHTML = `<b>${on}</b> de ${de.length} operando`;
+    el.innerHTML = `<b>${de.filter(a => enc.includes(a)).length}</b>/${de.length}`;
+    el.title = 'operando de este grupo';
+  });
+  document.querySelectorAll('#s-bloque .pab').forEach(el => {
+    const ab = (el.dataset.ab || '').split(',').filter(a => operando.has(a)).length;
+    el.hidden = !ab;
+    el.textContent = ab;
+    el.title = `${ab} operación${ab === 1 ? '' : 'es'} abierta${ab === 1 ? '' : 's'}`;
   });
   for (const a of activos) {
     const card = $('card_' + a);
@@ -1816,6 +1933,8 @@ function render(d) {
   pintarCaidas(d);
 
   pintarHorarioK(d);
+  pintarCampana(d);
+  pintarCalendario(d);
   pintarNoticias(d);
   pintarFiltro(d);
   pintarPorActivo(d);
@@ -2206,6 +2325,125 @@ $('guardarKey').onclick = async () => {
   if (r.ok) { $('pem').value = ''; $('keyId').value = ''; }
   refrescar();
 };
+
+// ---- calendario: el resultado de cada día del mes, con puntitos donde hay noticias ----
+// Va en hora de Texas, como la fecha del CSV. Las noticias son las de la semana que publica
+// ForexFactory, así que los puntitos salen en la semana en curso. Se redibuja solo si algo cambió:
+// si se rehiciera cada segundo, un clic justo en el refresco se perdería.
+const fechaTx = ts => new Date(ts * 1000).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
+let calMes = null, calSel = null, calFirma = '';
+function pintarCalendario(d) {
+  const hoy = fechaTx(ahoraS());
+  if (!calMes) calMes = hoy.slice(0, 7);
+  const dias = d.dias || {}, nots = d.noticias_dias || {};
+  const enMes = Object.entries(dias).filter(([k]) => k.startsWith(calMes));
+  const firma = JSON.stringify([calMes, calSel, hoy, enMes, Object.entries(nots).filter(([k]) => k.startsWith(calMes))]);
+  if (firma === calFirma) return;
+  calFirma = firma;
+  const [Y, M] = calMes.split('-').map(Number);
+  const nDias = new Date(Y, M, 0).getDate(), hueco = (new Date(Y, M - 1, 1).getDay() + 6) % 7;   // lunes primero
+  const maxAbs = Math.max(0.01, ...enMes.map(([, v]) => Math.abs(v.usd)));
+  const celdas = Array.from({ length: hueco }, () => '<div class="cal-d fuera" aria-hidden="true"></div>');
+  for (let dia = 1; dia <= nDias; dia++) {
+    const k = `${calMes}-${dos(dia)}`, v = dias[k], ns = nots[k] || [];
+    const alta = ns.filter(e => e.impacto === 'High'), media = ns.filter(e => e.impacto !== 'High');
+    const fondo = v ? `background:${v.usd >= 0 ? 'rgba(47,224,122,' : 'rgba(255,95,95,'}${(0.07 + 0.3 * Math.min(1, Math.abs(v.usd) / maxAbs)).toFixed(3)})` : '';
+    const tit = [v ? `${usd(v.usd)} · ${v.ops} operaciones · ${v.ganadas} ganadas / ${v.perdidas} perdidas` : 'sin operaciones']
+      .concat(ns.map(e => `${e.hora} ${e.titulo} (${e.impacto === 'High' ? 'alto' : 'medio'})`)).join('\n');
+    celdas.push(`<button type="button" class="cal-d${k === hoy ? ' hoy' : ''}${k > hoy ? ' futuro' : ''}${k === calSel ? ' sel' : ''}"
+        data-dia="${k}" style="${fondo}" title="${esc(tit)}">
+      <span class="n">${dia}</span>
+      ${ns.length ? `<span class="pnts">${alta.length ? '<i class="pnt alta"></i>' : ''}${media.length ? '<i class="pnt media"></i>' : ''}</span>` : ''}
+      ${v ? `<span class="u ${clase(v.usd)}">${usd(v.usd)}</span><span class="o">${v.ops} op · ${v.wr}%</span>` : ''}
+    </button>`);
+  }
+  $('calGrid').innerHTML = celdas.join('');
+  const mes = new Date(Y, M - 1, 1).toLocaleDateString('es', { month: 'long', year: 'numeric' });
+  $('calMes').textContent = mes.charAt(0).toUpperCase() + mes.slice(1);     // "Octubre de 2026"
+  const total = enMes.reduce((s, [, v]) => s + v.usd, 0);
+  $('calTotal').innerHTML = enMes.length ? `este mes <b class="num ${clase(total)}">${usd(total)}</b>` : '';
+  const verdes = enMes.filter(([, v]) => v.usd > 0).length, rojos = enMes.filter(([, v]) => v.usd < 0).length;
+  const mejor = enMes.reduce((a, b) => (!a || b[1].usd > a[1].usd ? b : a), null);
+  $('calResumen').innerHTML = enMes.length ? `<b>${verdes}</b> días en verde · <b>${rojos}</b> en rojo`
+    + (mejor ? ` · mejor día <b>${+mejor[0].slice(8)}</b> (${usd(mejor[1].usd)})` : '') : 'sin operaciones este mes';
+  // el día elegido, con su detalle y sus noticias
+  const v = calSel && dias[calSel], ns = (calSel && nots[calSel]) || [];
+  const tituloDia = calSel ? new Date(calSel + 'T12:00:00').toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' }) : '';
+  $('calDia').innerHTML = !calSel ? '' : `<h3>${esc(tituloDia.charAt(0).toUpperCase() + tituloDia.slice(1))}</h3>`
+    + (v ? `<dl class="kpis">
+        <div class="kpi"><dt>Resultado</dt><dd class="${clase(v.usd)}">${usd(v.usd)}</dd></div>
+        <div class="kpi"><dt>Operaciones</dt><dd>${v.ops}</dd><div class="nota"><b class="pos">${v.ganadas}</b> ganadas · <b class="neg">${v.perdidas}</b> perdidas</div></div>
+        <div class="kpi"><dt>Acierto</dt><dd>${v.wr}%</dd></div>
+        <div class="kpi"><dt>Ganada media</dt><dd class="pos">${v.media_ganada == null ? '–' : usd(v.media_ganada)}</dd></div>
+        <div class="kpi"><dt>Perdida media</dt><dd class="neg">${v.media_perdida == null ? '–' : usd(v.media_perdida)}</dd></div>
+        <div class="kpi"><dt>Mejor · peor</dt><dd class="chico"><span class="pos">${usd(v.mejor)}</span> · <span class="neg">${usd(v.peor)}</span></dd></div>
+      </dl>` : '<p class="ayuda" style="margin:0">Ese día no hubo operaciones.</p>')
+    + (ns.length ? `<div style="margin-top:10px">${ns.map(e => `<div class="ev"><span class="imp ${e.impacto === 'High' ? 'alta' : 'media'}"></span>
+        <span class="cuando num">${esc(h12(e.hora))}</span><span class="que">${esc(e.titulo)}<small>${esc(e.moneda)} · impacto ${e.impacto === 'High' ? 'alto' : 'medio'}</small></span></div>`).join('')}</div>` : '');
+}
+$('calGrid').addEventListener('click', ev => {
+  const b = ev.target.closest('[data-dia]');
+  if (!b) return;
+  calSel = calSel === b.dataset.dia ? null : b.dataset.dia;
+  if (ultimo) pintarCalendario(ultimo);
+});
+function moverMes(n) {
+  const [Y, M] = calMes.split('-').map(Number), f = new Date(Y, M - 1 + n, 1);
+  calMes = `${f.getFullYear()}-${dos(f.getMonth() + 1)}`;
+  calSel = null;
+  if (ultimo) pintarCalendario(ultimo);
+}
+$('calAtras').addEventListener('click', () => moverMes(-1));
+$('calAdelante').addEventListener('click', () => moverMes(1));
+
+// ---- campanita: lo que el bot no pudo hacer o le salió mal ----
+// El número rojo cuenta las que llegaron después de la última vez que se marcaron como leídas
+// (se recuerda en este navegador). Repetidas en menos de 10 min vienen juntas, con "×N".
+const TIPOS_AVISO = { saldo: 'Sin saldo', parcial: 'Entrada parcial', rechazo: 'Orden rechazada',
+  precio: 'Sin precio', error: 'Error del bot' };
+let avisoVisto = 0;
+try { avisoVisto = +localStorage.getItem('kbot.avisoVisto') || 0; } catch (e) { /* sin almacenamiento */ }
+function haceTxt(ts) {
+  const s = Math.max(0, ahoraS() - ts);
+  return s < 60 ? 'ahora' : s < 3600 ? `hace ${Math.floor(s / 60)} min` : s < 86400 ? `hace ${Math.floor(s / 3600)} h`
+    : cuandoTxt(ts);
+}
+function pintarCampana(d) {
+  const av = d.avisos || [], nuevos = av.filter(a => a.id > avisoVisto).length, n = $('campanaN');
+  n.hidden = !nuevos;
+  n.textContent = nuevos > 99 ? '99+' : nuevos;
+  $('bCampana').title = nuevos ? `${nuevos} notificación${nuevos === 1 ? '' : 'es'} nueva${nuevos === 1 ? '' : 's'}` : 'Notificaciones';
+  if ($('campanaMenu').hidden) return;          // la lista solo se dibuja con el menú abierto
+  $('campanaLista').innerHTML = av.length ? av.map(a => `<div class="cm-item ${esc(a.tipo)}${a.id > avisoVisto ? ' nuevo' : ''}">
+      <span class="cm-pun"></span>
+      <div class="cm-cuerpo">
+        <div class="cm-tit">${esc(TIPOS_AVISO[a.tipo] || a.tipo)}${a.activo ? ' · ' + esc(nombre(a.activo)) : ''}
+          ${a.veces > 1 ? `<span class="veces">×${a.veces}</span>` : ''}<span class="ayuda" title="${esc(cuandoTxt(a.ts))}">${esc(haceTxt(a.ts))}</span></div>
+        <div class="cm-txt">${esc(a.texto)}</div>
+      </div></div>`).join('')
+    : '<div class="cm-vacio">Todo en orden: el bot no ha tenido problemas.</div>';
+}
+function leerAvisos() {
+  const av = (ultimo && ultimo.avisos) || [];
+  avisoVisto = Math.max(avisoVisto, ...av.map(a => a.id), 0);
+  try { localStorage.setItem('kbot.avisoVisto', String(avisoVisto)); } catch (e) { /* sin almacenamiento */ }
+  if (ultimo) pintarCampana(ultimo);
+}
+$('bCampana').addEventListener('click', ev => {
+  ev.stopPropagation();
+  const m = $('campanaMenu');
+  m.hidden = !m.hidden;
+  $('bCampana').setAttribute('aria-expanded', String(!m.hidden));
+  if (ultimo) pintarCampana(ultimo);
+});
+$('campanaLeer').addEventListener('click', ev => { ev.stopPropagation(); leerAvisos(); });
+$('campanaMenu').addEventListener('click', ev => ev.stopPropagation());
+document.addEventListener('click', () => {         // clic fuera: se cierra
+  if (!$('campanaMenu').hidden) { $('campanaMenu').hidden = true; $('bCampana').setAttribute('aria-expanded', 'false'); }
+});
+document.addEventListener('keydown', ev => {
+  if (ev.key === 'Escape' && !$('campanaMenu').hidden) { $('campanaMenu').hidden = true; $('bCampana').setAttribute('aria-expanded', 'false'); $('bCampana').focus(); }
+});
 
 // ---- plegar recuadros: una flechita a la izquierda de la cabecera de cada uno ----
 // Cada recuadro abre como viene (desplegado, o plegado si lleva data-pleg-cerrado: Registro y
