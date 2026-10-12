@@ -145,7 +145,7 @@ class Registro:
             contratos=op.contratos, min_restantes=round((op.cierre - op.ts_entrada) / 60, 1),
             delta=round(op.delta, 1) if op.delta is not None else "",
             atraso_s=round(op.atraso, 1) if op.atraso is not None else "",
-            pnl_c=round(pnl / op.contratos * 100, 2) if op.contratos else 0, pnl_usd=round(pnl, 2),
+            pnl_c=round(pnl / op.contratos * 100, 2) if op.contratos else 0, pnl_usd=round(pnl, 4),   # 4 decimales: con contratos sueltos (0.35) el céntimo se comía la ganancia
             resultado="GANA" if pnl > 0 else "PIERDE", modo=self.modo,
             bid_min=round(op.bid_min, 3) if op.bid_min is not None else "",
             stop=op.stop if op.stop is not None else "",
@@ -192,22 +192,26 @@ class Registro:
                  and (desde is None or f["fecha"] >= desde)
                  and (activo is None or f.get("activo") == activo)]
         pnl = [float(f["pnl_usd"]) for f in filas]
-        g = [p for p in pnl if p > 0]
-        p_ = [p for p in pnl if p <= 0]
+        # ganada o perdida sale de la columna "resultado", calculada con el pnl sin redondear.
+        # Con el pnl_usd (redondeado a céntimos) una ganada de 0.35 contratos (+$0.0035)
+        # quedaba en 0.00 y contaba como perdida.
+        gano = [f.get("resultado") == "GANA" if f.get("resultado") else x > 0 for f, x in zip(filas, pnl)]
+        g = [x for x, s in zip(pnl, gano) if s]
+        p_ = [x for x, s in zip(pnl, gano) if not s]
         # racha: cuántas seguidas, contando desde la última hacia atrás. Positiva si son
         # ganadas, negativa si son perdidas. Dice más que el porcentaje de acierto solo.
         racha = 0
-        for x in reversed(pnl):
+        for s in reversed(gano):
             if racha == 0:
-                racha = 1 if x > 0 else -1
-            elif (x > 0) == (racha > 0):
+                racha = 1 if s else -1
+            elif s == (racha > 0):
                 racha += 1 if racha > 0 else -1
             else:
                 break
         # la mejor racha de ganadas que ha habido, no solo la de ahora
         mejor_racha, n = 0, 0
-        for x in pnl:
-            n = n + 1 if x > 0 else 0
+        for s in gano:
+            n = n + 1 if s else 0
             mejor_racha = max(mejor_racha, n)
         # el bajón más hondo: cuánto se llegó a perder desde el punto más alto.
         # Es el número que dice si una racha mala te habría dejado sin saldo.
@@ -238,10 +242,10 @@ class Registro:
         centavos = [c for c in (num(f.get("pnl_c")) for f in filas) if c is not None]
         # por lado (YES/NO): cuántas y qué acierto lleva cada uno
         lados = {}
-        for f, x in zip(filas, pnl):
+        for f, s in zip(filas, gano):
             l = lados.setdefault(f.get("lado") or "?", [0, 0])
             l[0] += 1
-            l[1] += x > 0
+            l[1] += s
         lados = {k: dict(ops=v[0], wr=round(100 * v[1] / v[0], 1)) for k, v in lados.items()}
         # cómo cerraron: TP, Exit (stop), al cierre del bloque... (columna "salida")
         salidas = {}
