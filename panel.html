@@ -158,30 +158,34 @@ html{scroll-behavior:smooth}
 .filtros{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px}
 .filtros .par{display:inline-flex;align-items:center;gap:9px}
 .filtros .et{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--tenue)}
-.kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+/* 16 cuadros + la curva (que vale por dos) = 18: con 6 columnas son 3 filas justas */
+.kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
 @media(min-width:720px){.kpis{grid-template-columns:repeat(4,minmax(0,1fr))}}
-@media(min-width:1150px){.kpis{grid-template-columns:repeat(5,minmax(0,1fr))}}
-.kpi{background:var(--n1);border:1px solid var(--linea);border-radius:var(--r-s);padding:9px 11px 10px;
+@media(min-width:1150px){.kpis{grid-template-columns:repeat(6,minmax(0,1fr))}}
+.kpi{background:var(--n1);border:1px solid var(--linea);border-radius:var(--r-s);padding:7px 10px 8px;
   min-width:0;transition:border-color var(--t)}
 .kpi:hover{border-color:var(--linea-2)}
-.kpi dt{font-size:9.5px;letter-spacing:.08em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:uppercase;color:var(--tenue)}
-.kpi dd{margin:4px 0 0;font-family:var(--mono);font-size:19px;font-weight:600;letter-spacing:-.035em;
+.kpi dt{font-size:9px;letter-spacing:.08em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:uppercase;color:var(--tenue)}
+.kpi dd{margin:3px 0 0;font-family:var(--mono);font-size:16px;font-weight:600;letter-spacing:-.035em;
   line-height:1.05;color:var(--claro);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .kpi dd.pos{color:var(--sube)}.kpi dd.neg{color:var(--baja)}
-.kpi dd .chico{font-size:12px}
+.kpi dd .chico{font-size:11px}
 .kpi dd .sep{color:var(--tenue);font-weight:400;margin:0 2px}
-.kpi .nota{margin-top:4px;font-size:10.5px;line-height:1.4;color:var(--gris)}
+.kpi .nota{margin-top:3px;font-size:10px;line-height:1.35;color:var(--gris)}
 .kpi .nota + .nota{margin-top:1px}
-.kpi .fila{display:flex;justify-content:space-between;gap:6px;font-size:10.5px;color:var(--gris);line-height:1.5}
+.kpi .fila{display:flex;justify-content:space-between;gap:6px;font-size:10px;color:var(--gris);line-height:1.4}
 .kpi .fila b{font-family:var(--mono);font-weight:600;color:var(--claro)}
 .kpi .fila b.pos{color:var(--sube)}.kpi .fila b.neg{color:var(--baja)}
 .kpi .nota b{font-family:var(--mono);font-weight:600;color:var(--claro)}
 .kpi .nota .pos{color:var(--sube)}.kpi .nota .neg{color:var(--baja)}
-/* la curva ocupa la fila entera: en span 2 dejaba el resto de la fila vacío */
-.kpi.ancha{grid-column:1/-1}
+/* la curva vale por dos cuadros: con 6 columnas cierra la tercera fila sin huecos */
+.kpi.ancha{grid-column:span 2}
 
-/* curva de la ganancia acumulada, un punto por día */
-.curva{margin:8px -4px 0;min-width:0;position:relative}
+/* curva de la ganancia acumulada, un punto por día, con sus datos debajo */
+.curva{margin:5px -4px 0;min-width:0;position:relative}
+.cinfo{display:flex;flex-wrap:wrap;gap:2px 12px;margin-top:4px;font-size:10px;color:var(--gris)}
+.cinfo b{font-family:var(--mono);font-weight:600;color:var(--claro)}
+.cinfo b.pos{color:var(--sube)}.cinfo b.neg{color:var(--baja)}
 .curva svg{display:block;width:100%;height:auto}
 .curva .nada{padding:14px 4px;font-size:11.5px;color:var(--tenue)}
 .sinlinea{margin:0;padding:26px 6px;font-size:12px;line-height:1.6;color:var(--tenue)}
@@ -201,7 +205,7 @@ html{scroll-behavior:smooth}
 @keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
 
 /* lateral: marcador por activo y estado del filtro */
-.porfila{display:flex;align-items:baseline;gap:9px;padding:9px 0;border-top:1px solid var(--linea)}
+.porfila{display:flex;align-items:baseline;gap:9px;padding:5px 0;border-top:1px solid var(--linea)}
 .porfila:first-of-type{border-top:0}
 .porfila .nom{font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:var(--claro);min-width:34px}
 .porfila .pnl{font-family:var(--mono);font-size:14px;font-weight:600;margin-left:auto}
@@ -226,15 +230,15 @@ html{scroll-behavior:smooth}
 .sgrupo:hover{border-color:var(--linea-2)}
 .sgrupo .sgt{display:inline-flex;align-items:center;gap:6px;align-self:stretch;padding:0 10px 0 8px;margin-right:2px;
   border-right:1px solid var(--linea);font-size:9.5px;font-weight:500;letter-spacing:.11em;text-transform:uppercase;color:var(--tenue)}
-.sgrupo .sgt svg{flex:none;color:var(--gris)}
+.sgrupo .sgt svg{flex:none}
 .selector button{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border:0;border-radius:8px;
   background:transparent;color:var(--gris);font:inherit;font-size:12px;letter-spacing:.01em;cursor:pointer;
   transition:color var(--t),background var(--t),box-shadow var(--t)}
-.selector button .ico{width:14px;height:14px;margin:0;color:var(--tenue)}
+/* cada icono lleva su color; sin elegir se ve más apagado y al elegirlo, entero */
+.selector button .ico{width:14px;height:14px;margin:0;opacity:.85;transition:opacity var(--t)}
 .selector button:hover{color:var(--claro);background:var(--n1)}
-.selector button:hover .ico{color:var(--gris)}
+.selector button:hover .ico,.selector button[aria-pressed="true"] .ico{opacity:1}
 .selector button[aria-pressed="true"]{background:var(--n2);color:var(--claro);box-shadow:inset 0 0 0 1px var(--linea-2)}
-.selector button[aria-pressed="true"] .ico{color:var(--claro)}
 @media(max-width:860px){.sgrupo .sgt{width:100%;border-right:0;padding:3px 8px 4px;margin:0}}
 /* cabeza de cada grupo de tarjetas: nombre, cuántas operan y una raya hasta el borde */
 .grupo .gcuenta{font-size:10.5px;letter-spacing:.02em;text-transform:none;font-weight:400;color:var(--gris);
@@ -254,10 +258,14 @@ html{scroll-behavior:smooth}
   letter-spacing:.1em;text-transform:uppercase;color:var(--tenue)}
 .grupo::after{content:"";flex:1;height:1px;background:var(--linea)}
 #s-bloque > .grupo:first-child{margin-top:0}
-.grupo + .bloque{margin-top:0}
+/* tarjetas plegadas en rejilla; la abierta (clase la pone el JS al abrirla) a todo lo ancho */
+.rejilla-b{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,400px),1fr));gap:12px;align-items:start}
+.rejilla-b > .bloque{padding:12px 14px;scroll-margin-top:calc(var(--cabeza) + 14px)}
+.rejilla-b > .bloque.abierta{grid-column:1/-1;padding:16px 18px 18px}
+/* plegada, la tarjeta solo enseña lo que se mira de un vistazo */
+.crip:not([open]) > summary .act,.crip:not([open]) > summary .tic{display:none}
 .porgrupo{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--tenue);margin:10px 0 2px}
 .porgrupo:first-child{margin-top:0}
-.bloque + .bloque{margin-top:14px}
 .bloque .titulo h2 .act{color:var(--tenue);font-weight:400;margin-left:6px}
 /* cada cripto se pliega con su flechita */
 .crip > summary{list-style:none;cursor:pointer;margin:0}
@@ -268,10 +276,12 @@ html{scroll-behavior:smooth}
 .crip > summary:hover .fl{color:var(--claro)}
 .crip.off > summary h2{color:var(--gris)}
 .apagado{font-size:10.5px;color:var(--tenue);border:1px solid var(--linea);border-radius:3px;padding:1px 6px}
-/* icono de cada activo: moneda para las criptos, lingote para los metales */
-.ico{width:19px;height:19px;flex:0 0 auto;margin-right:8px;color:var(--gris);
-  transition:color var(--t)}
-.crip[open] > summary .ico,.crip > summary:hover .ico{color:var(--claro)}
+/* icono de cada activo: moneda, lingote, gota, llama o billete, cada uno con su color
+   (en línea, ver COLORES). El gris solo queda para un activo sin color asignado */
+.ico{width:19px;height:19px;flex:0 0 auto;margin-right:8px;color:var(--gris);transition:opacity var(--t)}
+/* un activo parado se ve apagado; al pasar el ratón o abrirlo recupera el color */
+.crip.off > summary .ico{opacity:.45}
+.crip.off[open] > summary .ico,.crip.off > summary:hover .ico{opacity:1}
 .ico .sim{font-family:var(--mono);font-size:10px;font-weight:700;fill:currentColor;stroke:none}
 .porfila .ico{width:15px;height:15px;margin-right:0}
 
@@ -453,27 +463,55 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
   border-radius:50%;animation:gira 750ms linear infinite;background:none}
 @keyframes gira{to{transform:rotate(360deg)}}
 
+/* ---------------------------------------------------------------- operaciones abiertas */
+/* arriba del todo, una tarjeta por operación: activo, lado, cómo va y la barra stop-TP */
+.abiertas{margin:0 0 18px;padding:14px 16px 16px;background:var(--n1);border:1px solid var(--linea-2);border-radius:var(--r)}
+.ab-t{display:flex;align-items:center;gap:9px;margin-bottom:12px}
+.ab-t .punto{margin-left:0}
+.ab-t .ayuda b{font-weight:600}
+.ab-n{font-size:11px;font-weight:600;color:var(--claro);padding:0 7px;border-radius:999px;background:var(--n2);border:1px solid var(--linea-2)}
+.ab-lista{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.ab{padding:11px 13px 9px;border:1px solid var(--linea);border-left:3px solid var(--linea-2);
+  border-radius:var(--r-s);background:var(--n0);cursor:pointer;min-width:0;
+  transition:border-color var(--t),background var(--t)}
+.ab:hover{background:#101010;border-color:var(--linea-2)}
+.ab.gana{border-left-color:var(--sube)}
+.ab.pierde{border-left-color:var(--baja)}
+.ab-c{display:flex;align-items:center;gap:7px}
+.ab-c .ico{width:17px;height:17px;margin-right:0}
+.ab-nom{font-size:13.5px;font-weight:600;color:var(--claro)}
+.ab-lado{font-size:10px;font-weight:600;letter-spacing:.06em;padding:1px 7px;border-radius:999px;border:1px solid}
+.ab-lado.yes{color:var(--sube);border-color:rgba(47,224,122,.45);background:var(--sube-f)}
+.ab-lado.no{color:var(--baja);border-color:rgba(255,95,95,.45);background:var(--baja-f)}
+.ab-pnl{font-size:15px;font-weight:600}
+.ab-d{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:6px;font-size:11.5px;color:var(--gris)}
+.ab-d b{color:var(--claro);font-weight:600}
+.ab .medidor{margin-top:10px;padding-top:0;border-top:0}
+.ab .m-min{display:none}
+/* la entrada ya sale en la línea de arriba; en la tarjeta estrecha chocaba con el TP */
+.ab .pista-pies > span:nth-child(2){display:none}
+
 /* ---------------------------------------------------------------- horario de Kalshi */
 /* materias primas: si el mercado está abierto o cerrado, y cuánto falta para que cambie */
 #s-horario{scroll-margin-top:calc(var(--cabeza) + 18px)}
-.hk-fila{padding:12px 0 4px;border-top:1px solid var(--linea)}
-.hk-fila:first-child,.porgrupo + .hk-fila{border-top:0;padding-top:4px}
-#horarioK .porgrupo:not(:first-child){margin-top:16px;padding-top:12px;border-top:1px solid var(--linea)}
-.hk-cab{display:flex;align-items:center;gap:8px}
-.hk-cab .ico{width:16px;height:16px;margin-right:0}
-.hk-cab .nom{font-size:13px;font-weight:500;color:var(--claro)}
-.hk-est{font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;padding:1px 7px;border-radius:999px;
-  border:1px solid var(--linea-2);color:var(--gris)}
-.abierto .hk-est{color:var(--sube);border-color:rgba(47,224,122,.4);background:var(--sube-f)}
-.cerrado-k .hk-est{color:var(--avisa);border-color:rgba(240,180,41,.4);background:var(--avisa-f)}
-.hk-cuenta{display:flex;flex-direction:column;align-items:flex-end;line-height:1.15}
-.hk-cuenta small{font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--tenue)}
-.hk-cuenta b{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:15px;font-weight:600;
+/* una fila por activo: icono, nombre, línea de tiempo y cuenta atrás */
+.hk-fila{display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid var(--linea)}
+.hk-fila:first-child,.porgrupo + .hk-fila{border-top:0}
+#horarioK .porgrupo:not(:first-child){margin-top:8px;padding-top:8px;border-top:1px solid var(--linea)}
+#horarioK .hk-mas > summary + .porgrupo{margin-top:8px;padding-top:0;border-top:0}
+.hk-fila .ico{width:15px;height:15px;margin-right:0}
+.hk-fila .nom{flex:none;width:74px;font-size:12px;font-weight:500;color:var(--claro);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hk-cuenta{flex:none;min-width:62px;display:flex;flex-direction:column;align-items:flex-end;line-height:1.1}
+.hk-cuenta small{font-size:9px;color:var(--tenue)}
+.hk-cuenta b{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12.5px;font-weight:600;
   letter-spacing:-.02em;color:var(--claro)}
+/* el color dice el estado: verde abierto, ámbar cerrado */
+.abierto .hk-cuenta b{color:var(--sube)}
 .cerrado-k .hk-cuenta b{color:var(--avisa)}
-.hk-sub{margin:3px 0 10px 24px;font-size:11.5px;color:var(--gris)}
 /* línea de tiempo: de hace 6 h a dentro de 30 h; verde = hay bloques en Kalshi */
-.hk-linea{position:relative;margin-left:24px;padding-bottom:17px}
+.hk-linea{position:relative;padding-bottom:14px}
+.hk-linea.mini{flex:1;min-width:40px;padding:0}
 .hk-pista{position:relative;height:7px;border-radius:4px;background:var(--n0);border:1px solid var(--linea);overflow:hidden}
 .hk-pista i{position:absolute;top:0;bottom:0;background:var(--sube);opacity:.5}
 .hk-pista i.nd{background:repeating-linear-gradient(-45deg,transparent 0 3px,rgba(255,255,255,.1) 3px 5px);opacity:1}
@@ -483,6 +521,13 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 .hk-dia{position:absolute;top:12px;transform:translateX(-50%);font-size:9.5px;letter-spacing:.05em;color:var(--tenue);white-space:nowrap}
 .hk-dia::before{content:"";position:absolute;left:50%;top:-13px;width:1px;height:9px;background:var(--linea-2)}
 .hk-nota{font-size:11px;color:var(--tenue);margin:6px 0 0}
+.hk-mas{margin-top:8px;padding-top:8px;border-top:1px solid var(--linea)}
+.hk-mas > summary{cursor:pointer;font-size:11.5px;color:var(--gris);list-style:none;display:flex;align-items:center;gap:7px}
+.hk-mas > summary::-webkit-details-marker{display:none}
+.hk-mas > summary::before{content:"›";display:inline-block;transition:transform 160ms var(--sal)}
+.hk-mas[open] > summary::before{transform:rotate(90deg)}
+.hk-mas > summary:hover{color:var(--claro)}
+.porfila.resto{display:block;font-size:11px;line-height:1.45;color:var(--tenue)}
 
 /* tarjeta de una materia prima con el mercado cerrado: la cuenta atrás manda */
 .espera{display:grid;grid-template-columns:minmax(0,1fr);gap:18px 28px;padding:14px 2px 2px}
@@ -504,7 +549,6 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 .esp-datos dd{margin:3px 0 0;font-family:var(--mono);font-size:12.5px;color:var(--claro)}
 .esp-linea{grid-column:1/-1}
 .esp-linea .k{display:block;margin-bottom:8px}
-.esp-linea .hk-linea{margin-left:0}
 /* sin bloque no hay columna de al lado: la cuenta atrás ocupa todo el ancho */
 .cuerpo.solo{display:block}
 .cuerpo.solo .aparte{display:none}
@@ -546,7 +590,7 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
   .nav a[aria-current="true"]{background:var(--azul-c);color:var(--claro);box-shadow:none}
   main{margin-left:0;padding:calc(var(--cabeza) + 14px) 14px 78px}
   .consola{left:0;padding:0 14px;gap:9px}
-  .bloque,.grid2 > div{padding:14px 14px 16px}
+  .bloque,.grid2 > div,.rejilla-b > .bloque.abierta{padding:14px 14px 16px}
   .wrap{margin:0 -14px;padding:0 14px}
   .rg b{font-size:32px}
   #logs{max-height:200px}
@@ -589,6 +633,7 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 
 <main id="contenido">
 <div id="avisos"></div>
+<section id="abiertas" class="abiertas" aria-label="Operaciones abiertas" hidden></section>
 
 <section class="resumen" id="s-res" aria-label="Resultado">
   <div class="filtros">
@@ -631,7 +676,7 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
     <div class="kpi"><dt>Saldo en Kalshi</dt><dd id="sSaldo" class="skel">–</dd>
       <div class="nota"><span id="sKey"></span> · encendido <b id="sOn">–</b></div></div>
     <div class="kpi ancha"><dt>Ganancia acumulada<span id="sDias" style="text-transform:none;letter-spacing:0;color:var(--tenue)"></span></dt>
-      <div class="curva" id="sCurva"></div></div>
+      <div class="curva" id="sCurva"></div><div class="cinfo" id="sCurvaInfo"></div></div>
   </dl>
 </section>
 
@@ -1046,7 +1091,7 @@ function medidor(g) {
     </div>
     <div class="pista-pies">
       <span class="neg num">stop ${n(ex, 2)}</span>
-      <span class="ayuda num" style="left:${Math.min(Math.max(pEnt, 17), 76)}%">entrada ${n(g.entrada, 3)}</span>
+      <span class="ayuda num" style="left:${Math.min(Math.max(pEnt, 22), 62)}%">entrada ${n(g.entrada, 3)}</span>
       <span class="pos num">TP ${n(g.tp, 2)}</span>
     </div>
     ${bm == null ? '' : (() => {
@@ -1054,6 +1099,60 @@ function medidor(g) {
       return `<div class="m-min${cerca ? ' cerca' : ''}">lo más bajo hasta ahora: <b>${n(bm, 3)}</b> · a ${n(bm - ref, 2)} del ${g.exit != null ? 'stop' : '0.50'}${cerca ? ' · casi pierde' : ''}</div>`;
     })()}
   </div>`;
+}
+
+// Arriba del todo: una tarjeta por operación abierta, para ver de un vistazo cuáles hay,
+// de qué lado, cómo van y cuánto les queda. Pulsar una abre la tarjeta de ese activo.
+function pintarAbiertas(d) {
+  const caja = $('abiertas');
+  const ops = d.abiertas || [];
+  caja.hidden = !ops.length;
+  if (!ops.length) { caja.innerHTML = ''; caja.dataset.clave = ''; return; }
+  const vivo = {};
+  for (const v of d.vivo || []) vivo[v.activo] = v;
+  // Las tarjetas se crean solo cuando cambia QUÉ operaciones hay; cada segundo se rellena
+  // su contenido. Si se rehiciera todo, un clic justo en el refresco se perdería y el
+  // teclado perdería el foco.
+  const clave = ops.map(o => o.ticker).join(',');
+  if (caja.dataset.clave !== clave) {
+    caja.dataset.clave = clave;
+    caja.innerHTML = `<div class="ab-t" id="abT"></div><div class="ab-lista">${ops.map((o, i) =>
+      `<div class="ab" id="ab_${i}" data-ir="${esc(o.activo)}" role="button" tabindex="0"
+        title="Abrir la tarjeta de ${esc(nombre(o.activo))}"></div>`).join('')}</div>`;
+  }
+  let total = 0, conBid = 0;
+  ops.forEach((o, i) => {
+    const v = vivo[o.activo] || {}, g = v.grafico || null;
+    const bid = g && g.bid != null ? g.bid : null;
+    // lo que daría vender ahora mismo al bid, sin comisiones
+    const pnl = bid == null ? null : (bid - o.entrada) * o.contratos;
+    if (pnl != null) { total += pnl; conBid++; }
+    const queda = v.mercado && v.quedan != null ? reloj(v.quedan) : null;
+    const el = $('ab_' + i);
+    el.className = 'ab ' + (pnl == null ? '' : pnl >= 0 ? 'gana' : 'pierde');
+    el.innerHTML = `<div class="ab-c">${icono(o.activo)}<b class="ab-nom">${esc(nombre(o.activo))}</b>
+        <span class="ab-lado ${o.lado === 'YES' ? 'yes' : 'no'}">${esc(o.lado)}</span>
+        <span class="sp"></span><span class="ab-pnl num ${clase(pnl)}">${pnl == null ? '–' : usd(pnl)}</span></div>
+      <div class="ab-d num"><span>${nq(o.contratos, 2)} a <b>${n(o.entrada, 3)}</b></span>
+        <span>bid <b>${bid == null ? '–' : n(bid, 3)}</b></span>
+        <span class="sp"></span><span>${queda ? 'queda <b>' + queda + '</b>' : 'esperando el cierre'}</span></div>
+      ${bid != null ? medidor(g) : ''}`;
+  });
+  $('abT').innerHTML = `<span class="punto si"></span><h2>Operaciones abiertas</h2>
+      <span class="ab-n num">${ops.length}</span><span class="sp"></span>
+      ${conBid ? `<span class="ayuda">si vendieras ahora <b class="num ${clase(total)}">${usd(total)}</b></span>` : ''}`;
+  if (!caja.dataset.listo) {
+    caja.dataset.listo = '1';
+    const ir = ev => {
+      const b = ev.target.closest('[data-ir]');
+      const card = b && $('card_' + b.dataset.ir);
+      if (!card) return;
+      card.open = true;
+      card.closest('.bloque').scrollIntoView({ block: 'start', behavior: 'smooth' });   // con su margen bajo la cabecera
+    };
+    caja.addEventListener('click', ir);
+    caja.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); ir(ev); } });
+  }
 }
 
 // ---- la cruz y su cajita ----
@@ -1131,6 +1230,15 @@ const ICONOS = {
   EURUSD: [BILLETE, '€', 15.4], GBPUSD: [BILLETE, '£', 15.4], USDJPY: [BILLETE, '¥', 15.4],
   AUDUSD: [BILLETE, 'A$', 14.7], USDCAD: [BILLETE, 'C$', 14.7],
 };
+// el color de cada icono: el de la marca de la moneda o el del metal, aclarado lo justo para
+// leerse sobre el fondo negro. Se evitan el verde y el rojo exactos de "sube" y "baja".
+const COLORES = {
+  BTC: '#f7931a', ETH: '#8c9eff', SOL: '#b083ff', XRP: '#29a9e6', DOGE: '#d4b552', HYPE: '#7fe3cf',
+  BNB: '#f3ba2f', NEAR: '#9adcf0', ZEC: '#e8a33d',
+  GOLD: '#e9c35b', SILVER: '#c9d0da', OIL: '#d8955a', NATGAS: '#6aaeff',
+  COPPER: '#df8a5a', PLATINUM: '#aebfd8', PALLADIUM: '#b6c2a8',
+  EURUSD: '#6a95f2', GBPUSD: '#c08cf0', USDJPY: '#f0908a', AUDUSD: '#f2c25a', USDCAD: '#ff9a72',
+};
 // nombre que se lee en pantalla (el código interno sigue siendo el de Kalshi/bot)
 const NOMBRES = {GOLD: 'Oro', SILVER: 'Plata', OIL: 'Petróleo', NATGAS: 'Gas natural',
   COPPER: 'Cobre', PLATINUM: 'Platino', PALLADIUM: 'Paladio',
@@ -1150,8 +1258,9 @@ function icono(a) {
   const chico = sim.length > 1;      // "Au" no cabe con el mismo cuerpo que "₿"
   const texto = sim ? `<text class="sim" x="12" y="${alto || (chico ? 16.6 : 15.4)}" text-anchor="middle"`
     + `${chico ? ' style="font-size:7.5px"' : ''}>${esc(sim)}</text>` : '';
+  // el color va en línea: así gana a los grises de las reglas de hover y de "pulsado"
   return `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"`
-    + ` stroke-linejoin="round" aria-hidden="true">${forma}${texto}</svg>`;
+    + `${COLORES[a] ? ` style="color:${COLORES[a]}"` : ''} stroke-linejoin="round" aria-hidden="true">${forma}${texto}</svg>`;
 }
 
 // una tarjeta por activo. Solo se rehace cuando cambia la lista: si se rehiciera
@@ -1205,10 +1314,17 @@ function armarCarteles(lista) {
     </details>
   </details>
   </section>`;
+  // plegadas, las tarjetas van en rejilla (dos o tres por fila); la que se abre ocupa la fila entera
   $('s-bloque').innerHTML = porGrupos(lista).map(([g, l], i) =>
     `<h2 class="grupo"><span>${g}</span><span class="gcuenta" id="gc_${i}" data-de="${l.join(',')}"></span></h2>`
-    + l.map(carta).join('')).join('');
+    + `<div class="rejilla-b">${l.map(carta).join('')}</div>`).join('');
   llenarForm(ajustesGuardados);
+  // "toggle" no sube por el árbol: se escucha en la fase de captura
+  $('s-bloque').addEventListener('toggle', ev => {
+    if (!ev.target.classList.contains('crip')) return;     // los Ajustes de dentro también son <details>
+    ev.target.closest('.bloque').classList.toggle('abierta', ev.target.open);
+    if (ultimo) render(ultimo);                            // el gráfico se mide con el ancho nuevo
+  }, true);
   $('s-bloque').addEventListener('click', ev => {
     const g = ev.target.closest('[data-guardar]'), h = ev.target.closest('[data-deshacer]');
     const w = ev.target.closest('[data-sw]');
@@ -1303,9 +1419,9 @@ function segmento(id, actual, alElegir) {
     const btn = o => `<button type="button" data-v="${o}">${o === 'todo' ? 'Todo' : icono(o) + esc(nombre(o))}</button>`;
     // "Todo" va solo; cripto y materias primas, cada una en su cajita con su nombre
     const ICO_GRUPO = {
-      Cripto: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M9.5 8h4a2 2 0 0 1 0 4h-4m0 0h4.5a2 2 0 0 1 0 4H9.5zM11 6v2m0 8v2"></path></svg>',
-      'Materias primas': '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M3.4 18l2.8-8.4h11.6l2.8 8.4z"></path></svg>',
-      Divisas: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="2.6" y="6.2" width="18.8" height="11.6" rx="2.2"></rect><circle cx="12" cy="12" r="2.6"></circle></svg>',
+      Cripto: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="color:#f7931a" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M9.5 8h4a2 2 0 0 1 0 4h-4m0 0h4.5a2 2 0 0 1 0 4H9.5zM11 6v2m0 8v2"></path></svg>',
+      'Materias primas': '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" style="color:#e9c35b" aria-hidden="true"><path d="M3.4 18l2.8-8.4h11.6l2.8 8.4z"></path></svg>',
+      Divisas: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="color:#6a95f2" aria-hidden="true"><rect x="2.6" y="6.2" width="18.8" height="11.6" rx="2.2"></rect><circle cx="12" cy="12" r="2.6"></circle></svg>',
     };
     caja.innerHTML = `<span class="sgrupo">${btn('todo')}</span>` + porGrupos(activos).map(([g, l]) =>
       `<span class="sgrupo" role="group" aria-label="${g}"><span class="sgt">${ICO_GRUPO[g] || ''}${g}</span>`
@@ -1325,15 +1441,22 @@ function pintarPorActivo(d) {
   if (!caja) return;
   const pa = d.por_activo || {};
   const enc = (d.ajustes.activos || '').split(',').filter(Boolean);
-  caja.innerHTML = porGrupos(d.activos_validos || []).map(([g, l]) => `<div class="porgrupo">${g}</div>` + l.map(a => {
-    const x = pa[a] || {}, t = x.total || {}, h = x.hoy || {};
-    return `<div class="porfila">
-      ${icono(a)}<span class="nom">${esc(nombre(a))}</span>
-      ${enc.includes(a) ? '' : '<span class="apag">apagado</span>'}
-      <span class="det">${h.ops || 0} hoy · ${t.ops || 0} en total${t.wr == null ? '' : ' · ' + t.wr + '%'}</span>
-      <span class="pnl ${clase(h.usd)}">${usd(h.usd || 0)}</span>
-    </div>`;
-  }).join('')).join('');
+  // apagados y sin ninguna operación no tienen nada que contar: van todos juntos en una línea
+  const mudo = a => !enc.includes(a) && !((pa[a] || {}).total || {}).ops;
+  caja.innerHTML = porGrupos(d.activos_validos || []).map(([g, l]) => {
+    const filas = l.filter(a => !mudo(a)).map(a => {
+      const x = pa[a] || {}, t = x.total || {}, h = x.hoy || {};
+      return `<div class="porfila">
+        ${icono(a)}<span class="nom">${esc(nombre(a))}</span>
+        ${enc.includes(a) ? '' : '<span class="apag">apagado</span>'}
+        <span class="det">${h.ops || 0} hoy · ${t.ops || 0} en total${t.wr == null ? '' : ' · ' + t.wr + '%'}</span>
+        <span class="pnl ${clase(h.usd)}">${usd(h.usd || 0)}</span>
+      </div>`;
+    });
+    const resto = l.filter(mudo);
+    if (resto.length) filas.push(`<div class="porfila resto">apagados, sin operaciones: ${esc(resto.map(nombre).join(', '))}</div>`);
+    return `<div class="porgrupo">${g}</div>` + filas.join('');
+  }).join('');
 }
 
 // lateral: qué está haciendo el filtro de noticias
@@ -1365,11 +1488,31 @@ function pintarFiltro(d) {
         `<span>⛔ ${esc(a)}: ${esc(p)}</span>`).join('')}</div>` : '');
 }
 
+// Debajo de la curva: el mejor y el peor día, cuántos días cerraron en verde y el máximo
+// al que llegó. Sale de la misma curva (acumulado por día), así que no pide nada al bot.
+function infoCurva(pts) {
+  const caja = $('sCurvaInfo');
+  if (!caja) return;
+  if (!pts || !pts.length) { caja.innerHTML = ''; return; }
+  // el primer punto es el resultado de su día... salvo que el bot haya recortado la curva a
+  // los últimos 60 días: entonces arrastra lo de antes y no se cuenta como un día
+  const dias = pts.map((p, i) => [p[0], p[1] - (i ? pts[i - 1][1] : 0)]).slice(pts.length >= 60 ? 1 : 0);
+  if (!dias.length) { caja.innerHTML = ''; return; }
+  const mejor = dias.reduce((a, b) => (b[1] > a[1] ? b : a)), peor = dias.reduce((a, b) => (b[1] < a[1] ? b : a));
+  const verdes = dias.filter(d => d[1] > 0).length, techo = Math.max(...pts.map(p => p[1]));
+  const fecha = f => f.slice(5).replace('-', '/');
+  caja.innerHTML = `<span>mejor día <b class="${clase(mejor[1])}">${usd(mejor[1])}</b> ${fecha(mejor[0])}</span>`
+    + `<span>peor <b class="${clase(peor[1])}">${usd(peor[1])}</b> ${fecha(peor[0])}</span>`
+    + `<span>en verde <b>${verdes}</b> de ${dias.length} días</span>`
+    + `<span>máximo <b class="${clase(techo)}">${usd(techo)}</b></span>`;
+}
+
 // Curva de la ganancia acumulada: un punto por día. Una sola serie, así que no lleva
 // leyenda; el color lo decide el signo, igual que el resto del panel.
 function curvaGanancia(pts) {
   const caja = $('sCurva');
   if (!caja) return;
+  infoCurva(pts);
   if (!pts || pts.length < 2) {
     caja.innerHTML = `<p class="nada">${pts && pts.length === 1
       ? 'Un solo día con operaciones: la curva aparece a partir del segundo.'
@@ -1377,7 +1520,7 @@ function curvaGanancia(pts) {
     return;
   }
   const W = Math.max(200, Math.round(caja.clientWidth || 260));
-  const H = Math.round(Math.max(64, Math.min(150, W * 0.1)));   // ancha y baja parece una raya
+  const H = Math.round(Math.max(44, Math.min(64, W * 0.16)));   // baja, para que el cuadro no crezca
   const X0 = 2, X1 = W - 2, Y0 = 8, Y1 = H - 8;
   const vs = pts.map(p => p[1]);
   let lo = Math.min(0, ...vs), hi = Math.max(0, ...vs);
@@ -1448,10 +1591,9 @@ function render(d) {
   if (d.conectado && !d.encendido) av.push(['warn grande', 'El bot está APAGADO: no va a abrir ninguna operación.']);
   if (d.limite_diario) av.push(['warn', 'Se alcanzó el límite del día: no abre operaciones nuevas hasta mañana (CDT).']);
   if (d.aviso_precio) av.push(['warn', 'Precio del índice: ' + d.aviso_precio + '.']);
-  if (d.aviso_saldo) av.push(['warn', 'Saldo justo: ' + d.aviso_saldo + '.']);
-  if (d.abiertas.length) av.push(['on', 'Operación abierta: ' + d.abiertas.map(o => `${o.activo} ${o.lado} ${o.contratos} a ${n(o.entrada)} → TP ${n(o.objetivo)}`).join(' · ')]);
   if (d.pendientes) av.push(['off', `${d.pendientes} operación(es) cerrando: esperando el resultado oficial de Kalshi.`]);
   $('avisos').innerHTML = av.map(([c, t]) => `<div class="aviso ${c}">${esc(t)}</div>`).join('');
+  pintarAbiertas(d);
 
   activos = d.activos_validos || [];
   sinIndice = d.sin_indice || [];
@@ -1817,8 +1959,9 @@ function tic() {
 setInterval(tic, 1000);
 
 // De hace 6 h a dentro de 30 h: verde donde Kalshi tiene bloques, rayado donde aún no
-// los ha creado (no se sabe), y una marca blanca en "ahora".
-function lineaTiempo(x) {
+// los ha creado (no se sabe), y una marca blanca en "ahora". `mini`: sin los nombres de los
+// días, para que quepa en la fila del lateral.
+function lineaTiempo(x, mini) {
   const t = ahoraS(), ini = t - 6 * 3600, fin = t + 30 * 3600;
   const pct = v => (Math.max(ini, Math.min(fin, v)) - ini) / (fin - ini) * 100;
   const tramos = (x.tramos || []).filter(([a, c]) => c > ini && a < fin);
@@ -1837,16 +1980,17 @@ function lineaTiempo(x) {
   for (; m.getTime() / 1000 < fin; m.setDate(m.getDate() + 1)) {
     const p = pct(m.getTime() / 1000);
     if (p > 5 && p < 95) marcas.push(`<span class="hk-dia" style="left:${p.toFixed(2)}%">`
-      + `${esc(m.toLocaleDateString('es', { weekday: 'short' }).replace('.', ''))}</span>`);
+      + `${mini ? '' : esc(m.toLocaleDateString('es', { weekday: 'short' }).replace('.', ''))}</span>`);
   }
   const txt = tramos.length
     ? 'Abierto en Kalshi: ' + tramos.map(([a, c]) => cuandoTxt(a) + ' a ' + cuandoTxt(c)).join(', ')
     : 'Sin bloques en Kalshi en estas horas';
-  return `<div class="hk-linea" role="img" aria-label="${esc(txt)}" title="${esc(txt)}">`
+  return `<div class="hk-linea${mini ? ' mini' : ''}" role="img" aria-label="${esc(txt)}" title="${esc(txt)}">`
     + `<div class="hk-pista">${seg}${nd}</div><b class="hk-ahora" style="left:${pct(t).toFixed(2)}%"></b>${marcas.join('')}</div>`;
 }
 
 // lateral: materias primas y divisas, cada grupo con su título, con su cuenta atrás
+let hkMasAbierto = false;
 function pintarHorarioK(d) {
   const caja = $('horarioK');
   if (!caja) return;
@@ -1855,24 +1999,33 @@ function pintarHorarioK(d) {
   if (!lista.length) return;
   const fila = a => {
     const x = mk[a];
-    if (!x) return `<div class="hk-fila"><div class="hk-cab">${icono(a)}<span class="nom">${esc(nombre(a))}</span>`
-      + `<span class="sp"></span><span class="ayuda">${d.mercados_error ? 'sin respuesta de Kalshi' : 'leyendo…'}</span></div></div>`;
+    if (!x) return `<div class="hk-fila">${icono(a)}<span class="nom">${esc(nombre(a))}</span>`
+      + `<span class="sp"></span><span class="ayuda">${d.mercados_error ? 'sin respuesta de Kalshi' : 'leyendo…'}</span></div>`;
     const abierto = x.estado === 'abierto', hasta = abierto ? x.cierra : x.abre;
     const sub = abierto
       ? (x.cierra ? 'cierra ' + cuandoTxt(x.cierra) : 'abierto al menos hasta ' + cuandoTxt(x.horizonte))
       : (x.abre ? 'abre ' + cuandoTxt(x.abre) : 'Kalshi aún no ha publicado cuándo vuelve')
         + (x.desde ? ' · cerró ' + cuandoTxt(x.desde) : '');
-    return `<div class="hk-fila ${abierto ? 'abierto' : 'cerrado-k'}">
-      <div class="hk-cab">${icono(a)}<span class="nom">${esc(nombre(a))}</span>
-        <span class="hk-est">${abierto ? 'abierto' : 'cerrado'}</span><span class="sp"></span>
-        ${hasta ? `<span class="hk-cuenta"><small>${abierto ? 'cierra en' : 'abre en'}</small>`
-          + `<b data-hasta="${hasta}">${cuenta(hasta - ahoraS())}</b></span>` : ''}</div>
-      <div class="hk-sub">${esc(sub)}</div>
-      ${lineaTiempo(x)}
+    // Una fila por activo: nombre, su línea de tiempo y la cuenta atrás, todo en una línea.
+    // El estado lo dice el color (verde abierto, ámbar cerrado); el detalle, al pasar el ratón.
+    return `<div class="hk-fila ${abierto ? 'abierto' : 'cerrado-k'}" title="${esc(nombre(a))} ${abierto ? 'abierto' : 'cerrado'}: ${esc(sub)}">
+      ${icono(a)}<span class="nom">${esc(nombre(a))}</span>${lineaTiempo(x, true)}
+      ${hasta ? `<span class="hk-cuenta"><small>${abierto ? 'cierra' : 'abre'}</small>`
+        + `<b data-hasta="${hasta}">${cuenta(hasta - ahoraS())}</b></span>`
+        : `<span class="hk-cuenta"><small>${abierto ? 'abierto' : 'sin fecha'}</small><b>+1 día</b></span>`}
     </div>`;
   };
-  caja.innerHTML = porGrupos(lista).map(([g, l]) => `<div class="porgrupo">${g}</div>` + l.map(fila).join('')).join('')
+  // arriba los que están operando; los apagados, plegados (si no, 12 filas alargan la página)
+  const enc = (d.ajustes.activos || '').split(',').filter(Boolean);
+  const grupos = l => porGrupos(l).map(([g, x]) => `<div class="porgrupo">${g}</div>` + x.map(fila).join('')).join('');
+  const on = lista.filter(a => enc.includes(a)), off = lista.filter(a => !enc.includes(a));
+  caja.innerHTML = (on.length ? grupos(on) : '<p class="ayuda" style="margin:0">Ninguna materia prima ni divisa está operando.</p>')
+    + (off.length ? `<details class="hk-mas"${hkMasAbierto ? ' open' : ''}><summary>ver las ${off.length} apagadas</summary>${grupos(off)}</details>` : '')
     + `<p class="hk-nota">Sale de los bloques que Kalshi ya tiene creados (unas 30 h por delante). Rayado: todavía no existen.</p>`;
+  if (!caja.dataset.listo) {          // se rehace cada segundo: hay que recordar si se dejó abierto
+    caja.dataset.listo = '1';
+    caja.addEventListener('toggle', ev => { if (ev.target.classList.contains('hk-mas')) hkMasAbierto = ev.target.open; }, true);
+  }
 
   // cabecera: cuántas están abiertas y, si ninguna, cuándo vuelve la primera
   const hm = $('hMat'), vals = lista.map(a => mk[a]).filter(Boolean);

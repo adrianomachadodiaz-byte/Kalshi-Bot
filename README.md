@@ -43,6 +43,13 @@ Todo se maneja desde el panel (el dominio de Railway, con tu clave `ACCESS_TOKEN
   próximos eventos de impacto alto y medio del USD, con cuánto falta, la hora, el pronóstico y el dato anterior.
   Se pide cada 20 minutos en un hilo aparte: si falla, el panel lo dice y el bot sigue igual. Se apaga con
   `NOTICIAS=0`; con `NOTICIAS_MONEDAS` cambias las divisas (por defecto `USD`).
+- **Operaciones abiertas** (arriba del todo): una tarjeta por operación con el activo, el lado (YES verde, NO
+  rojo), contratos, entrada, bid, lo que daría venderla ahora, el tiempo que queda y la barra entre stop y TP.
+  Pulsarla abre la tarjeta de ese activo.
+- **Bloques en vivo**: plegadas, las tarjetas van de dos en dos (o tres, según el ancho); la que se abre ocupa la
+  fila entera con su gráfico. Cada activo tiene un icono de color.
+- **Saldo por shard**: el bot reserva 1 $ por contrato de cada activo encendido en el shard donde opera (las
+  divisas en el 0, el resto en el 2) y, al pasar saldo al shard 2, deja en el 0 lo que necesitan las divisas.
 - **Activos**: tres grupos, cada uno con su sección. **Cripto** (BTC, ETH, SOL, XRP, DOGE, HYPE, BNB, NEAR, ZEC),
   con Delta. **Materias primas** (oro, plata, petróleo, gas natural, cobre, platino, paladio) y **divisas**
   (EUR/USD, GBP/USD, USD/JPY, AUD/USD, USD/CAD), sin Delta: Kalshi las liquida con Pyth, y la API de Pyth solo

@@ -73,10 +73,17 @@ class EjecutorReal:
         self.espera = espera_entrada   # segundos que la orden de entrada se queda puesta (0 = IOC)
         self.n_activos = n_activos
         self.info = {}          # ticker -> info del mercado (shard, ticks)
+        self.shard_de = {}      # activo -> shard de su mercado (las divisas en el 0, el resto en el 2)
         self.fondos = {}        # ticker -> True si el shard tiene saldo para operar
         self.ultimo_tp = {}     # ticker -> último intento de poner el TP
 
     # ------------------------------------------------------------------ inicio de cada bloque
+    def ver_mercado(self, activo, m):
+        """Lo llama el bot en cada vuelta con el bloque abierto de cada activo."""
+        self.info[m["ticker"]] = m
+        if m.get("exchange_index") is not None:
+            self.shard_de[activo] = m["exchange_index"]
+
     def preparar_bloque(self, activo, m, estado):
         """Al empezar un bloque: no operar si ya hay una posición que el bot no conoce, y dejar saldo en el shard."""
         ticker, shard = m["ticker"], m["exchange_index"]
@@ -89,12 +96,21 @@ class EjecutorReal:
         self.fondos[ticker] = self._asegurar_fondos(activo, shard)
         return "ok"
 
+    def _necesario(self, shard):
+        """Lo que hay que tener en `shard`: 1 $ por contrato de cada activo encendido que opera ahí.
+        Un activo del que aún no se ha visto el mercado cuenta en todos (lo prudente)."""
+        porc = self.contratos if isinstance(self.contratos, dict) else {}
+        if not porc:
+            return self.contratos * self.n_activos
+        return sum(c for a, c in porc.items() if self.shard_de.get(a, shard) == shard)
+
     def _asegurar_fondos(self, activo, shard):
-        """Cada contrato puede costar hasta 1 $: el shard del mercado necesita CONTRATOS x 1 $ por activo."""
-        # cada activo puede llevar un nº de contratos distinto: se reserva la suma de todos
+        """Cada contrato puede costar hasta 1 $: el shard del mercado necesita CONTRATOS x 1 $ por cada
+        activo que opera en ESE shard. Las divisas viven en el 0 y el resto en el 2: cada uno reserva
+        lo suyo, y al pasar saldo al 2 se deja en el 0 lo que necesitan las divisas."""
         porc = self.contratos if isinstance(self.contratos, dict) else {}
         contratos = porc.get(activo, 1.0) if porc else self.contratos
-        necesario = sum(porc.values()) if porc else contratos * self.n_activos
+        necesario = self._necesario(shard)
         disponible = self.k.saldo(shard)
         if disponible >= necesario - 1e-6:
             return True
@@ -102,10 +118,12 @@ class EjecutorReal:
             log(f"{activo} saldo insuficiente: {disponible:.2f} $ (hacen falta ~{necesario:g} $)")
             return disponible >= contratos
         falta = necesario - disponible
-        origen = self.k.saldo(0)
+        # del shard 0 solo se pasa lo que no reservan los activos que operan en él
+        reserva0 = sum(c for a, c in porc.items() if self.shard_de.get(a) == 0)
+        origen = self.k.saldo(0) - reserva0
         if origen < falta:
-            log(f"{activo} el shard {shard} tiene {disponible:.2f} $ y el shard 0 solo {origen:.2f} $: no alcanza para "
-                f"{necesario:g} $")
+            log(f"{activo} el shard {shard} tiene {disponible:.2f} $ y el shard 0 solo {origen:.2f} $ libres"
+                f"{f' (aparte de {reserva0:g} $ de las divisas)' if reserva0 else ''}: no alcanza para {necesario:g} $")
             return disponible >= contratos
         try:
             self.k.transferir_a_shard(falta, shard)

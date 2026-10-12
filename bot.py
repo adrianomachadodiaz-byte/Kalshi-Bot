@@ -835,6 +835,7 @@ class Bot:
             ej = EjecutorReal(k, contratos, v["desliz_entrada"], len(self.activos), v["espera_entrada"])
             if self.ej:
                 ej.info = self.ej.info
+                ej.shard_de = getattr(self.ej, "shard_de", {})
             self.k, self.ej, self.op.ej, self.mercados.k = k, ej, ej, k
             self.key_id = key_id
             self.preparado = {}                  # vuelve a revisar posición y saldo del bloque actual
@@ -878,7 +879,7 @@ class Bot:
         self._anotar_grafico(activo, f)
         if not self.ej:
             return
-        self.ej.info[t] = m
+        self.ej.ver_mercado(activo, m)
         encendido = not self.estado.pausado
         if encendido and self.preparado.get(activo) != t and activo in self.activos:
             self.preparado[activo] = t
@@ -965,16 +966,6 @@ class Bot:
                 fuera[a] = dict(motivo=motivo, abre=abre)
         return fuera
 
-    def _aviso_saldo(self, saldo):
-        """El bot reserva un contrato por activo encendido. Si el saldo no llega, sigue
-        operando de uno en uno, pero conviene verlo arriba y no enterrado en el registro."""
-        if saldo is None or not self.ej:
-            return ""
-        necesario = sum(c.contratos for a, c in self.cfgs.items() if a in self.activos)
-        if saldo >= necesario - 1e-6:
-            return ""
-        return (f"hacen falta {necesario:g} $ para los {len(self.activos)} activos encendidos "
-                f"y hay {saldo:.2f} $: algunas entradas se quedarán fuera")
 
     def _resumen(self, saldo):
         hoy = datetime.now(CDT).strftime("%Y-%m-%d")
@@ -1035,7 +1026,6 @@ class Bot:
             encendido=not self.estado.pausado, conectado=bool(self.ej),
             key_id=(self.key_id[:4] + "…" + self.key_id[-4:]) if len(self.key_id) > 8 else ("configurada" if self.key_id else ""),
             saldo=saldo, limite_diario=self.op.limite_diario(), aviso_precio=self.precios.nota,
-            aviso_saldo=self._aviso_saldo(saldo),
             horario=self._horarios(),
             mercados={a: self.horario_k.de(a, ahora) for a in SIN_INDICE},
             mercados_error=self.horario_k.error,
