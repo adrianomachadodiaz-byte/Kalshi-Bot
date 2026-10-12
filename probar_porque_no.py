@@ -46,7 +46,7 @@ cfg = Config(delta=15, delay=60, entrada_min=0.98, entrada_max=0.99, tp=0.15, ex
 d = Path(os.environ["DATA_DIR"])
 estado = Estado(d)
 estado.pausado = False            # con el bot apagado no hay nada que explicar
-op = Operador({"BTC": Estrategia(cfg)}, EjNulo(), estado, Registro(d, "sim"), 1)
+op = Operador({"BTC": Estrategia(cfg)}, EjNulo(), estado, Registro(d, "sim"))
 
 # bloque 1: Delta corto (el índice solo sube 3 $ y pide 15)
 for seg in range(850, 899, 4):

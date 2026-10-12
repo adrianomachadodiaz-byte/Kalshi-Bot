@@ -33,7 +33,6 @@
   --baja:#ff5f5f;          /* en contra */
   --avisa:#f0b429;         /* pide atención */
   --sube-f:rgba(47,224,122,.12); --baja-f:rgba(255,95,95,.12); --avisa-f:rgba(240,180,41,.12);
-  --azul-f:rgba(255,255,255,.06);
   --estado:var(--tenue);
   --r:15px; --r-s:9px;
   --sal:cubic-bezier(.16,1,.3,1);
@@ -77,7 +76,6 @@ h2{font-size:13px;margin:0;font-weight:500;letter-spacing:.02em;color:var(--text
 .oculto{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .logo svg{flex:none}
 .nav{display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:18px}
-.nav .rot{display:none}
 .nav a{display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:12px;
   color:var(--gris);border:0;position:relative;transition:color var(--t),background var(--t),box-shadow var(--t)}
 .nav a span{position:absolute;left:calc(100% + 10px);white-space:nowrap;padding:5px 9px;border-radius:7px;
@@ -87,7 +85,6 @@ h2{font-size:13px;margin:0;font-weight:500;letter-spacing:.02em;color:var(--text
 .nav a:hover span,.nav a:focus-visible span{opacity:1;transform:none}
 .nav a[aria-current="true"]{background:var(--azul-c);color:var(--claro)}
 .nav + .nav{margin-top:14px;padding-top:14px;border-top:1px solid var(--linea);width:40px}
-.lat-pie{display:none}
 
 /* ---------------------------------------------------------------- cabecera */
 .consola{position:fixed;top:0;left:var(--lateral);right:0;height:var(--cabeza);z-index:19;
@@ -101,13 +98,6 @@ h2{font-size:13px;margin:0;font-weight:500;letter-spacing:.02em;color:var(--text
 .pill::before{background:var(--tenue)}
 .pill.on::before{background:var(--sube)}
 .pill.warn::before{background:var(--avisa)}
-/* lecturas del instrumento: lo que se mira cada segundo */
-.lecturas{display:flex;align-items:baseline;gap:20px;padding:0 18px;
-  border-left:1px solid var(--linea);border-right:1px solid var(--linea)}
-.lecturas > div{display:flex;flex-direction:column;gap:2px}
-.lecturas .v{font-family:var(--mono);font-size:19px;font-weight:600;line-height:1;letter-spacing:-.03em;color:var(--claro)}
-.lecturas .v.chico{font-size:16px;color:var(--texto)}
-.lecturas .v.pos{color:var(--sube)}.lecturas .v.neg{color:var(--baja)}
 
 /* ---------------------------------------------------------------- botones */
 button{font:inherit;font-size:13px;font-weight:450;border:1px solid transparent;border-radius:var(--r-s);
@@ -154,8 +144,7 @@ html{scroll-behavior:smooth}
 /* ---------------------------------------------------------------- tablero */
 .tablero{display:grid;gap:18px;grid-template-columns:minmax(0,1fr);align-items:start}
 @media(min-width:1080px){.tablero{grid-template-columns:minmax(0,1fr) 300px}}
-.bloque,.marcador,.panel,.noticias{background:var(--n1);border:1px solid var(--linea);border-radius:var(--r);padding:16px 18px 18px}
-.marcador{padding:18px 18px 8px}
+.bloque,.panel,.noticias{background:var(--n1);border:1px solid var(--linea);border-radius:var(--r);padding:16px 18px 18px}
 /* la tarjeta del bloque se distingue por el borde algo más claro, sin color */
 .bloque{border-color:var(--linea-2)}
 .rail{display:grid;gap:18px;align-content:start}
@@ -164,10 +153,6 @@ html{scroll-behavior:smooth}
 .principal > *,.rail > *,.tablero > *{min-width:0}
 .principal > .seccion{margin-top:0}
 @media(min-width:1080px){.rail{position:sticky;top:calc(var(--cabeza) + 22px)}}
-.total .k{display:block}
-.total .v{display:block;font-family:var(--mono);font-size:33px;font-weight:600;letter-spacing:-.035em;
-  line-height:1.05;margin:7px 0 4px;color:var(--claro)}
-.total .v.pos{color:var(--sube)}.total .v.neg{color:var(--baja)}
 /* ---------------------------------------------------------------- marcador en tarjetas */
 .resumen{margin-bottom:18px}
 .filtros{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px}
@@ -211,23 +196,6 @@ html{scroll-behavior:smooth}
 .rbarra i{display:block;height:100%;border-radius:3px;transition:width 300ms var(--sal)}
 .rbarra .g{background:var(--sube)}
 .rbarra .p{background:var(--baja)}
-.rpies{display:flex;justify-content:space-between;gap:10px;margin-top:7px;font-size:11.5px;color:var(--gris)}
-.rpies b{font-family:var(--mono);font-weight:600}
-.rpies .g b{color:var(--sube)}.rpies .p b{color:var(--baja)}
-/* cuatro datos en rejilla: ocupan la mitad que seis filas */
-.rejilla{display:grid;grid-template-columns:1fr 1fr;gap:1px;margin-top:16px;
-  background:var(--linea);border:1px solid var(--linea);border-radius:var(--r-s);overflow:hidden}
-.rejilla > div{background:var(--n1);padding:9px 11px}
-.rejilla dt{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--tenue)}
-.rejilla dd{margin:3px 0 0;font-family:var(--mono);font-size:15px;font-weight:600;
-  letter-spacing:-.02em;color:var(--claro)}
-.rejilla dd.pos{color:var(--sube)}.rejilla dd.neg{color:var(--baja)}
-.rejilla dd small{font-family:var(--texto-f,inherit);font-size:10.5px;font-weight:400;color:var(--tenue);margin-left:5px}
-/* el pie: saldo y tiempo encendido */
-.mpie{display:flex;justify-content:space-between;gap:12px;margin-top:14px;padding-top:12px;
-  border-top:1px solid var(--linea);font-size:11.5px;color:var(--gris)}
-.mpie b{display:block;font-family:var(--mono);font-size:14px;font-weight:600;color:var(--claro);margin-top:2px}
-.mpie .der{text-align:right}
 .skel{color:transparent!important;background:linear-gradient(90deg,var(--linea) 25%,var(--linea-2) 50%,var(--linea) 75%);
   background-size:200% 100%;border-radius:4px;animation:sk 1.5s ease-in-out infinite}
 @keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
@@ -244,15 +212,44 @@ html{scroll-behavior:smooth}
 .fbloq{margin-top:9px;padding-top:9px;border-top:1px solid var(--linea);font-size:11.5px;color:var(--avisa-t,var(--gris))}
 .fbloq span{display:block;margin-top:4px}
 
-/* selector de activo: Todo / BTC / ETH */
+/* selector del periodo: Todo / 7 días / Hoy */
 .segm{display:inline-flex;flex-wrap:wrap;align-items:center;gap:2px;padding:2px;background:var(--n0);border:1px solid var(--linea);border-radius:var(--r-s)}
 .segm button{padding:3px 10px;border:0;background:transparent;color:var(--gris);font:inherit;font-size:11.5px;
   letter-spacing:.03em;border-radius:3px;cursor:pointer;transition:color var(--t),background var(--t)}
 .segm button:hover{color:var(--claro)}
 .segm button[aria-pressed="true"]{background:var(--n2);color:var(--claro)}
-/* criptos y materias primas por separado: una etiqueta pequeña delante de cada grupo */
-.segm .sgrp{font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--tenue);padding:0 6px 0 9px;
-  border-left:1px solid var(--linea);margin-left:2px;align-self:stretch;display:inline-flex;align-items:center}
+/* selector de activo en dos grupos: cada uno en su cajita con su nombre, y un icono en cada botón */
+.filtros .par.ancho{flex-wrap:wrap;align-items:center}
+.selector{display:inline-flex;flex-wrap:wrap;align-items:stretch;gap:8px}
+.sgrupo{display:inline-flex;flex-wrap:wrap;align-items:center;gap:2px;padding:3px;
+  background:var(--n0);border:1px solid var(--linea);border-radius:11px;transition:border-color var(--t)}
+.sgrupo:hover{border-color:var(--linea-2)}
+.sgrupo .sgt{display:inline-flex;align-items:center;gap:6px;align-self:stretch;padding:0 10px 0 8px;margin-right:2px;
+  border-right:1px solid var(--linea);font-size:9.5px;font-weight:500;letter-spacing:.11em;text-transform:uppercase;color:var(--tenue)}
+.sgrupo .sgt svg{flex:none;color:var(--gris)}
+.selector button{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border:0;border-radius:8px;
+  background:transparent;color:var(--gris);font:inherit;font-size:12px;letter-spacing:.01em;cursor:pointer;
+  transition:color var(--t),background var(--t),box-shadow var(--t)}
+.selector button .ico{width:14px;height:14px;margin:0;color:var(--tenue)}
+.selector button:hover{color:var(--claro);background:var(--n1)}
+.selector button:hover .ico{color:var(--gris)}
+.selector button[aria-pressed="true"]{background:var(--n2);color:var(--claro);box-shadow:inset 0 0 0 1px var(--linea-2)}
+.selector button[aria-pressed="true"] .ico{color:var(--claro)}
+@media(max-width:860px){.sgrupo .sgt{width:100%;border-right:0;padding:3px 8px 4px;margin:0}}
+/* cabeza de cada grupo de tarjetas: nombre, cuántas operan y una raya hasta el borde */
+.grupo .gcuenta{font-size:10.5px;letter-spacing:.02em;text-transform:none;font-weight:400;color:var(--gris);
+  padding:1px 8px;border:1px solid var(--linea);border-radius:999px;background:var(--n1)}
+.grupo .gcuenta b{font-family:var(--mono);font-weight:600;color:var(--claro)}
+/* ganó, pero el bid llegó cerca del stop */
+.casi{display:inline-flex;align-items:center;gap:5px;margin-left:7px;padding:1px 7px;border-radius:999px;
+  font-size:10.5px;color:var(--avisa);background:var(--avisa-f);border:1px solid rgba(240,180,41,.35)}
+.casi::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
+.kpi dd.avisa{color:var(--avisa)}
+.marca-min{position:absolute;top:-3px;width:2px;height:10px;border-radius:1px;background:var(--avisa);
+  transform:translateX(-1px);transition:left var(--t)}
+.m-min{margin-top:4px;font-size:11px;color:var(--gris)}
+.m-min b{font-family:var(--mono);font-weight:600;color:var(--claro)}
+.m-min.cerca b{color:var(--avisa)}
 .grupo{display:flex;align-items:center;gap:10px;margin:22px 0 10px;font-size:10.5px;font-weight:500;
   letter-spacing:.1em;text-transform:uppercase;color:var(--tenue)}
 .grupo::after{content:"";flex:1;height:1px;background:var(--linea)}
@@ -455,7 +452,6 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 .estado-guardado.yendo::before{border:1.8px solid var(--linea-2);border-top-color:var(--azul-c);
   border-radius:50%;animation:gira 750ms linear infinite;background:none}
 @keyframes gira{to{transform:rotate(360deg)}}
-.pie{margin-top:26px;padding-top:14px;border-top:1px solid var(--linea);font-size:11px;color:var(--tenue)}
 
 /* ---------------------------------------------------------------- horario de Kalshi */
 /* materias primas: si el mercado está abierto o cerrado, y cuánto falta para que cambie */
@@ -519,25 +515,16 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 @media(min-width:1600px){
   .tablero{grid-template-columns:minmax(0,1fr) 360px;gap:22px}
   .principal,.rail{gap:22px}
-  .bloque,.marcador,.panel,.noticias,.grid2>div{padding:20px 22px 22px}
-  .total .v{font-size:40px}
-  .lista .v{font-size:18px}
-  .lista > div{padding:12px 0}
+  .bloque,.panel,.noticias,.grid2>div{padding:20px 22px 22px}
   table{font-size:13.5px}
   th,td{padding:10px 14px 10px 0}
-  .lecturas .v{font-size:22px}
   .grid2{gap:22px}
 }
 @media(max-width:1280px){
   :root{--lateral:64px}
   .lateral{padding:0 10px 14px;align-items:stretch}
-  .logo span{display:none}
-  .nav .rot{display:none}
   .nav a{justify-content:center;padding:10px 0}
   .nav a span{display:none}
-  .nav a[aria-current="true"]::before{left:-10px}
-  .nav + .nav{margin-top:14px;padding-top:14px;border-top:1px solid var(--linea)}
-  .lat-pie{display:none}
 }
 @media(max-width:1079px){
   .consola .msg{max-width:100%}
@@ -547,7 +534,7 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
   .lateral{left:0;right:0;bottom:0;top:auto;width:auto;height:56px;flex-direction:row;align-items:center;
     border-right:0;border-top:1px solid var(--linea);padding:0 6px;
     background:rgba(10,10,10,.94);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
-  .logo,.lat-pie{display:none}
+  .logo{display:none}
   .nav{flex-direction:row;flex:1;margin:0;gap:0;justify-content:space-around}
   .nav + .nav{margin:0;padding:0;border:0}
   .nav a{flex-direction:column;gap:3px;padding:8px 6px;font-size:9.5px;letter-spacing:.02em;border-radius:var(--r-s)}
@@ -556,19 +543,13 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
     color:inherit;text-transform:uppercase;font-size:9px;letter-spacing:.06em;white-space:nowrap}
   .nav a{width:auto;height:auto}
   .nav a[aria-current="true"]{background:var(--azul-c);color:var(--claro);box-shadow:none}
-  .nav a[aria-current="true"]::before{left:50%;top:auto;bottom:-0px;width:16px;height:2px;
-    transform:translateX(-50%);border-radius:2px}
   main{margin-left:0;padding:calc(var(--cabeza) + 14px) 14px 78px}
   .consola{left:0;padding:0 14px;gap:9px}
-  .lecturas{padding:0;border:0;gap:16px;margin-left:auto}
-  .lecturas .v{font-size:17px}
-  .bloque,.marcador,.grid2 > div{padding:14px 14px 16px}
+  .bloque,.grid2 > div{padding:14px 14px 16px}
   .wrap{margin:0 -14px;padding:0 14px}
-  .total .v{font-size:29px}
   .rg b{font-size:32px}
   #logs{max-height:200px}
   .solo-pc{display:none}
-  .pie{margin-bottom:8px}
 }
 @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
@@ -583,27 +564,19 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
     <h1 class="oculto">Kalshi Bot</h1>
   </div>
   <div class="nav">
-    <p class="rot">Operación</p>
     <a href="#s-res" data-sec="s-res"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="12" width="4.5" height="8" rx="1"></rect><rect x="9.75" y="7" width="4.5" height="13" rx="1"></rect><rect x="16.5" y="4" width="4.5" height="16" rx="1"></rect></svg><span>Resultado</span></a>
     <a href="#s-bloque" data-sec="s-bloque"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 15l4.5-5 3.5 3L21 5"></path><path d="M3 20h18"></path></svg><span>Bloque</span></a>
     <a href="#s-ops" data-sec="s-ops"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10"></path></svg><span>Operaciones</span></a>
     <a href="#s-log" data-sec="s-log"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"></rect><path d="M7 9l2.5 2.5L7 14M12.5 15h4"></path></svg><span>Registro</span></a>
   </div>
   <div class="nav">
-    <p class="rot">Configuración</p>
     <a href="#s-ajustes" data-sec="s-ajustes"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4 8h10M18 8h2M4 16h4M12 16h8"></path><circle cx="16" cy="8" r="2.2"></circle><circle cx="10" cy="16" r="2.2"></circle></svg><span>Ajustes</span></a>
   </div>
-  <div class="lat-pie"><span id="uptime"></span></div>
 </nav>
 
 <header class="consola">
   <span id="pill" class="pill off">cargando</span>
   <a id="hMat" class="pill solo-pc" href="#s-horario" hidden title="Horario de Kalshi de las materias primas"></a>
-  <span class="sp"></span>
-  <div class="lecturas" id="instr" hidden style="display:none">
-    <div><span class="k" id="hQuien">Delta</span><span class="v num" id="hDelta">–</span></div>
-    <div><span class="k">Queda</span><span class="v num chico" id="hQueda">–</span></div>
-  </div>
   <span class="sp"></span>
   <span id="msgPower" class="msg" role="status" aria-live="polite"></span>
   <button id="cancelar" class="b-ghost" hidden>Cancelar</button>
@@ -619,7 +592,7 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 <section class="resumen" id="s-res" aria-label="Resultado">
   <div class="filtros">
     <span class="par"><span class="et">Periodo</span><span class="segm" id="segPeriodo"></span></span>
-    <span class="par"><span class="et">Activo</span><span class="segm" id="segStats"></span></span>
+    <span class="par ancho"><span class="et">Activo</span><span class="selector" id="segStats"></span></span>
   </div>
   <dl class="kpis">
     <div class="kpi"><dt id="sTitulo">Resultado</dt><dd id="sProfit" class="skel">–</dd>
@@ -652,6 +625,8 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
       <div class="nota" id="sSimulNota"></div></div>
     <div class="kpi"><dt>Por lado</dt><div id="sLados" style="margin-top:5px"></div></div>
     <div class="kpi"><dt>Cómo cierran</dt><div id="sSalidas" style="margin-top:5px"></div></div>
+    <div class="kpi"><dt>Casi pierden</dt><dd id="sCasi">–</dd>
+      <div class="nota" id="sCasiNota"></div></div>
     <div class="kpi"><dt>Saldo en Kalshi</dt><dd id="sSaldo" class="skel">–</dd>
       <div class="nota"><span id="sKey"></span> · encendido <b id="sOn">–</b></div></div>
     <div class="kpi ancha"><dt>Ganancia acumulada<span id="sDias" style="text-transform:none;letter-spacing:0;color:var(--tenue)"></span></dt>
@@ -664,12 +639,12 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
   <div id="s-bloque"></div>
 
 <section class="seccion panel" id="s-ops" aria-label="Operaciones">
-  <div class="titulo"><h2>Operaciones</h2><span class="segm" id="segOps"></span><span id="opsCuenta" class="ayuda"></span>
+  <div class="titulo"><h2>Operaciones</h2><span class="selector" id="segOps"></span><span id="opsCuenta" class="ayuda"></span>
     <span class="sp"></span><a href="/operaciones.csv">bajar todas (CSV)</a>
     <button id="reiniciar" class="b-ghost chico">Reiniciar resultados</button>
     <span id="msgReiniciar" class="msg" role="status" aria-live="polite"></span></div>
   <div class="wrap alto-tope"><table>
-    <thead><tr><th scope="col">Fecha (CDT)</th><th scope="col">Activo</th><th scope="col">Lado</th><th scope="col">Entrada</th><th scope="col">Salida</th><th scope="col">Precio salida</th><th scope="col">Contratos</th><th scope="col">Resultado</th><th scope="col">$</th></tr></thead>
+    <thead><tr><th scope="col">Fecha (CDT)</th><th scope="col">Activo</th><th scope="col">Lado</th><th scope="col">Entrada</th><th scope="col">Salida</th><th scope="col">Precio salida</th><th scope="col" title="Lo más bajo que llegó el bid de su lado mientras estuvo abierta">Más bajo</th><th scope="col">Contratos</th><th scope="col">Resultado</th><th scope="col">$</th></tr></thead>
     <tbody id="ops"></tbody>
   </table></div>
 </section>
@@ -797,7 +772,6 @@ const GS = {}, hoverX = {};
 const VERDE = '#2fe07a', ROJO = '#ff5f5f', NEUTRO = '#9b9b9b', TENUE = '#757575';
 const REJILLA = '#242424', LIENZO = '#131313', FONDO = '#0a0a0a', CLARO = '#ffffff', AZUL = '#9b9b9b';
 const BLOQUE_S = 900;
-const angosto = () => window.innerWidth < 640;
 // el lienzo se adapta: si fuera siempre de 880 de ancho, en el movil las etiquetas
 // quedarian a media escala y no se leerian
 // el lienzo mide lo mismo que la caja: una unidad del SVG es un píxel de pantalla.
@@ -857,7 +831,7 @@ function grafico(v, a) {
   const ya = p => Y1 - (p - lo) / (hi - lo) * (Y1 - Y0);
   const corta = y => Math.max(Y0, Math.min(Y1, y));
 
-  G = { g, x, ya, lo, hi, X0, X1, Y0, Y1, W, H };
+  GS[a] = { g, x, ya, lo, hi, X0, X1, Y0, Y1, W, H };   // lo usa la cruz del ratón (dibujarCruz)
   const o = [];
   const ult = g.activo[g.activo.length - 1];
   const arriba = ref == null || ult[1] >= ref;
@@ -1043,11 +1017,20 @@ function pintarNoticias(d) {
   }).join('');
 }
 
+// misma regla que operador.casi_pierde: una ganada cuyo bid llegó a `margen` o menos del stop
+// (sin stop, de 0.50)
+function casiPierde(r, margen) {
+  if (r.resultado !== 'GANA' || r.bid_min == null || r.bid_min === '') return false;
+  const ref = r.stop == null || r.stop === '' ? 0.5 : +r.stop;
+  return +r.bid_min <= ref + margen + 1e-9;
+}
+
 // medidor de la posición: dónde está el bid entre el stop y el objetivo
 function medidor(g) {
   if (g.tp == null || g.bid == null) return '';
   const ex = g.exit != null ? g.exit : 0;
-  const lo = Math.min(ex, g.bid, g.entrada), hi = Math.max(g.tp, g.bid);
+  const bm = g.bid_min;
+  const lo = Math.min(ex, g.bid, g.entrada, bm == null ? Infinity : bm), hi = Math.max(g.tp, g.bid);
   const pct = v => ((v - lo) / (hi - lo || 1)) * 100;
   const pBid = Math.max(0, Math.min(100, pct(g.bid))), pEnt = Math.max(0, Math.min(100, pct(g.entrada)));
   const gana = g.bid >= g.entrada;
@@ -1056,6 +1039,7 @@ function medidor(g) {
     <div class="pista">
       <div class="tramo ${gana ? 'gana' : 'pierde'}" style="left:${izq}%;width:${anc}%"></div>
       <div class="marca-ent" style="left:${pEnt}%"></div>
+      ${bm == null ? '' : `<div class="marca-min" style="left:${Math.max(0, Math.min(100, pct(bm)))}%" title="lo más bajo: ${n(bm, 3)}"></div>`}
       <div class="marca-bid" style="left:${pBid}%"></div>
     </div>
     <div class="pista-pies">
@@ -1063,6 +1047,10 @@ function medidor(g) {
       <span class="ayuda num" style="left:${Math.min(Math.max(pEnt, 17), 76)}%">entrada ${n(g.entrada, 3)}</span>
       <span class="pos num">TP ${n(g.tp, 2)}</span>
     </div>
+    ${bm == null ? '' : (() => {
+      const ref = g.exit != null ? g.exit : 0.5, cerca = bm <= ref + ((ultimo && +ultimo.ajustes.casi_margen) || 0) + 1e-9;
+      return `<div class="m-min${cerca ? ' cerca' : ''}">lo más bajo hasta ahora: <b>${n(bm, 3)}</b> · a ${n(bm - ref, 2)} del ${g.exit != null ? 'stop' : '0.50'}${cerca ? ' · casi pierde' : ''}</div>`;
+    })()}
   </div>`;
 }
 
@@ -1161,7 +1149,7 @@ function icono(a) {
 // Una tarjeta por cripto, con su gráfico y SU configuración dentro. Se arma una sola
 // vez: si se rehiciera en cada refresco se perdería lo que el usuario esté plegando o
 // escribiendo en un campo.
-function armarCarteles(lista, encendidos) {
+function armarCarteles(lista) {
   const clave = lista.join(',');
   if (clave === cartelesPara) return;
   cartelesPara = clave;
@@ -1207,8 +1195,9 @@ function armarCarteles(lista, encendidos) {
     </details>
   </details>
   </section>`;
-  $('s-bloque').innerHTML = porGrupos(lista).map(([g, l]) =>
-    `<h2 class="grupo">${g}</h2>` + l.map(carta).join('')).join('');
+  $('s-bloque').innerHTML = porGrupos(lista).map(([g, l], i) =>
+    `<h2 class="grupo"><span>${g}</span><span class="gcuenta" id="gc_${i}" data-de="${l.join(',')}"></span></h2>`
+    + l.map(carta).join('')).join('');
   llenarForm(ajustesGuardados);
   $('s-bloque').addEventListener('click', ev => {
     const g = ev.target.closest('[data-guardar]'), h = ev.target.closest('[data-deshacer]');
@@ -1301,9 +1290,15 @@ function segmento(id, actual, alElegir) {
   const clave = ops.join(',');
   if (caja.dataset.ops !== clave) {
     caja.dataset.ops = clave;
-    const btn = o => `<button type="button" data-v="${o}">${o === 'todo' ? 'Todo' : esc(nombre(o))}</button>`;
-    caja.innerHTML = btn('todo') + porGrupos(activos).map(([g, l]) =>
-      `<span class="sgrp">${g === 'Cripto' ? 'Cripto' : 'Materias'}</span>` + l.map(btn).join('')).join('');
+    const btn = o => `<button type="button" data-v="${o}">${o === 'todo' ? 'Todo' : icono(o) + esc(nombre(o))}</button>`;
+    // "Todo" va solo; cripto y materias primas, cada una en su cajita con su nombre
+    const ICO_GRUPO = {
+      Cripto: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M9.5 8h4a2 2 0 0 1 0 4h-4m0 0h4.5a2 2 0 0 1 0 4H9.5zM11 6v2m0 8v2"></path></svg>',
+      'Materias primas': '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M3.4 18l2.8-8.4h11.6l2.8 8.4z"></path></svg>',
+    };
+    caja.innerHTML = `<span class="sgrupo">${btn('todo')}</span>` + porGrupos(activos).map(([g, l]) =>
+      `<span class="sgrupo" role="group" aria-label="${g}"><span class="sgt">${ICO_GRUPO[g] || ''}${g}</span>`
+      + l.map(btn).join('') + '</span>').join('');
     caja.onclick = ev => {
       const b = ev.target.closest('button');
       if (b) { alElegir(b.dataset.v); if (ultimo) render(ultimo); }
@@ -1436,7 +1431,6 @@ function render(d) {
     btn.textContent = d.encendido ? 'Apagar' : 'Encender';
     btn.className = d.encendido ? 'b-apagar' : 'b-encender';
   }
-  $('uptime').textContent = 'servidor activo hace ' + dur(d.servidor_s);
 
   const av = [];
   if (!d.conectado) av.push(['warn', 'Falta conectar tu API key de Kalshi (abajo, en "API de Kalshi"). Sin ella el bot solo mira precios.']);
@@ -1542,6 +1536,15 @@ function render(d) {
     `<div class="fila"><span>${esc(m)}</span><b>${c} <span style="color:var(--tenue);font-weight:400">${Math.round(100 * c / t.ops)}%</span></b></div>`).join('')
     : '<div class="nota">sin operaciones</div>';
 
+  // ganadas que casi fueron perdidas (solo las medidas: las de antes no traen el dato)
+  const cm = +d.ajustes.casi_margen || 0, cs = $('sCasi');
+  cs.innerHTML = t.casi_de ? `${t.casi} <span class="chico">de ${t.casi_de}</span>` : '–';
+  cs.className = t.casi ? 'avisa' : '';
+  $('sCasiNota').innerHTML = t.casi_de
+    ? `ganadas que bajaron a <b>${n(cm, 2)}</b> o menos del stop`
+      + (t.casi ? ` · <b>${Math.round(100 * t.casi / t.casi_de)}%</b>` : '')
+    : 'se mide desde esta versión del bot';
+
   destellar($('sSaldo'), d.saldo == null ? '–' : '$' + d.saldo.toFixed(2), '');
   $('sKey').textContent = d.conectado ? 'key ' + d.key_id : 'sin API key';
   $('sOn').textContent = d.encendido ? dur(d.encendido_s) : 'apagado';
@@ -1549,28 +1552,20 @@ function render(d) {
   $('sDias').textContent = t.dias ? ` · ${t.dias} día${t.dias === 1 ? '' : 's'} con operaciones` : '';
   curvaGanancia(t.curva);
 
-  // cabecera-instrumento: lo que se mira cada segundo
-  const vc = d.vivo.find(v => v.mercado);   // la cabecera enseña el primero; cada tarjeta trae el suyo
-  $('instr').hidden = true;     // la cabecera ya no enseña el Delta de una sola cripto
-  if (false && vc) {
-    const dl = $('hDelta');
-    // con cinco criptos hace falta decir de cuál es este Delta
-    $('hQuien').textContent = vc.activo;
-    dl.textContent = vc.delta == null ? '–'
-      : (vc.delta >= 0 ? '+' : '−') + n(Math.abs(vc.delta), dec2(vc.referencia));
-    dl.className = 'v num ' + clase(vc.delta);
-    $('hQueda').textContent = vc.quedan == null ? '–'
-      : Math.floor(vc.quedan / 60) + ':' + String(Math.floor(vc.quedan % 60)).padStart(2, '0');
-  }
-
   // hay tarjeta para cada cripto, encendida o no: si solo las hubiera para las
   // encendidas, una apagada no se podría ni configurar
   const enc = (d.ajustes.activos || '').split(',').filter(Boolean);
-  armarCarteles(activos, enc);
+  armarCarteles(activos);
   const conDatos = new Set(d.vivo.map(v => v.activo));
   const operando = new Set(d.abiertas.map(o => o.activo));
   d.vivo.forEach(v => pintarVivo(d, v));
   pintarHorarios(d);
+  // cabeza de cada grupo: cuántas de ese grupo están operando
+  document.querySelectorAll('.grupo .gcuenta').forEach(el => {
+    const de = (el.dataset.de || '').split(',').filter(Boolean);
+    const on = de.filter(a => enc.includes(a)).length;
+    el.innerHTML = `<b>${on}</b> de ${de.length} operando`;
+  });
   for (const a of activos) {
     const card = $('card_' + a);
     if (!card) continue;
@@ -1587,11 +1582,18 @@ function render(d) {
   if ($('auto').checked && abajo) box.scrollTop = box.scrollHeight;
 
   const ops = focoOps === 'todo' ? d.operaciones : d.operaciones.filter(r => r.activo === focoOps);
-  $('ops').innerHTML = ops.length ? ops.map(r => `<tr><td class="num">${r.fecha} ${h12(r.hora_entrada)}</td><td>${r.activo}</td><td>${r.lado}</td>
-    <td class="num">${r.entrada}</td><td>${r.salida}</td><td class="num">${r.precio_salida}</td><td class="num">${r.contratos}</td>
-    <td class="${r.resultado === 'GANA' ? 'pos' : 'neg'}">${r.resultado === 'GANA' ? 'ganada' : 'perdida'}</td>
-    <td class="num ${clase(+r.pnl_usd)}">${usd(+r.pnl_usd)}</td></tr>`).join('')
-    : `<tr><td colspan="9" class="vacio">${focoOps === 'todo' ? 'Todavía no hay operaciones. Aparecerán aquí en cuanto el bot cierre la primera.' : 'Todavía no hay operaciones de ' + esc(focoOps) + '.'}</td></tr>`;
+  const margen = +d.ajustes.casi_margen || 0;
+  $('ops').innerHTML = ops.length ? ops.map(r => {
+    const casi = casiPierde(r, margen);
+    const ref = r.stop !== '' && r.stop != null ? +r.stop : 0.5;
+    return `<tr><td class="num">${r.fecha} ${h12(r.hora_entrada)}</td><td>${r.activo}</td><td>${r.lado}</td>
+    <td class="num">${r.entrada}</td><td>${r.salida}</td><td class="num">${r.precio_salida}</td>
+    <td class="num"${casi ? ' style="color:var(--avisa)"' : ''} title="${r.bid_min ? 'a ' + n(+r.bid_min - ref, 2) + ' del ' + (r.stop ? 'stop' : '0.50') : 'sin dato: operación de antes de medirlo'}">${r.bid_min ? n(+r.bid_min, 3) : '–'}</td>
+    <td class="num">${r.contratos}</td>
+    <td class="${r.resultado === 'GANA' ? 'pos' : 'neg'}">${r.resultado === 'GANA' ? 'ganada' : 'perdida'}${casi ? '<span class="casi">casi pierde</span>' : ''}</td>
+    <td class="num ${clase(+r.pnl_usd)}">${usd(+r.pnl_usd)}</td></tr>`;
+  }).join('')
+    : `<tr><td colspan="10" class="vacio">${focoOps === 'todo' ? 'Todavía no hay operaciones. Aparecerán aquí en cuanto el bot cierre la primera.' : 'Todavía no hay operaciones de ' + esc(focoOps) + '.'}</td></tr>`;
   const totOps = focoOps === 'todo' ? d.total.ops : (((d.por_activo || {})[focoOps] || {}).total || {}).ops || 0;
   $('opsCuenta').textContent = ops.length
     ? (totOps > ops.length ? `últimas ${ops.length} de ${totOps}` : `${totOps} en total`) : '';

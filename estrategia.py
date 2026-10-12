@@ -94,6 +94,8 @@ class Operacion:
     shard: Optional[int] = None  # exchange_index del mercado (modo real)
     atraso: Optional[float] = None   # antigüedad del precio con el que se decidió entrar
     sin_tp: bool = False       # entrada + TP pasa de 0.99: no se pone orden, se cobra al cerrar el bloque
+    bid_min: Optional[float] = None  # lo más bajo que llegó el bid de su lado mientras estuvo abierta
+    stop: Optional[float] = None     # el Exit con el que entró: con bid_min dice si "casi pierde"
 
     def abiertos(self):
         return round(self.contratos - sum(s["n"] for s in self.salidas), 2)

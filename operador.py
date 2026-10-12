@@ -17,7 +17,24 @@ from estrategia import BLOQUE, Estrategia, Foto, Operacion
 
 CDT = ZoneInfo("America/Chicago")
 COLUMNAS = ["fecha", "hora_entrada", "hora_salida", "activo", "mercado", "lado", "entrada", "salida",
-            "precio_salida", "contratos", "min_restantes", "delta", "atraso_s", "pnl_c", "pnl_usd", "resultado", "modo"]
+            "precio_salida", "contratos", "min_restantes", "delta", "atraso_s", "pnl_c", "pnl_usd", "resultado", "modo",
+            "bid_min", "stop"]
+
+
+def casi_pierde(fila, margen):
+    """True si una GANADA llegó a tener el bid a `margen` o menos de su stop.
+    Sin stop se compara con 0.50: el contrato llegó a ir perdiendo."""
+    if fila.get("resultado") != "GANA":
+        return False
+    try:
+        bajo = float(fila.get("bid_min"))
+    except (TypeError, ValueError):
+        return False                  # operación de antes de que se anotara: no se sabe
+    try:
+        ref = float(fila.get("stop"))
+    except (TypeError, ValueError):
+        ref = 0.50
+    return bajo <= ref + margen + 1e-9
 
 
 LOGS = deque(maxlen=500)   # últimas líneas, para el panel
@@ -73,9 +90,26 @@ class Registro:
         self.ruta = carpeta / "operaciones.csv"
         self.modo = modo
         self.filas = []
+        self.casi_margen = 0.05       # lo cambia el panel (ajuste casi_margen)
         if self.ruta.exists():
             with open(self.ruta, encoding="utf-8", newline="") as fh:
-                self.filas = list(csv.DictReader(fh))
+                lector = csv.DictReader(fh)
+                self.filas = list(lector)
+                cabecera = lector.fieldnames or []
+            if cabecera != COLUMNAS:
+                self._reescribir()
+
+    def _reescribir(self):
+        """CSV con columnas viejas -> columnas de ahora (las nuevas quedan vacías). Sin esto, las
+        filas nuevas llevarían más campos que la cabecera y el archivo se leería mal."""
+        tmp = self.ruta.with_suffix(".tmp")
+        with open(tmp, "w", encoding="utf-8", newline="") as fh:
+            w = csv.DictWriter(fh, fieldnames=COLUMNAS, extrasaction="ignore")
+            w.writeheader()
+            for f in self.filas:
+                w.writerow({k: f.get(k) or "" for k in COLUMNAS})
+        os.replace(tmp, self.ruta)
+        log(f"{self.ruta.name}: columnas puestas al día ({', '.join(COLUMNAS[-2:])} nuevas)")
 
     def anotar(self, op: Operacion):
         pnl = op.pnl()
@@ -94,7 +128,9 @@ class Registro:
             delta=round(op.delta, 1) if op.delta is not None else "",
             atraso_s=round(op.atraso, 1) if op.atraso is not None else "",
             pnl_c=round(pnl / op.contratos * 100, 2) if op.contratos else 0, pnl_usd=round(pnl, 2),
-            resultado="GANA" if pnl > 0 else "PIERDE", modo=self.modo)
+            resultado="GANA" if pnl > 0 else "PIERDE", modo=self.modo,
+            bid_min=round(op.bid_min, 3) if op.bid_min is not None else "",
+            stop=op.stop if op.stop is not None else "")
         nuevo = not self.ruta.exists()
         with open(self.ruta, "a", encoding="utf-8", newline="") as fh:
             w = csv.DictWriter(fh, fieldnames=COLUMNAS)
@@ -122,7 +158,7 @@ class Registro:
         El panel pide ~20 resúmenes por segundo (3 periodos x 6 criptos), así que el
         resultado se guarda hasta que cambia el número de operaciones.
         """
-        sello = (len(self.filas), self.modo)
+        sello = (len(self.filas), self.modo, self.casi_margen)
         if getattr(self, "_sello", None) != sello:       # entró una operación: a recalcular
             self._sello, self._cache = sello, {}
         clave = (fecha, activo, curva, desde)
@@ -220,7 +256,10 @@ class Registro:
         simul_max = max(a_la_vez) if a_la_vez else None
         simul_media = round(sum(a_la_vez) / len(a_la_vez), 1) if a_la_vez else None
         simul_pct = round(100 * sum(1 for x in a_la_vez if x > 1) / len(a_la_vez)) if a_la_vez else None
-        return dict(ops=len(pnl), ganadas=len(g), perdidas=len(p_), usd=round(sum(pnl), 2),
+        # ganadas que casi fueron perdidas: solo cuentan las que ya traen bid_min
+        medidas = [f for f in filas if f.get("resultado") == "GANA" and f.get("bid_min") not in (None, "")]
+        casi = sum(1 for f in medidas if casi_pierde(f, self.casi_margen))
+        return dict(casi=casi, casi_de=len(medidas),ops=len(pnl), ganadas=len(g), perdidas=len(p_), usd=round(sum(pnl), 2),
                     invertido=round(invertido, 2),
                     roi=round(100 * sum(pnl) / invertido, 2) if invertido else None,
                     c_media=round(sum(centavos) / len(centavos), 2) if centavos else None,
@@ -247,12 +286,11 @@ class Operador:
     """Lleva las operaciones de todos los activos. `procesar` se llama una vez por segundo y activo."""
 
     def __init__(self, estrategias: dict, ejecutor, estado: Estado, registro: Registro,
-                 contratos: float, max_perdida_dia: float = 0, meta_dia: float = 0):
-        self.estrategias = estrategias        # activo -> Estrategia
+                 max_perdida_dia: float = 0, meta_dia: float = 0):
+        self.estrategias = estrategias        # activo -> Estrategia (los contratos van en su Config)
         self.ej = ejecutor
         self.estado = estado
         self.registro = registro
-        self.contratos = contratos
         self.max_perdida_dia = max_perdida_dia
         self.meta_dia = meta_dia
         self.lock = threading.RLock()
@@ -290,6 +328,7 @@ class Operador:
             op = self.ej.entrar(activo, f, lado, ask, est.cfg.contratos, est.cfg)
             if op is None:
                 return                        # no se llenó: se vuelve a intentar en la foto siguiente
+            op.stop = est.cfg.exit
             self.estado.operado[activo] = f.ticker
             self.estado.abiertas[activo] = op
             self.estado.guardar()
@@ -300,6 +339,11 @@ class Operador:
     def _gestionar(self, op: Operacion, f: Foto):
         est = self.estrategias[op.activo]
         cambio = self.ej.revisar(op)                     # modo real: ¿se llenó la orden del TP?
+        # lo más bajo que llegó: con las mismas fotos que mira el stop (las que salida() da por buenas)
+        bid = f.bid(op.lado)
+        if f.valida() and f.ts < op.cierre and bid is not None and (op.bid_min is None or bid < op.bid_min - 1e-9):
+            op.bid_min = bid
+            cambio = True                                # se guarda: sobrevive a un reinicio
         if op.abiertos() > 0:
             if not op.saliendo:
                 decision = est.salida(op, f)

@@ -51,7 +51,12 @@ Todo se maneja desde el panel (el dominio de Railway, con tu clave `ACCESS_TOKEN
   cuánto dura la sesión siguiente y, si el filtro de horario hace esperar más, desde cuándo entra el bot. La
   cabecera dice de un vistazo cuántas materias primas están abiertas. Se apaga con `HORARIO_KALSHI=0`.
 - **Registro**: los últimos mensajes del bot (entradas, TP, stops, errores), se actualizan cada segundo.
-- **Operaciones**: las últimas 50 y un botón para bajarlas todas en CSV.
+- **Operaciones**: las últimas 50 y un botón para bajarlas todas en CSV. La columna **Más bajo** dice hasta dónde
+  bajó el bid de su lado mientras estuvo abierta (se mira con las mismas fotos que vigilan el stop). Una ganada que
+  llegó a quedar a 0.05 o menos del stop (sin stop: de 0.50) lleva la etiqueta **casi pierde**, y el cuadro
+  **Casi pierden** de Resultado las cuenta. El margen se cambia en Ajustes → Avanzado. Las operaciones de antes de
+  esta versión no traen el dato. En el CSV van como columnas nuevas `bid_min` y `stop`; un CSV viejo se pone al día
+  solo al arrancar, sin perder filas.
 - **Ajustes**: contratos, Delta, Delay, rango de entrada, TP, Exit, BreakEven, límites del día y deslizamiento.
   Se aplican al instante al guardar (sin reiniciar) y revisa que tengan sentido (por ejemplo, entrada máxima + TP ≤ 0.99).
 - **API de Kalshi**: pegas la API key ID y la private key; el bot las prueba pidiendo tu saldo y solo las guarda si Kalshi las acepta.

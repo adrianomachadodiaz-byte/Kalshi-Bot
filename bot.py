@@ -46,7 +46,6 @@ ACTIVOS_VALIDOS = ("BTC", "ETH", "SOL", "XRP", "DOGE", "HYPE", "BNB", "NEAR", "Z
 SIN_INDICE = ("GOLD", "SILVER", "OIL", "NATGAS")
 CICLO = float(env("CICLO_S", "0.25"))    # valor inicial; manda el del panel (campo "ritmo")
 CICLO_INDICE = float(env("CICLO_INDICE_S", "1.0"))   # el índice avanza cada 2-3 s: pedirlo más rápido es tirar peticiones
-PASO_GRAFICO = 1                         # segundos entre puntos de la serie que dibuja el panel
 
 # ---------------------------------------------------------------- ajustes (panel > variables de Railway > defecto)
 # clave, tipo, defecto, etiqueta, ayuda, sección ("" = básico, "av" = avanzado)
@@ -96,6 +95,7 @@ CAMPOS_GLOBAL = [
     ("filtro_horario", "sino", "si", "Filtro de horario",
      "mañana de EE. UU. (cierres 08:00-09:00 y 10:00-10:30 ET) y horas de metales/petróleo", ""),
     ("filtro_finde", "sino", "si", "Sin fin de semana (cripto)", "no opera cripto sábado ni domingo (UTC)", ""),
+    ("casi_margen", "num", 0.05, "Casi pierde (margen)", "ganadas cuyo bid bajó a esto o menos del stop", "av"),
     ("noticia_margen", "num", 2.0, "Margen noticia (min)", "después del cierre del bloque", "av"),
     ("noticia_dia_alto", "ent", 3, "Día cargado (eventos)", "desde cuántos rojos se recorta; 0 = nunca", "av"),
     ("noticia_dia_modo", "texto", "mitad", "Día cargado: qué hacer", "mitad = opera uno de cada dos · nada = no opera", "av"),
@@ -201,6 +201,8 @@ def validar(crudo):
         err["desliz_entrada"] = "entre 0 y 0.10"
     if not 0 <= v["espera_entrada"] <= 30:
         err["espera_entrada"] = "entre 0 y 30 segundos"
+    if not 0 <= v["casi_margen"] <= 0.5:
+        err["casi_margen"] = "entre 0 y 0.50"
     if not 0 <= v["noticia_margen"] <= 60:
         err["noticia_margen"] = "entre 0 y 60 minutos"
     if not 0 <= v["noticia_dia_alto"] <= 20:
@@ -443,7 +445,6 @@ class Noticias:
     def __init__(self):
         self.eventos = []          # todos los de la semana, ya ordenados
         self.error = ""
-        self.cuando = 0.0
         self.s = requests.Session()
         if env("NOTICIAS", "1") != "0":
             threading.Thread(target=self._bucle, daemon=True).start()
@@ -482,7 +483,7 @@ class Noticias:
             fuera.append(dict(titulo=str(e.get("title") or "")[:80], moneda=mon, impacto=imp, ts=ts,
                               previsto=str(e.get("forecast") or ""), anterior=str(e.get("previous") or "")))
         fuera.sort(key=lambda x: x["ts"])
-        self.eventos, self.error, self.cuando = fuera, "", time.time()
+        self.eventos, self.error = fuera, ""
 
     def proximas(self, cuantas=4):
         ahora = time.time()
@@ -757,7 +758,7 @@ class Bot:
         self.noticias = Noticias()
         self.filtro = FiltroNoticias(self.noticias)
         self.horario_k = HorarioKalshi(SIN_INDICE)
-        self.op = Operador({}, None, self.estado, self.registro, 1)
+        self.op = Operador({}, None, self.estado, self.registro)
         self.activos, self.cfgs = [], {}
         self.aplicar(self.ajustes.valores)
         self.preparado, self.visto, self.vista, self.historia = {}, {}, {}, {}
@@ -787,6 +788,7 @@ class Bot:
             self.ciclo_indice = v["ritmo_indice"]
             self.filtro.aplicar(v)
             self.op.filtro = self.filtro
+            self.registro.casi_margen = v["casi_margen"]
             if self.ej:
                 self.ej.contratos = {a: c.contratos for a, c in self.cfgs.items()}
                 self.ej.desliz, self.ej.n_activos = v["desliz_entrada"], len(activos)
@@ -1010,7 +1012,8 @@ class Bot:
                     entrada=op.entrada if op else None, tp=op.objetivo if op else None,
                     sin_tp=bool(op.sin_tp) if op else None,
                     exit=cfg.exit if (op and cfg) else None, lado=op.lado if op else None,
-                    bid=(f.bid(op.lado) if op else None))
+                    bid=(f.bid(op.lado) if op else None),
+                    bid_min=(op.bid_min if op else None))
                 fila.update(mercado=f.ticker, quedan=quedan, referencia=f.referencia, precio=f.precio,
                             indice_s=self.precios.atraso(a), delta=d,
                             delta_ok=bool(cfg and d is not None and d >= cfg.delta), yes_ask=f.yes_ask,

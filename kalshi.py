@@ -249,12 +249,6 @@ class Kalshi:
                 return num(p.get("position_fp")) or 0.0, num(p.get("market_exposure_dollars")) or 0.0
         return 0.0, 0.0
 
-    def ordenes_abiertas(self, ticker, exchange_index=None):
-        params = {"ticker": ticker, "status": "resting"}
-        if exchange_index is not None:
-            params["exchange_index"] = exchange_index
-        return self._pedir("GET", "/portfolio/orders", params).get("orders", [])
-
     # ------------------------------------------------------------------ órdenes
     def crear_orden(self, ticker, lado_libro, precio, contratos, tif, exchange_index=None, reduce_only=False):
         """lado_libro: 'bid' (comprar YES) o 'ask' (vender YES). precio: del lado YES, en dólares."""

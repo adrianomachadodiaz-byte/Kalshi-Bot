@@ -56,7 +56,7 @@ def main():
     reg = Registro(tmp, "simulacion")
     estado = Estado(tmp)
     estado.pausado = False
-    op = Operador({a.activo: Estrategia(CFG_BTC)}, EjecutorSim(), estado, reg, a.contratos)
+    op = Operador({a.activo: Estrategia(CFG_BTC)}, EjecutorSim(), estado, reg)
 
     visto = set()
     info = {}           # ticker -> dict(cierre, ult_pre=(ts, up, down), post=[(up, down)])
