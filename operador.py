@@ -333,8 +333,11 @@ class Operador:
             self.estado.abiertas[activo] = op
             self.estado.guardar()
             meta = "sin TP, al cierre" if op.sin_tp else f"TP {op.objetivo:.3f}"
+            # materias primas y divisas no tienen Delta (op.delta es None): con ":.1f" esta línea
+            # reventaba justo después de entrar y en el registro salía "error en el ciclo"
+            dl = f"delta {op.delta:.1f}" if op.delta is not None else "sin Delta"
             log(f"{activo} ENTRA {lado.upper()} {op.contratos:g} a {op.entrada:.3f} | {meta} | "
-                f"delta {op.delta:.1f} | quedan {(op.cierre - f.ts) / 60:.1f} min | {f.ticker}")
+                f"{dl} | quedan {(op.cierre - f.ts) / 60:.1f} min | {f.ticker}")
 
     def _gestionar(self, op: Operacion, f: Foto):
         est = self.estrategias[op.activo]

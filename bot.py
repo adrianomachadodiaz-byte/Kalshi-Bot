@@ -1026,6 +1026,8 @@ class Bot:
             encendido=not self.estado.pausado, conectado=bool(self.ej),
             key_id=(self.key_id[:4] + "…" + self.key_id[-4:]) if len(self.key_id) > 8 else ("configurada" if self.key_id else ""),
             saldo=saldo, limite_diario=self.op.limite_diario(), aviso_precio=self.precios.nota,
+            # entradas perdidas por falta de dinero en los últimos 15 min (el único aviso de saldo)
+            sin_saldo={a: x for a, x in (getattr(self.ej, "sin_saldo", None) or {}).items() if ahora - x["ts"] < 900},
             horario=self._horarios(),
             mercados={a: self.horario_k.de(a, ahora) for a in SIN_INDICE},
             mercados_error=self.horario_k.error,

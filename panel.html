@@ -165,15 +165,15 @@ html{scroll-behavior:smooth}
 .kpi{background:var(--n1);border:1px solid var(--linea);border-radius:var(--r-s);padding:7px 10px 8px;
   min-width:0;transition:border-color var(--t)}
 .kpi:hover{border-color:var(--linea-2)}
-.kpi dt{font-size:9px;letter-spacing:.08em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:uppercase;color:var(--tenue)}
-.kpi dd{margin:3px 0 0;font-family:var(--mono);font-size:16px;font-weight:600;letter-spacing:-.035em;
+.kpi dt{font-size:10px;letter-spacing:.07em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:uppercase;color:var(--tenue)}
+.kpi dd{margin:3px 0 0;font-family:var(--mono);font-size:18px;font-weight:600;letter-spacing:-.035em;
   line-height:1.05;color:var(--claro);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .kpi dd.pos{color:var(--sube)}.kpi dd.neg{color:var(--baja)}
-.kpi dd .chico{font-size:11px}
+.kpi dd .chico{font-size:12px}
 .kpi dd .sep{color:var(--tenue);font-weight:400;margin:0 2px}
-.kpi .nota{margin-top:3px;font-size:10px;line-height:1.35;color:var(--gris)}
+.kpi .nota{margin-top:3px;font-size:11px;line-height:1.35;color:var(--gris)}
 .kpi .nota + .nota{margin-top:1px}
-.kpi .fila{display:flex;justify-content:space-between;gap:6px;font-size:10px;color:var(--gris);line-height:1.4}
+.kpi .fila{display:flex;justify-content:space-between;gap:6px;font-size:11px;color:var(--gris);line-height:1.4}
 .kpi .fila b{font-family:var(--mono);font-weight:600;color:var(--claro)}
 .kpi .fila b.pos{color:var(--sube)}.kpi .fila b.neg{color:var(--baja)}
 .kpi .nota b{font-family:var(--mono);font-weight:600;color:var(--claro)}
@@ -183,7 +183,7 @@ html{scroll-behavior:smooth}
 
 /* curva de la ganancia acumulada, un punto por día, con sus datos debajo */
 .curva{margin:5px -4px 0;min-width:0;position:relative}
-.cinfo{display:flex;flex-wrap:wrap;gap:2px 12px;margin-top:4px;font-size:10px;color:var(--gris)}
+.cinfo{display:flex;flex-wrap:wrap;gap:2px 12px;margin-top:4px;font-size:11px;color:var(--gris)}
 .cinfo b{font-family:var(--mono);font-weight:600;color:var(--claro)}
 .cinfo b.pos{color:var(--sube)}.cinfo b.neg{color:var(--baja)}
 .curva svg{display:block;width:100%;height:auto}
@@ -463,6 +463,20 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
   border-radius:50%;animation:gira 750ms linear infinite;background:none}
 @keyframes gira{to{transform:rotate(360deg)}}
 
+/* ---------------------------------------------------------------- plegar recuadros */
+/* la flechita de cada cabecera: apunta abajo desplegado y a la derecha plegado */
+.plegar{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;padding:0;flex:none;
+  border:1px solid var(--linea);border-radius:6px;background:var(--n0);color:var(--gris);cursor:pointer;
+  transition:color var(--t),border-color var(--t)}
+.plegar:hover{color:var(--claro);border-color:var(--linea-2)}
+.plegar svg{transition:transform 160ms var(--sal)}
+.plegar[aria-expanded="true"] svg{transform:rotate(90deg)}
+/* plegado: del recuadro solo queda la cabecera */
+section.plegado > :not(.titulo):not(.filtros):not(.ab-t){display:none}
+section.plegado > .titulo,section.plegado > .filtros,section.plegado > .ab-t{margin-bottom:0}
+.grupo.plegado + .rejilla-b{display:none}
+.grupo .plegar{margin-right:-2px}
+
 /* ---------------------------------------------------------------- operaciones abiertas */
 /* arriba del todo, una tarjeta por operación: activo, lado, cómo va y la barra stop-TP */
 .abiertas{margin:0 0 18px;padding:14px 16px 16px;background:var(--n1);border:1px solid var(--linea-2);border-radius:var(--r)}
@@ -633,9 +647,9 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 
 <main id="contenido">
 <div id="avisos"></div>
-<section id="abiertas" class="abiertas" aria-label="Operaciones abiertas" hidden></section>
+<section id="abiertas" class="abiertas" aria-label="Operaciones abiertas" data-pleg="abiertas" hidden></section>
 
-<section class="resumen" id="s-res" aria-label="Resultado">
+<section class="resumen" id="s-res" aria-label="Resultado" data-pleg="res">
   <div class="filtros">
     <span class="par"><span class="et">Periodo</span><span class="segm" id="segPeriodo"></span></span>
     <span class="par ancho"><span class="et">Activo</span><span class="selector" id="segStats"></span></span>
@@ -684,7 +698,7 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
   <div class="principal">
   <div id="s-bloque"></div>
 
-<section class="seccion panel" id="s-ops" aria-label="Operaciones">
+<section class="seccion panel" id="s-ops" aria-label="Operaciones" data-pleg="ops">
   <div class="titulo"><h2>Operaciones</h2><span class="selector" id="segOps"></span><span id="opsCuenta" class="ayuda"></span>
     <span class="sp"></span><a href="/operaciones.csv">bajar todas (CSV)</a>
     <button id="reiniciar" class="b-ghost chico">Reiniciar resultados</button>
@@ -706,22 +720,22 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
   </div>
 
   <div class="rail">
-  <section class="noticias" id="s-horario" aria-label="Horario de Kalshi">
+  <section class="noticias" id="s-horario" aria-label="Horario de Kalshi" data-pleg="horario">
     <div class="titulo"><h2>Horario de Kalshi</h2><span class="sp"></span><span class="ayuda">materias y divisas · tu hora</span></div>
     <div id="horarioK"><p class="ayuda" style="margin:0">Leyendo los bloques de Kalshi…</p></div>
   </section>
 
-  <section class="noticias" aria-label="Próximas noticias">
+  <section class="noticias" aria-label="Próximas noticias" data-pleg="noticias">
     <div class="titulo"><h2>Próximas noticias</h2><span class="sp"></span><span class="ayuda">ForexFactory</span></div>
     <div id="noticias"></div>
   </section>
 
-  <section class="noticias" aria-label="Filtros de entrada">
+  <section class="noticias" aria-label="Filtros de entrada" data-pleg="filtros">
     <div class="titulo"><h2>Filtros de entrada</h2><span class="sp"></span><span id="fEstado" class="aviso off">–</span></div>
     <div id="filtro"></div>
   </section>
 
-  <section class="noticias" aria-label="Resultado por activo">
+  <section class="noticias" aria-label="Resultado por activo" data-pleg="poractivo">
     <div class="titulo"><h2>Por activo</h2><span class="sp"></span><span class="ayuda">hoy · total</span></div>
     <div id="porActivo"></div>
   </section>
@@ -1116,7 +1130,9 @@ function pintarAbiertas(d) {
   const clave = ops.map(o => o.ticker).join(',');
   if (caja.dataset.clave !== clave) {
     caja.dataset.clave = clave;
-    caja.innerHTML = `<div class="ab-t" id="abT"></div><div class="ab-lista">${ops.map((o, i) =>
+    caja.innerHTML = `<div class="ab-t">${botonPlegar('abiertas')}<span class="punto si"></span>`
+      + `<h2>Operaciones abiertas</h2><span class="ab-n num" id="abN"></span><span class="sp"></span>`
+      + `<span class="ayuda" id="abTot"></span></div><div class="ab-lista">${ops.map((o, i) =>
       `<div class="ab" id="ab_${i}" data-ir="${esc(o.activo)}" role="button" tabindex="0"
         title="Abrir la tarjeta de ${esc(nombre(o.activo))}"></div>`).join('')}</div>`;
   }
@@ -1138,9 +1154,8 @@ function pintarAbiertas(d) {
         <span class="sp"></span><span>${queda ? 'queda <b>' + queda + '</b>' : 'esperando el cierre'}</span></div>
       ${bid != null ? medidor(g) : ''}`;
   });
-  $('abT').innerHTML = `<span class="punto si"></span><h2>Operaciones abiertas</h2>
-      <span class="ab-n num">${ops.length}</span><span class="sp"></span>
-      ${conBid ? `<span class="ayuda">si vendieras ahora <b class="num ${clase(total)}">${usd(total)}</b></span>` : ''}`;
+  $('abN').textContent = ops.length;
+  $('abTot').innerHTML = conBid ? `si vendieras ahora <b class="num ${clase(total)}">${usd(total)}</b>` : '';
   if (!caja.dataset.listo) {
     caja.dataset.listo = '1';
     const ir = ev => {
@@ -1316,8 +1331,10 @@ function armarCarteles(lista) {
   </section>`;
   // plegadas, las tarjetas van en rejilla (dos o tres por fila); la que se abre ocupa la fila entera
   $('s-bloque').innerHTML = porGrupos(lista).map(([g, l], i) =>
-    `<h2 class="grupo"><span>${g}</span><span class="gcuenta" id="gc_${i}" data-de="${l.join(',')}"></span></h2>`
+    `<h2 class="grupo" data-pleg="g-${i}">${botonPlegar('g-' + i)}<span>${g}</span>`
+    + `<span class="gcuenta" id="gc_${i}" data-de="${l.join(',')}"></span></h2>`
     + `<div class="rejilla-b">${l.map(carta).join('')}</div>`).join('');
+  porGrupos(lista).forEach((_, i) => pintarPlegado('g-' + i));
   llenarForm(ajustesGuardados);
   // "toggle" no sube por el árbol: se escucha en la fase de captura
   $('s-bloque').addEventListener('toggle', ev => {
@@ -1591,6 +1608,10 @@ function render(d) {
   if (d.conectado && !d.encendido) av.push(['warn grande', 'El bot está APAGADO: no va a abrir ninguna operación.']);
   if (d.limite_diario) av.push(['warn', 'Se alcanzó el límite del día: no abre operaciones nuevas hasta mañana (CDT).']);
   if (d.aviso_precio) av.push(['warn', 'Precio del índice: ' + d.aviso_precio + '.']);
+  // solo cuando de verdad se perdió una entrada por no tener dinero (los últimos 15 min)
+  const ss = Object.entries(d.sin_saldo || {});
+  if (ss.length) av.push(['warn', 'No entró por falta de saldo: ' + ss.map(([a, x]) =>
+    `${nombre(a)} (hace ${Math.max(1, Math.round((ahoraS() - x.ts) / 60))} min)`).join(' · ') + '.']);
   if (d.pendientes) av.push(['off', `${d.pendientes} operación(es) cerrando: esperando el resultado oficial de Kalshi.`]);
   $('avisos').innerHTML = av.map(([c, t]) => `<div class="aviso ${c}">${esc(t)}</div>`).join('');
   pintarAbiertas(d);
@@ -2141,6 +2162,38 @@ $('guardarKey').onclick = async () => {
   if (r.ok) { $('pem').value = ''; $('keyId').value = ''; }
   refrescar();
 };
+
+// ---- plegar secciones: una flechita en la cabecera de cada recuadro ----
+// Lo que se deja plegado se recuerda en este navegador (si no se puede guardar, todo abre desplegado).
+const PLEGADOS = 'kbot.plegados';
+let plegados = new Set();
+try { plegados = new Set(JSON.parse(localStorage.getItem(PLEGADOS) || '[]')); } catch (e) { /* sin almacenamiento */ }
+function botonPlegar(id) {
+  return `<button type="button" class="plegar" data-plegar="${id}" aria-expanded="${!plegados.has(id)}" `
+    + `title="Plegar o desplegar"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" `
+    + `stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></button>`;
+}
+function pintarPlegado(id) {
+  const abierto = !plegados.has(id);
+  document.querySelectorAll(`[data-pleg="${id}"]`).forEach(el => el.classList.toggle('plegado', !abierto));
+  document.querySelectorAll(`[data-plegar="${id}"]`).forEach(b => b.setAttribute('aria-expanded', String(abierto)));
+}
+document.addEventListener('click', ev => {
+  const b = ev.target.closest('[data-plegar]');
+  if (!b) return;
+  ev.preventDefault(); ev.stopPropagation();
+  const id = b.dataset.plegar;
+  if (plegados.has(id)) plegados.delete(id); else plegados.add(id);
+  try { localStorage.setItem(PLEGADOS, JSON.stringify([...plegados])); } catch (e) { /* sin almacenamiento */ }
+  pintarPlegado(id);
+  if (ultimo) render(ultimo);           // lo que se despliega se mide y se dibuja con su ancho
+});
+// las secciones fijas llevan el botón al principio de su cabecera
+document.querySelectorAll('section[data-pleg]').forEach(s => {
+  const cab = s.querySelector(':scope > .titulo, :scope > .filtros');
+  if (cab) cab.insertAdjacentHTML('afterbegin', botonPlegar(s.dataset.pleg));
+  pintarPlegado(s.dataset.pleg);
+});
 
 refrescar();
 setInterval(refrescar, 1000);

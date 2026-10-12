@@ -74,6 +74,7 @@ class EjecutorReal:
         self.n_activos = n_activos
         self.info = {}          # ticker -> info del mercado (shard, ticks)
         self.shard_de = {}      # activo -> shard de su mercado (las divisas en el 0, el resto en el 2)
+        self.sin_saldo = {}     # activo -> la última vez que no pudo entrar por falta de dinero
         self.fondos = {}        # ticker -> True si el shard tiene saldo para operar
         self.ultimo_tp = {}     # ticker -> último intento de poner el TP
 
@@ -104,36 +105,51 @@ class EjecutorReal:
             return self.contratos * self.n_activos
         return sum(c for a, c in porc.items() if self.shard_de.get(a, shard) == shard)
 
+    def _reserva(self, shard):
+        """Lo que necesitan en `shard` los activos que ya se sabe que operan ahí: eso no se le quita."""
+        porc = self.contratos if isinstance(self.contratos, dict) else {}
+        return sum(c for a, c in porc.items() if self.shard_de.get(a) == shard)
+
     def _asegurar_fondos(self, activo, shard):
         """Cada contrato puede costar hasta 1 $: el shard del mercado necesita CONTRATOS x 1 $ por cada
-        activo que opera en ESE shard. Las divisas viven en el 0 y el resto en el 2: cada uno reserva
-        lo suyo, y al pasar saldo al 2 se deja en el 0 lo que necesitan las divisas."""
+        activo que opera en ESE shard (las divisas en el 0, cripto y materias primas en el 2).
+
+        Si le falta, lo pide a los otros shards, pero cada uno solo da lo que le sobra por encima de
+        lo que necesitan sus propios activos: así ninguno se queda sin dinero por llenar al otro, y el
+        dinero no va y viene. Si no llega para todo, se pasa lo que se pueda: alcanza para algunas
+        entradas, y el bot entra mientras haya al menos el precio de un contrato."""
         porc = self.contratos if isinstance(self.contratos, dict) else {}
         contratos = porc.get(activo, 1.0) if porc else self.contratos
         necesario = self._necesario(shard)
         disponible = self.k.saldo(shard)
         if disponible >= necesario - 1e-6:
             return True
-        if not shard:
-            log(f"{activo} saldo insuficiente: {disponible:.2f} $ (hacen falta ~{necesario:g} $)")
-            return disponible >= contratos
-        falta = necesario - disponible
-        # del shard 0 solo se pasa lo que no reservan los activos que operan en él
-        reserva0 = sum(c for a, c in porc.items() if self.shard_de.get(a) == 0)
-        origen = self.k.saldo(0) - reserva0
-        if origen < falta:
-            log(f"{activo} el shard {shard} tiene {disponible:.2f} $ y el shard 0 solo {origen:.2f} $ libres"
-                f"{f' (aparte de {reserva0:g} $ de las divisas)' if reserva0 else ''}: no alcanza para {necesario:g} $")
-            return disponible >= contratos
-        try:
-            self.k.transferir_a_shard(falta, shard)
-            log(f"{activo} paso {falta:.2f} $ del shard 0 al shard {shard}")
-        except Exception as e:  # noqa: BLE001
-            log(f"{activo} no pude pasar saldo al shard {shard}: {e}")
-        for _ in range(20):                     # la transferencia tarda un poco
-            time.sleep(0.5)
-            if self.k.saldo(shard) >= necesario - 1e-6:
-                return True
+        falta, movido = necesario - disponible, 0.0
+        # de dónde: la cuenta principal (0) y los shards en los que opera algún activo del bot
+        for origen in sorted(({0} | set(self.shard_de.values())) - {shard}):
+            try:
+                libre = self.k.saldo(origen) - self._reserva(origen)
+            except Exception as e:  # noqa: BLE001
+                log_cada(f"saldo{origen}", f"no pude leer el saldo del shard {origen}: {e}", 300)
+                continue
+            a_pasar = int(min(falta, libre) * 100) / 100           # a céntimos, hacia abajo
+            if a_pasar < 0.01:
+                continue
+            try:
+                self.k.transferir(a_pasar, origen, shard)
+                log(f"{activo} paso {a_pasar:.2f} $ del shard {origen} al shard {shard}")
+                movido += a_pasar
+                falta -= a_pasar
+            except Exception as e:  # noqa: BLE001
+                log(f"{activo} no pude pasar saldo del shard {origen} al {shard}: {e}")
+            if falta < 0.01:
+                break
+        if movido:
+            for _ in range(20):                 # la transferencia tarda un poco
+                time.sleep(0.5)
+                if self.k.saldo(shard) >= disponible + movido - 0.005:
+                    break
+        # si no llega para todos no se avisa aquí: solo cuando de verdad se pierde una entrada (_sin_saldo)
         return self.k.saldo(shard) >= contratos
 
 
@@ -170,10 +186,16 @@ class EjecutorReal:
         return limite, cruza
 
     # ------------------------------------------------------------------ entrada
+    def _sin_saldo(self, activo, f, detalle):
+        """Había entrada y no se pudo por falta de dinero: es lo único que se avisa del saldo
+        (el panel lo enseña arriba durante 15 min)."""
+        self.sin_saldo[activo] = dict(ts=time.time(), ticker=f.ticker, detalle=detalle)
+        log_cada(f"sinsaldo{f.ticker}", f"{activo} NO ENTRÓ por falta de saldo: {detalle}", 60)
+
     def entrar(self, activo, f, lado, ask, n, cfg):
         m = self.info[f.ticker]
         if not self.fondos.get(f.ticker):
-            log_cada(f"fondos{f.ticker}", f"{activo} señal de entrada pero sin saldo en el shard: no entro")
+            self._sin_saldo(activo, f, f"en el shard {m.get('exchange_index')} no hay ni para un contrato")
             return None
         limite, cruza = self.limite_entrada(ask, cfg)
         if lado == "yes":
@@ -186,6 +208,9 @@ class EjecutorReal:
         try:
             r = self.k.crear_orden(f.ticker, libro, precio_yes, n, tif, m["exchange_index"])
         except ErrorKalshi as e:
+            if e.status < 500 and "insufficient_balance" in e.texto:
+                self._sin_saldo(activo, f, "Kalshi rechazó la orden: saldo insuficiente")
+                return None
             if e.status < 500:
                 log_cada(f"entrada{f.ticker}", f"{activo} orden de entrada rechazada: {e}")
                 return None

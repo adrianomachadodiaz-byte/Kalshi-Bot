@@ -237,10 +237,12 @@ class Kalshi:
         b = num(d.get("balance_dollars"))
         return b if b is not None else (num(d.get("balance")) or 0) / 100
 
-    def transferir_a_shard(self, dolares, destino):
-        """Pasa saldo del shard 0 al shard del mercado (como NightShark). amount en centésimas de centavo."""
+    def transferir(self, dolares, origen, destino):
+        """Pasa saldo de un shard a otro (el 0 es la cuenta principal; cripto y materias primas
+        viven en el 2, las divisas en el 0). amount en centésimas de centavo, hacia abajo: nunca
+        se pide pasar más de lo que hay."""
         cuerpo = {"source": "event_contract", "destination": "event_contract",
-                  "amount": int(math.ceil(dolares * 10000 - 1e-6)), "source_exchange_shard": 0,
+                  "amount": int(math.floor(dolares * 10000 + 1e-6)), "source_exchange_shard": origen,
                   "destination_exchange_shard": destino, "source_subaccount": 0, "destination_subaccount": 0}
         return self._pedir("POST", "/portfolio/intra_exchange_instance_transfer", cuerpo=cuerpo, reintentos=1)
 

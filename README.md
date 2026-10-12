@@ -49,7 +49,12 @@ Todo se maneja desde el panel (el dominio de Railway, con tu clave `ACCESS_TOKEN
 - **Bloques en vivo**: plegadas, las tarjetas van de dos en dos (o tres, según el ancho); la que se abre ocupa la
   fila entera con su gráfico. Cada activo tiene un icono de color.
 - **Saldo por shard**: el bot reserva 1 $ por contrato de cada activo encendido en el shard donde opera (las
-  divisas en el 0, el resto en el 2) y, al pasar saldo al shard 2, deja en el 0 lo que necesitan las divisas.
+  divisas en el 0, cripto y materias primas en el 2). Si a un shard le falta, lo pide al otro, que solo da lo que
+  le sobra por encima de lo que necesitan sus propios activos (en las dos direcciones: 0 → 2 y 2 → 0). Si no
+  llega para todo, pasa lo que pueda. Solo avisa cuando de verdad **no pudo entrar** en una operación por falta
+  de dinero: una línea "NO ENTRÓ por falta de saldo" en el registro y un aviso arriba durante 15 minutos.
+- **Plegar**: cada recuadro (Resultado, Operaciones abiertas, Operaciones, cada grupo de bloques y los del
+  lateral) tiene una flechita para plegarlo. Lo plegado se recuerda en ese navegador.
 - **Activos**: tres grupos, cada uno con su sección. **Cripto** (BTC, ETH, SOL, XRP, DOGE, HYPE, BNB, NEAR, ZEC),
   con Delta. **Materias primas** (oro, plata, petróleo, gas natural, cobre, platino, paladio) y **divisas**
   (EUR/USD, GBP/USD, USD/JPY, AUD/USD, USD/CAD), sin Delta: Kalshi las liquida con Pyth, y la API de Pyth solo
