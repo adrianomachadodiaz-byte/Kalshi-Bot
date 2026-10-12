@@ -457,7 +457,8 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 /* materias primas: si el mercado está abierto o cerrado, y cuánto falta para que cambie */
 #s-horario{scroll-margin-top:calc(var(--cabeza) + 18px)}
 .hk-fila{padding:12px 0 4px;border-top:1px solid var(--linea)}
-.hk-fila:first-child{border-top:0;padding-top:0}
+.hk-fila:first-child,.porgrupo + .hk-fila{border-top:0;padding-top:4px}
+#horarioK .porgrupo:not(:first-child){margin-top:16px;padding-top:12px;border-top:1px solid var(--linea)}
 .hk-cab{display:flex;align-items:center;gap:8px}
 .hk-cab .ico{width:16px;height:16px;margin-right:0}
 .hk-cab .nom{font-size:13px;font-weight:500;color:var(--claro)}
@@ -576,7 +577,7 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 
 <header class="consola">
   <span id="pill" class="pill off">cargando</span>
-  <a id="hMat" class="pill solo-pc" href="#s-horario" hidden title="Horario de Kalshi de las materias primas"></a>
+  <a id="hMat" class="pill solo-pc" href="#s-horario" hidden title="Horario de Kalshi de las materias primas y las divisas"></a>
   <span class="sp"></span>
   <span id="msgPower" class="msg" role="status" aria-live="polite"></span>
   <button id="cancelar" class="b-ghost" hidden>Cancelar</button>
@@ -661,7 +662,7 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 
   <div class="rail">
   <section class="noticias" id="s-horario" aria-label="Horario de Kalshi">
-    <div class="titulo"><h2>Horario de Kalshi</h2><span class="sp"></span><span class="ayuda">materias primas · tu hora</span></div>
+    <div class="titulo"><h2>Horario de Kalshi</h2><span class="sp"></span><span class="ayuda">materias y divisas · tu hora</span></div>
     <div id="horarioK"><p class="ayuda" style="margin:0">Leyendo los bloques de Kalshi…</p></div>
   </section>
 
@@ -720,7 +721,8 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 const $ = id => document.getElementById(id);
 let ultimo = null, campos = [], camposActivo = [], activos = [], ajustesGuardados = null;
 let focoStats = 'todo', focoOps = 'todo', focoPeriodo = 'total', cartelesPara = '';
-let sinIndice = [];          // oro, plata y petróleo: operan sin Delta
+let sinIndice = [];          // materias primas y divisas: operan sin Delta
+let divisas = [];            // EUR/USD, GBP/USD...: tercer grupo del panel
 const conDelta = a => !sinIndice.includes(a);
 const PERIODOS = [['total', 'Todo'], ['semana', '7 días'], ['hoy', 'Hoy']];
 
@@ -1114,31 +1116,39 @@ function h12(hms) {
 }
 
 // Un icono por activo: moneda para las criptos, lingote para los metales, gota para
-// el petróleo. De trazo y en gris, como el resto de los controles del panel.
+// el petróleo, billete para las divisas. De trazo y en gris, como el resto de los controles.
 const MONEDA = '<circle cx="12" cy="12" r="8.6"></circle>';
 const LINGOTE = '<path d="M3.4 18l2.8-8.4h11.6l2.8 8.4z"></path>';
 const LLAMA = '<path d="M12 3.8c.6 3-2.6 4.6-2.6 7.6a2.6 2.6 0 0 0 5.2.2c1.2 1.1 1.9 2.5 1.9 4a4.5 4.5 0 0 1-9 0c0-4.3 4.5-6.6 4.5-11.8z"></path>';
 const GOTA = '<path d="M12 4.2c3.1 3.6 5 6.2 5 8.7a5 5 0 0 1-10 0c0-2.5 1.9-5.1 5-8.7z"></path>';
+const BILLETE = '<rect x="2.6" y="6.2" width="18.8" height="11.6" rx="2.2"></rect>';
+// [forma, símbolo, altura del símbolo si la forma no es la de siempre]
 const ICONOS = {
   BTC: [MONEDA, '₿'], ETH: [MONEDA, 'Ξ'], SOL: [MONEDA, 'S'], XRP: [MONEDA, 'X'],
   DOGE: [MONEDA, 'Ð'], HYPE: [MONEDA, 'H'], BNB: [MONEDA, 'B'], NEAR: [MONEDA, 'N'], ZEC: [MONEDA, 'Z'],
   GOLD: [LINGOTE, 'Au'], SILVER: [LINGOTE, 'Ag'], OIL: [GOTA, ''], NATGAS: [LLAMA, ''],
+  COPPER: [LINGOTE, 'Cu'], PLATINUM: [LINGOTE, 'Pt'], PALLADIUM: [LINGOTE, 'Pd'],
+  EURUSD: [BILLETE, '€', 15.4], GBPUSD: [BILLETE, '£', 15.4], USDJPY: [BILLETE, '¥', 15.4],
+  AUDUSD: [BILLETE, 'A$', 14.7], USDCAD: [BILLETE, 'C$', 14.7],
 };
 // nombre que se lee en pantalla (el código interno sigue siendo el de Kalshi/bot)
-const NOMBRES = {GOLD: 'Oro', SILVER: 'Plata', OIL: 'Petróleo', NATGAS: 'Gas natural'};
+const NOMBRES = {GOLD: 'Oro', SILVER: 'Plata', OIL: 'Petróleo', NATGAS: 'Gas natural',
+  COPPER: 'Cobre', PLATINUM: 'Platino', PALLADIUM: 'Paladio',
+  EURUSD: 'EUR/USD', GBPUSD: 'GBP/USD', USDJPY: 'USD/JPY', AUDUSD: 'AUD/USD', USDCAD: 'USD/CAD'};
 const nombre = a => NOMBRES[a] || a;
-// las materias primas son las que no tienen índice público (las manda el bot en sin_indice)
-const esMateria = a => sinIndice.includes(a);
+// sin índice público van las materias primas y las divisas; las divisas las manda el bot aparte
+const esDivisa = a => divisas.includes(a);
+const esMateria = a => sinIndice.includes(a) && !esDivisa(a);
 function porGrupos(lista) {
-  return [['Cripto', lista.filter(a => !esMateria(a))], ['Materias primas', lista.filter(esMateria)]]
-    .filter(([, l]) => l.length);
+  return [['Cripto', lista.filter(a => !sinIndice.includes(a))], ['Materias primas', lista.filter(esMateria)],
+    ['Divisas', lista.filter(esDivisa)]].filter(([, l]) => l.length);
 }
 
 function icono(a) {
-  const [forma, sim] = ICONOS[a] || [MONEDA, (a || '?')[0]];
+  const [forma, sim, alto] = ICONOS[a] || [MONEDA, (a || '?')[0]];
   // el símbolo va centrado dentro de la forma; sin símbolo, la forma sola basta
   const chico = sim.length > 1;      // "Au" no cabe con el mismo cuerpo que "₿"
-  const texto = sim ? `<text class="sim" x="12" y="${chico ? 16.6 : 15.4}" text-anchor="middle"`
+  const texto = sim ? `<text class="sim" x="12" y="${alto || (chico ? 16.6 : 15.4)}" text-anchor="middle"`
     + `${chico ? ' style="font-size:7.5px"' : ''}>${esc(sim)}</text>` : '';
   return `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"`
     + ` stroke-linejoin="round" aria-hidden="true">${forma}${texto}</svg>`;
@@ -1215,7 +1225,7 @@ function pintarVivo(d, v) {
   const a = v.activo;
   if (!$('vivo_' + a)) return;
   $('vivo_' + a).innerHTML = v.mercado ? `<tr>
-    <td class="num">${Math.floor(v.quedan / 60)}:${String(Math.floor(v.quedan % 60)).padStart(2, '0')}</td><td class="num">${n(v.referencia, decim(v.referencia))}</td><td class="num">${n(v.precio, decim(v.referencia))}</td><td class="ayuda num">${v.indice_s == null ? '–' : Math.max(0, v.indice_s).toFixed(0) + ' s'}</td>
+    <td class="num">${Math.floor(v.quedan / 60)}:${String(Math.floor(v.quedan % 60)).padStart(2, '0')}</td><td class="num">${conDelta(a) ? n(v.referencia, decim(v.referencia)) : nq(v.referencia, 6)}</td><td class="num">${n(v.precio, decim(v.referencia))}</td><td class="ayuda num">${v.indice_s == null ? '–' : Math.max(0, v.indice_s).toFixed(0) + ' s'}</td>
     <td class="num ${clase(v.delta)}">${conDelta(a) ? n(v.delta, dec2(v.referencia)) : '<span class="ayuda" title="sin precio público del subyacente">no usa</span>'}</td><td class="num">${n(v.yes_ask)} / ${n(v.yes_bid)}</td><td class="num">${n(v.no_ask)} / ${n(v.no_bid)}</td>
     <td>${esc(v.estado)}</td></tr>`
     : `<tr><td colspan="8" class="vacio">${esc(v.estado || 'esperando datos…')}</td></tr>`;
@@ -1247,7 +1257,7 @@ function pintarVivo(d, v) {
     }).join('');
   if (!conDelta(a) && v.grafico) {
     // Kalshi liquida estos con Pyth y ese precio no es público: no hay línea que dibujar
-    $('grafico_' + a).innerHTML = '<p class="sinlinea">Kalshi liquida ' + esc(a) + ' con Pyth, '
+    $('grafico_' + a).innerHTML = '<p class="sinlinea">Kalshi liquida ' + esc(nombre(a)) + ' con Pyth, '
       + 'y ese precio no es público: aquí no hay gráfico ni Delta.<br>'
       + 'Entra solo por la ventana y por el precio del contrato.</p>';
     $('medidor_' + a).innerHTML = v.grafico ? medidor(v.grafico) : '';
@@ -1295,6 +1305,7 @@ function segmento(id, actual, alElegir) {
     const ICO_GRUPO = {
       Cripto: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M9.5 8h4a2 2 0 0 1 0 4h-4m0 0h4.5a2 2 0 0 1 0 4H9.5zM11 6v2m0 8v2"></path></svg>',
       'Materias primas': '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M3.4 18l2.8-8.4h11.6l2.8 8.4z"></path></svg>',
+      Divisas: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="2.6" y="6.2" width="18.8" height="11.6" rx="2.2"></rect><circle cx="12" cy="12" r="2.6"></circle></svg>',
     };
     caja.innerHTML = `<span class="sgrupo">${btn('todo')}</span>` + porGrupos(activos).map(([g, l]) =>
       `<span class="sgrupo" role="group" aria-label="${g}"><span class="sgt">${ICO_GRUPO[g] || ''}${g}</span>`
@@ -1444,6 +1455,7 @@ function render(d) {
 
   activos = d.activos_validos || [];
   sinIndice = d.sin_indice || [];
+  divisas = d.divisas || [];
   if (!campos.length) { campos = d.campos; camposActivo = d.campos_activo || []; ajustesGuardados = d.ajustes; armarForm(); }
   segmento('segStats', focoStats, x => { focoStats = x; });
   segmento('segOps', focoOps, x => { focoOps = x; });
@@ -1834,14 +1846,14 @@ function lineaTiempo(x) {
     + `<div class="hk-pista">${seg}${nd}</div><b class="hk-ahora" style="left:${pct(t).toFixed(2)}%"></b>${marcas.join('')}</div>`;
 }
 
-// lateral: oro, plata, petróleo y gas, con su cuenta atrás
+// lateral: materias primas y divisas, cada grupo con su título, con su cuenta atrás
 function pintarHorarioK(d) {
   const caja = $('horarioK');
   if (!caja) return;
   const mk = d.mercados || {};
   const lista = (d.sin_indice || []).filter(a => a in mk);
   if (!lista.length) return;
-  const filas = lista.map(a => {
+  const fila = a => {
     const x = mk[a];
     if (!x) return `<div class="hk-fila"><div class="hk-cab">${icono(a)}<span class="nom">${esc(nombre(a))}</span>`
       + `<span class="sp"></span><span class="ayuda">${d.mercados_error ? 'sin respuesta de Kalshi' : 'leyendo…'}</span></div></div>`;
@@ -1858,8 +1870,8 @@ function pintarHorarioK(d) {
       <div class="hk-sub">${esc(sub)}</div>
       ${lineaTiempo(x)}
     </div>`;
-  });
-  caja.innerHTML = filas.join('')
+  };
+  caja.innerHTML = porGrupos(lista).map(([g, l]) => `<div class="porgrupo">${g}</div>` + l.map(fila).join('')).join('')
     + `<p class="hk-nota">Sale de los bloques que Kalshi ya tiene creados (unas 30 h por delante). Rayado: todavía no existen.</p>`;
 
   // cabecera: cuántas están abiertas y, si ninguna, cuándo vuelve la primera
@@ -1870,8 +1882,8 @@ function pintarHorarioK(d) {
   const prox = Math.min(...vals.filter(x => x.estado !== 'abierto' && x.abre).map(x => x.abre));
   hm.className = 'pill solo-pc ' + (abiertas ? 'on' : 'warn');
   hm.innerHTML = abiertas
-    ? `materias primas: ${abiertas} de ${vals.length} abiertas`
-    : 'materias primas cerradas' + (isFinite(prox) ? ` · abren en <b data-hasta="${prox}">${cuenta(prox - ahoraS())}</b>` : '');
+    ? `materias y divisas: ${abiertas} de ${vals.length} abiertas`
+    : 'materias y divisas cerradas' + (isFinite(prox) ? ` · abren en <b data-hasta="${prox}">${cuenta(prox - ahoraS())}</b>` : '');
 }
 
 // dentro de la tarjeta de una materia prima, cuando Kalshi no tiene bloque abierto

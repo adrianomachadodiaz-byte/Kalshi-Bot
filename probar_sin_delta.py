@@ -1,6 +1,6 @@
-"""Oro, plata y petróleo operan sin Delta; las criptos lo siguen exigiendo.
+"""Materias primas y divisas operan sin Delta; las criptos lo siguen exigiendo.
 
-Kalshi liquida esos tres con Pyth y ese precio no es público, así que el bot nunca
+Kalshi liquida esos activos con Pyth y ese precio no es público, así que el bot nunca
 tiene el precio del subyacente: su Foto llega con precio=None. La prueba comprueba
 que aun así entran, y que una cripto en la misma situación NO entra.
 """
@@ -39,9 +39,12 @@ v["por_activo"] = {a: B.defectos_de(a) for a in B.ACTIVOS_VALIDOS}
 for a in B.ACTIVOS_VALIDOS:                       # un rango donde 0.985 entra
     v["por_activo"][a].update(entrada_min=0.98, entrada_max=0.99, delay=120, exit=0.01)
 
-print("\n1) los tres salen marcados como sin Delta")
-ok(B.SIN_INDICE == ("GOLD", "SILVER", "OIL", "NATGAS"), f"SIN_INDICE = {B.SIN_INDICE}")
-for a in ("GOLD", "SILVER", "OIL", "NATGAS"):
+MATERIAS = ("GOLD", "SILVER", "OIL", "NATGAS", "COPPER", "PLATINUM", "PALLADIUM")
+DIVISAS = ("EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD")
+
+print("\n1) materias primas y divisas salen marcadas como sin Delta")
+ok(B.SIN_INDICE == MATERIAS + DIVISAS, f"SIN_INDICE = {B.SIN_INDICE}")
+for a in MATERIAS + DIVISAS:
     ok(not B.config_de(a, v).usa_delta, f"{a} no usa Delta")
 for a in ("BTC", "ETH", "SOL", "XRP", "DOGE", "HYPE"):
     ok(B.config_de(a, v).usa_delta, f"{a} sí usa Delta")
@@ -61,19 +64,24 @@ ok(btc.entrada(foto(850, 4136.82 + 500)) is not None, "y con Delta de sobra sí 
 
 print("\n4) el bot no le pide a Pyth un feed que no existe")
 bot = B.Bot()
-for a in ("GOLD", "SILVER", "OIL", "NATGAS"):
+for a in MATERIAS + DIVISAS:
     ok(bot.precios.get(a) is None, f"{a}: Precios.get devuelve None sin salir a la red")
 ok(bot.precios.nota == "", f"y sin dejar un aviso de error: {bot.precios.nota!r}")
 
-print("\n5) los tres están en las series de Kalshi")
+print("\n5) todos están en las series de Kalshi")
 import kalshi
-for a, serie in [("GOLD", "KXGOLD15M"), ("SILVER", "KXSILVER15M"), ("OIL", "KXWTI15M"), ("NATGAS", "KXNATGAS15M")]:
+for a, serie in [("GOLD", "KXGOLD15M"), ("SILVER", "KXSILVER15M"), ("OIL", "KXWTI15M"), ("NATGAS", "KXNATGAS15M"),
+                 ("COPPER", "KXCOPPER15M"), ("PLATINUM", "KXPLATINUM15M"), ("PALLADIUM", "KXPALLADIUM15M"),
+                 ("EURUSD", "KXEURUSD15M"), ("GBPUSD", "KXGBPUSD15M"), ("USDJPY", "KXUSDJPY15M"),
+                 ("AUDUSD", "KXAUDUSD15M"), ("USDCAD", "KXUSDCAD15M")]:
     ok(kalshi.SERIES.get(a) == serie, f"{a} -> {kalshi.SERIES.get(a)}")
 
 print("\n6) el panel recibe la lista")
 j = bot._resumen(100.0)
-ok(j.get("sin_indice") == ["GOLD", "SILVER", "OIL", "NATGAS"], f"sin_indice = {j.get('sin_indice')}")
-ok(len(j["activos_validos"]) == 13, f"trece activos: {j['activos_validos']}")
+ok(j.get("sin_indice") == list(MATERIAS + DIVISAS), f"sin_indice = {j.get('sin_indice')}")
+ok(j.get("divisas") == list(DIVISAS), f"divisas = {j.get('divisas')}")
+ok(len(j["activos_validos"]) == 21, f"veintiún activos: {len(j['activos_validos'])}")
+ok(all(a in kalshi.SERIES for a in B.ACTIVOS_VALIDOS), "cada activo tiene su serie de Kalshi")
 
 print("\n7) el texto de la configuración lo dice")
 ok("sin Delta" in B.config_de("OIL", v).texto(), B.config_de("OIL", v).texto())

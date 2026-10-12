@@ -37,13 +37,15 @@ PORT = int(env("PORT", "8080"))
 DATA_DIR = Path(env("DATA_DIR", "/data" if os.environ.get("RAILWAY_ENVIRONMENT") else "datos"))
 REST_URL = env("KALSHI_REST_URL", "https://api.elections.kalshi.com/trade-api/v2")
 INDICE_URL = env("KALSHI_INDICE_URL", INDICE_URL_DEF)    # feed público del índice ({activo} = btc/eth)
-# primero las criptos y después las materias primas: el panel las muestra en ese orden y por grupos
-ACTIVOS_VALIDOS = ("BTC", "ETH", "SOL", "XRP", "DOGE", "HYPE", "BNB", "NEAR", "ZEC",
-                   "GOLD", "SILVER", "OIL", "NATGAS")
-# Materias primas. Kalshi las liquida con Pyth, y el precio en vivo de Pyth no es público (sí el
-# de cripto, que sale del feed gratuito de Kalshi). Sin precio del subyacente no hay Delta:
-# estos activos entran solo por la ventana y por el precio del contrato.
-SIN_INDICE = ("GOLD", "SILVER", "OIL", "NATGAS")
+# criptos, materias primas y divisas: el panel las muestra en ese orden y por grupos
+MATERIAS = ("GOLD", "SILVER", "OIL", "NATGAS", "COPPER", "PLATINUM", "PALLADIUM")
+DIVISAS = ("EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD")
+ACTIVOS_VALIDOS = ("BTC", "ETH", "SOL", "XRP", "DOGE", "HYPE", "BNB", "NEAR", "ZEC") + MATERIAS + DIVISAS
+# Materias primas y divisas. Kalshi las liquida con Pyth, y el precio en vivo de Pyth no es
+# público: su API (hermes.pyth.network) solo deja ver el catálogo y responde 401 a los precios
+# (comprobado el 11-oct-2026). El feed gratuito de Kalshi solo trae cripto. Sin precio del
+# subyacente no hay Delta: estos activos entran solo por la ventana y por el precio del contrato.
+SIN_INDICE = MATERIAS + DIVISAS
 CICLO = float(env("CICLO_S", "0.25"))    # valor inicial; manda el del panel (campo "ritmo")
 CICLO_INDICE = float(env("CICLO_INDICE_S", "1.0"))   # el índice avanza cada 2-3 s: pedirlo más rápido es tirar peticiones
 
@@ -63,11 +65,9 @@ DEFECTO_ACTIVO = {
     "BNB": {"delta": 0.9},      # ~740 $  (precios del índice de Kalshi, 9-oct-2026)
     "NEAR": {"delta": 0.006},   # ~4.85 $
     "ZEC": {"delta": 1.45},     # ~1210 $
-    # en estos el Delta no se usa; el 0 deja claro en el panel que no filtra nada
-    "GOLD": {"delta": 0.0},
-    "SILVER": {"delta": 0.0},
-    "OIL": {"delta": 0.0},
-    "NATGAS": {"delta": 0.0},
+    # en las materias primas y las divisas el Delta no se usa; el 0 deja claro en el panel
+    # que no filtra nada
+    **{a: {"delta": 0.0} for a in SIN_INDICE},
 }
 
 
@@ -341,12 +341,17 @@ class Mercados:
     def __init__(self, k: Kalshi):
         self.k = k
         self.m, self.cuando, self.intento = {}, {}, {}
+        self.horario = None          # HorarioKalshi: con el mercado cerrado no se pregunta cada segundo
 
     def get(self, activo):
         ahora = time.time()
         m = self.m.get(activo)
         hace = ahora - self.cuando.get(activo, 0)
         vencido = m is None or ahora >= m["cierre"] or hace > 60 or (m["referencia"] is None and hace > 3)
+        # Kalshi tiene el mercado cerrado y ya dijo cuándo vuelve: hasta 10 s antes no hay nada que buscar
+        hk = self.horario.de(activo, ahora) if self.horario and activo in SIN_INDICE else None
+        if vencido and hk and hk["estado"] == "cerrado" and hk["abre"] and ahora < hk["abre"] - 10:
+            return None
         if vencido and ahora - self.intento.get(activo, 0) >= 1:
             self.intento[activo] = ahora
             try:
@@ -588,11 +593,16 @@ CRIPTOS = tuple(a for a in ACTIVOS_VALIDOS if a not in SIN_INDICE)
 # los que Kalshi liquida el petróleo y el gas son "PYTHOIL 24/7" y "NATGAS 24/7", con
 # horario O,O,O,O,O,O,O (los siete días). Kalshi les daba mercado de 15 min un viernes a
 # las 19:52 ET, con libro, y el filtro los estaba dejando fuera sin motivo.
-CME = ("GOLD", "SILVER")
+# Cobre, platino y paladio llevan el mismo horario que el oro en Pyth (Metal.XPT/USD:
+# 0000-1700&1800-2400 entre semana, viernes hasta las 17:00, sábado cerrado) y Kalshi les
+# crea los mismos bloques (comprobado el 11-oct-2026), así que van con la misma regla.
+# Las divisas no: Pyth las abre de domingo 17:00 a viernes 17:00 ET sin pausa diaria, y el
+# horario real de cada una lo da Kalshi (HorarioKalshi).
+CME = ("GOLD", "SILVER", "COPPER", "PLATINUM", "PALLADIUM")
 # Especificación "regla_horarios_v2" (9-oct-2026). Lo medido: 40 días de BTC+ETH, 3.175 ops.
 # Lo de metales y petróleo NO está medido (no hay datos grabados): es provisional.
 VENTANAS = [
-    # medido en cripto; se extiende a las materias primas porque son datos macro de EE. UU.
+    # medido en cripto; se extiende a materias primas y divisas porque son datos macro de EE. UU.
     Ventana("ET 08:00-09:00", ET_ZONA, 8, 0, 60, ACTIVOS_VALIDOS),
     Ventana("ET 10:00-10:30", ET_ZONA, 10, 0, 30, ACTIVOS_VALIDOS),
     # NO medido: referencias de Londres e inventarios de petróleo
@@ -758,6 +768,7 @@ class Bot:
         self.noticias = Noticias()
         self.filtro = FiltroNoticias(self.noticias)
         self.horario_k = HorarioKalshi(SIN_INDICE)
+        self.mercados.horario = self.horario_k
         self.op = Operador({}, None, self.estado, self.registro)
         self.activos, self.cfgs = [], {}
         self.aplicar(self.ajustes.valores)
@@ -1051,7 +1062,7 @@ class Bot:
             campos=[dict(clave=c, tipo=t, etiqueta=e, ayuda=h, seccion=sec) for c, t, _, e, h, sec in CAMPOS_GLOBAL],
             campos_activo=[dict(clave=c, tipo=t, etiqueta=e, ayuda=h, seccion=sec)
                            for c, t, _, e, h, sec in CAMPOS_ACTIVO],
-            activos_validos=list(ACTIVOS_VALIDOS), sin_indice=list(SIN_INDICE))
+            activos_validos=list(ACTIVOS_VALIDOS), sin_indice=list(SIN_INDICE), divisas=list(DIVISAS))
 
 
 # ---------------------------------------------------------------- panel web

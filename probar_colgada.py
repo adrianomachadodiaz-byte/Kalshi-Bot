@@ -33,10 +33,14 @@ cfg = Config(delta=0, delay=60, entrada_min=0.98, entrada_max=0.99, tp=0.15, exi
 
 
 def nuevo_bot():
-    """Cada caso con su carpeta: si no, el siguiente bot recupera el estado del anterior."""
+    """Cada caso con su carpeta: si no, el siguiente bot recupera el estado del anterior.
+    Kalshi no da mercado (fin de semana): se simula, así la prueba no depende de la hora
+    a la que se corra (con el oro abierto de verdad salía MAL)."""
     os.environ["DATA_DIR"] = tempfile.mkdtemp(prefix="colgada_")
     B.DATA_DIR = __import__("pathlib").Path(os.environ["DATA_DIR"])
-    return B.Bot()
+    b = B.Bot()
+    b.mercados.k.mercado_abierto = lambda activo: None
+    return b
 
 
 def abierta(bot, activo, cierre):
@@ -51,7 +55,6 @@ def abierta(bot, activo, cierre):
 print("\n1) el bloque ya venció y el mercado está cerrado: se suelta")
 bot = nuevo_bot()
 bot.estado.pausado = False
-bot.mercados.cache = {}                      # Kalshi no da mercado: fin de semana
 op = abierta(bot, "GOLD", time.time() - 3600)   # cerró hace una hora
 bot.paso("GOLD")
 ok("GOLD" not in bot.estado.abiertas, "ya no figura como abierta")
@@ -60,7 +63,6 @@ ok(any(o is op for o in bot.estado.pendientes), "y está en la cola de cobro")
 print("\n2) si el bloque todavía no ha vencido, no se toca")
 bot2 = nuevo_bot()
 bot2.estado.pausado = False
-bot2.mercados.cache = {}
 viva = abierta(bot2, "GOLD", time.time() + 300)   # cierra dentro de 5 min
 bot2.paso("GOLD")
 ok(bot2.estado.abiertas.get("GOLD") is viva, "la operación sigue abierta, como debe")
@@ -68,7 +70,6 @@ ok(not bot2.estado.pendientes, "y no se ha mandado a cobrar")
 
 print("\n3) sin operación abierta no pasa nada raro")
 bot3 = nuevo_bot()
-bot3.mercados.cache = {}
 bot3.paso("GOLD")
 ok(not bot3.estado.abiertas and not bot3.estado.pendientes, "ni abiertas ni pendientes")
 

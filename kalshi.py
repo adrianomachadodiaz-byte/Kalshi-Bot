@@ -20,7 +20,12 @@ SERIES = {"BTC": "KXBTC15M", "ETH": "KXETH15M", "SOL": "KXSOL15M", "XRP": "KXXRP
           "NEAR": "KXNEAR15M", "ZEC": "KXZEC15M",
           # materias primas (metales, petróleo y gas): mismos bloques de 15 min, pero Kalshi los
           # liquida con Pyth y el precio en vivo de Pyth no es público, así que van sin Delta (ver SIN_INDICE)
-          "GOLD": "KXGOLD15M", "SILVER": "KXSILVER15M", "OIL": "KXWTI15M", "NATGAS": "KXNATGAS15M"}
+          "GOLD": "KXGOLD15M", "SILVER": "KXSILVER15M", "OIL": "KXWTI15M", "NATGAS": "KXNATGAS15M",
+          "COPPER": "KXCOPPER15M", "PLATINUM": "KXPLATINUM15M", "PALLADIUM": "KXPALLADIUM15M",
+          # divisas: también con Pyth, igual de sin Delta. Viven en el shard 0 (las demás en el 2)
+          # y van a pasos de 0.01 en todo el rango
+          "EURUSD": "KXEURUSD15M", "GBPUSD": "KXGBPUSD15M", "USDJPY": "KXUSDJPY15M",
+          "AUDUSD": "KXAUDUSD15M", "USDCAD": "KXUSDCAD15M"}
 
 # Feed público de Kalshi con el índice de CF Benchmarks (BRTI en BTC): el MISMO precio que muestra la app,
 # sin API key. Se actualiza cada segundo y viene ~3-4 s por detrás del tiempo real.

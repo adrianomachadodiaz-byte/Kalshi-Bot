@@ -43,7 +43,14 @@ Todo se maneja desde el panel (el dominio de Railway, con tu clave `ACCESS_TOKEN
   próximos eventos de impacto alto y medio del USD, con cuánto falta, la hora, el pronóstico y el dato anterior.
   Se pide cada 20 minutos en un hilo aparte: si falla, el panel lo dice y el bot sigue igual. Se apaga con
   `NOTICIAS=0`; con `NOTICIAS_MONEDAS` cambias las divisas (por defecto `USD`).
-- **Horario de Kalshi** (oro, plata, petróleo y gas): si el mercado está abierto o cerrado, con una **cuenta
+- **Activos**: tres grupos, cada uno con su sección. **Cripto** (BTC, ETH, SOL, XRP, DOGE, HYPE, BNB, NEAR, ZEC),
+  con Delta. **Materias primas** (oro, plata, petróleo, gas natural, cobre, platino, paladio) y **divisas**
+  (EUR/USD, GBP/USD, USD/JPY, AUD/USD, USD/CAD), sin Delta: Kalshi las liquida con Pyth, y la API de Pyth solo
+  da los precios con clave (responde 401; comprobado el 11-oct-2026). Esas entran solo por la ventana y por el
+  precio del contrato. Cobre, platino y paladio llevan la misma regla de horario que el oro (pausa de CME). Las
+  divisas viven en el shard 0 de Kalshi: usan el saldo principal y no se les pasa saldo de otro shard. Todos
+  arrancan apagados; ninguno de los nuevos tiene backtest.
+- **Horario de Kalshi** (materias primas y divisas): si el mercado está abierto o cerrado, con una **cuenta
   regresiva** que baja cada segundo hasta que vuelve a abrir (o hasta que cierra, si está abierto), cuándo cerró y
   una línea de tiempo de hace 6 h a dentro de 30 h con los tramos abiertos y las pausas diarias. No supone horarios:
   sale de los bloques que Kalshi ya tiene creados por delante (unas 30 h), pedidos cada 2 minutos en un hilo aparte
