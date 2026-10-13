@@ -494,6 +494,7 @@ textarea{font:11.5px/1.6 var(--mono);height:88px;resize:vertical}
 .cal-d.hoy .n{color:var(--claro)}
 .cal-d .u{margin-top:auto;font:600 14px var(--mono);letter-spacing:-.02em}
 .cal-d .o{font-size:10px;color:var(--tenue)}
+.cal-d .mm{display:flex;flex-wrap:wrap;gap:0 6px;font:500 10px var(--mono);letter-spacing:-.02em}
 .cal-d .pnts{position:absolute;top:8px;right:8px;display:flex;gap:3px}
 .pnt{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--tenue)}
 .pnt.alta{background:var(--baja);box-shadow:0 0 0 2px var(--baja-f)}
@@ -2349,13 +2350,15 @@ function pintarCalendario(d) {
     const k = `${calMes}-${dos(dia)}`, v = dias[k], ns = nots[k] || [];
     const alta = ns.filter(e => e.impacto === 'High'), media = ns.filter(e => e.impacto !== 'High');
     const fondo = v ? `background:${v.usd >= 0 ? 'rgba(47,224,122,' : 'rgba(255,95,95,'}${(0.07 + 0.3 * Math.min(1, Math.abs(v.usd) / maxAbs)).toFixed(3)})` : '';
-    const tit = [v ? `${usd(v.usd)} · ${v.ops} operaciones · ${v.ganadas} ganadas / ${v.perdidas} perdidas` : 'sin operaciones']
+    const tit = [v ? `${usd(v.usd)} · ${v.ops} operaciones · ${v.ganadas} ganadas / ${v.perdidas} perdidas`
+        + (v.maximo != null ? `\nmáximo del día ${usd(v.maximo)} · mínimo ${usd(v.minimo)}` : '') : 'sin operaciones']
       .concat(ns.map(e => `${e.hora} ${e.titulo} (${e.impacto === 'High' ? 'alto' : 'medio'})`)).join('\n');
     celdas.push(`<button type="button" class="cal-d${k === hoy ? ' hoy' : ''}${k > hoy ? ' futuro' : ''}${k === calSel ? ' sel' : ''}"
         data-dia="${k}" style="${fondo}" title="${esc(tit)}">
       <span class="n">${dia}</span>
       ${ns.length ? `<span class="pnts">${alta.length ? '<i class="pnt alta"></i>' : ''}${media.length ? '<i class="pnt media"></i>' : ''}</span>` : ''}
       ${v ? `<span class="u ${clase(v.usd)}">${usd(v.usd)}</span><span class="o">${v.ops} op · ${v.wr}%</span>` : ''}
+      ${v && v.maximo != null ? `<span class="mm"><span class="pos">▲${usd(v.maximo).replace('$', '')}</span><span class="${clase(v.minimo)}">▼${usd(v.minimo).replace('$', '')}</span></span>` : ''}
     </button>`);
   }
   $('calGrid').innerHTML = celdas.join('');
@@ -2377,7 +2380,8 @@ function pintarCalendario(d) {
         <div class="kpi"><dt>Acierto</dt><dd>${v.wr}%</dd></div>
         <div class="kpi"><dt>Ganada media</dt><dd class="pos">${v.media_ganada == null ? '–' : usd(v.media_ganada)}</dd></div>
         <div class="kpi"><dt>Perdida media</dt><dd class="neg">${v.media_perdida == null ? '–' : usd(v.media_perdida)}</dd></div>
-        <div class="kpi"><dt>Mejor · peor</dt><dd class="chico"><span class="pos">${usd(v.mejor)}</span> · <span class="neg">${usd(v.peor)}</span></dd></div>
+        <div class="kpi"><dt>Mejor operación</dt><dd class="${clase(v.mejor)}">${usd(v.mejor)}</dd><div class="nota">la peor <b class="${clase(v.peor)}">${usd(v.peor)}</b></div></div>
+        <div class="kpi"><dt>Máximo del día</dt><dd class="${clase(v.maximo)}">${usd(v.maximo)}</dd><div class="nota" title="lo más arriba y lo más abajo que llegó la ganancia del día">mínimo <b class="${clase(v.minimo)}">${usd(v.minimo)}</b></div></div>
       </dl>` : '<p class="ayuda" style="margin:0">Ese día no hubo operaciones.</p>')
     + (ns.length ? `<div style="margin-top:10px">${ns.map(e => `<div class="ev"><span class="imp ${e.impacto === 'High' ? 'alta' : 'media'}"></span>
         <span class="cuando num">${esc(h12(e.hora))}</span><span class="que">${esc(e.titulo)}<small>${esc(e.moneda)} · impacto ${e.impacto === 'High' ? 'alto' : 'medio'}</small></span></div>`).join('')}</div>` : '');

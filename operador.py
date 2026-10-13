@@ -169,8 +169,12 @@ class Registro:
                 continue
             gana = f.get("resultado") == "GANA" if f.get("resultado") else x > 0
             d = por.setdefault(f["fecha"], dict(usd=0.0, ops=0, ganadas=0, perdidas=0, g=0.0, p=0.0,
-                                                mejor=None, peor=None))
+                                                mejor=None, peor=None, maximo=0.0, minimo=0.0))
             d["usd"] += x
+            # lo más arriba y lo más abajo que llegó el día, sumando las operaciones en el orden en
+            # que se cerraron (el del CSV). Se cuenta desde 0: un día que solo sube tiene mínimo 0.
+            d["maximo"] = max(d["maximo"], d["usd"])
+            d["minimo"] = min(d["minimo"], d["usd"])
             d["ops"] += 1
             d["ganadas" if gana else "perdidas"] += 1
             d["g" if gana else "p"] += x
@@ -180,7 +184,8 @@ class Registro:
                               wr=round(100 * v["ganadas"] / v["ops"], 1),
                               media_ganada=round(v["g"] / v["ganadas"], 4) if v["ganadas"] else None,
                               media_perdida=round(v["p"] / v["perdidas"], 4) if v["perdidas"] else None,
-                              mejor=v["mejor"], peor=v["peor"])
+                              mejor=v["mejor"], peor=v["peor"],
+                              maximo=round(v["maximo"], 4), minimo=round(v["minimo"], 4))
                       for k, v in por.items()}
         self._sello_dias = sello
         return self._dias
